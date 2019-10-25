@@ -32,9 +32,6 @@ export async function run(): Promise<void> {
 
   const testsRoot = path.resolve(__dirname, "..");
 
-  // nyc.createTempDirectory(); // create nyc' temp directory
-  // nyc.wrap(); // hook into require() calls, etc.
-
   for (const file of glob.sync("**/**.test.js", { cwd: testsRoot })) {
     // FIXME: make flycheck not create these files
     if (file.search("flycheck_") === -1) {

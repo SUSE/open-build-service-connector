@@ -1,5 +1,6 @@
 import * as path from "path";
 
+import { userInfo } from "os";
 import { runTests } from "vscode-test";
 
 async function main() {
@@ -12,8 +13,24 @@ async function main() {
     // Passed to --extensionTestsPath
     const extensionTestsPath = path.resolve(__dirname, "./suite/index");
 
+    const launchArgs: string[] = [];
+
+    // vscode insiders must be launched with --no-sandbox when running as root
+    // (this should only happen on the CI anyway)
+    if (
+      process.env.VSCODE_VERSION !== undefined &&
+      process.env.VSCODE_VERSION === "insiders" &&
+      userInfo().uid === 0
+    ) {
+      launchArgs.push("--no-sandbox");
+    }
     // Download VS Code, unzip it and run the integration test
-    await runTests({ extensionDevelopmentPath, extensionTestsPath });
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath,
+      launchArgs,
+      version: process.env.VSCODE_VERSION
+    });
   } catch (err) {
     console.error("Failed to run tests");
     process.exit(1);

@@ -3,6 +3,8 @@
   "displayName": "vscode-obs",
   "description": "Wrapper for the Open Build Service",
   "version": "0.0.1",
+  "publisher": "SUSE",
+  "repository": "https://gitlab.suse.de/dancermak/vscode-obs",
   "engines": {
     "vscode": "^1.37.0"
   },
@@ -108,11 +110,16 @@
     "pretest": "yarn run compile",
     "test": "node ./out/test/runTest.js",
     "coverage": "COVERAGE=1 yarn run test && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
-    "clean": "rm -rf ./out ./coverage"
+    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output",
+    "cleandeps": "rm -rf node_modules/",
+    "package": "vsce package --yarn"
   },
+  "_comment": "FIXME: need to drag in config-ini-parser and xml2js in from obs-ts, remove this once obs-ts has been properly released",
   "dependencies": {
     "keytar": "^5.0.0-beta.3",
-    "obs-ts": "https://gitlab.suse.de/dancermak/obs.ts.git"
+    "obs-ts": "https://gitlab.suse.de/dancermak/obs.ts.git",
+    "config-ini-parser": "^1.2.2",
+    "xml2js": "^0.4.22"
   },
   "devDependencies": {
     "@types/chai": "^4.2.3",
@@ -134,6 +141,7 @@
     "tslint": "^5.12.1",
     "tslint-config-prettier": "^1.18.0",
     "typescript": "^3.3.1",
+    "vsce": "^1.68.0",
     "vscode-test": "^1.0.2"
   }
 }

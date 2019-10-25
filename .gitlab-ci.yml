@@ -1,0 +1,52 @@
+stages:
+  - test
+variables:
+  DISPLAY: ':99.0'
+
+cache:
+  paths:
+    - node_modules/
+    - .vscode-test
+
+.node_env: &setup_env
+  before_script:
+    - apt -y update
+    - apt -y install libsecret-1-dev libnss3 libgtk-3-0 libxss1 libasound2 jq xvfb
+    - curl http://ca.suse.de/certificates/ca/SUSE_Trust_Root.crt -o SUSE_Trust_Root.crt
+    - "[[ $(openssl x509 -noout -fingerprint -sha512 -inform pem -in SUSE_Trust_Root.crt) = 'SHA512 Fingerprint=CC:73:71:70:7C:E0:AA:EC:EA:C0:E5:3B:9D:E7:ED:20:FF:B5:F2:28:E6:16:66:5D:03:6D:17:5F:59:05:99:00:C1:0B:7B:B7:D0:2A:14:21:84:A9:FC:7F:3D:D7:FC:C1:F5:BD:8A:A1:50:CE:E5:B7:7C:DA:13:72:DB:17:D5:56' ]]"
+    - mv SUSE_Trust_Root.crt /usr/local/share/ca-certificates/
+    - update-ca-certificates
+    - yarn install || yarn install || yarn install
+    - "/usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &"
+
+.node_test: &run_tests
+  script:
+    - >
+      for VER in "1.37.0" "1.37.1" "1.38.0" "1.38.1" "1.39.0" "1.39.1" "1.39.2" "insiders"; do
+         export VSCODE_VERSION=${VER}
+         echo "Running tests for VSCode ${VER}"
+         yarn run test
+         # FIXME: coverage reporting is broken inside a container for the ordinary release
+         if [[ "${VER}" = "insiders" ]]; then
+             yarn run coverage
+         fi
+      done
+    - yarn run package
+
+tests_node_10:
+  image: node:10
+  <<: *setup_env
+  <<: *run_tests
+  artifacts:
+    paths:
+      - vscode-obs-*.vsix
+
+tests_node_12:
+  image: node:12
+  <<: *setup_env
+  <<: *run_tests
+
+tests_node_13:
+  image: node:13
+  <<: *setup_env
+  <<: *run_tests
