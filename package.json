@@ -1,0 +1,139 @@
+{
+  "name": "vscode-obs",
+  "displayName": "vscode-obs",
+  "description": "Wrapper for the Open Build Service",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.37.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:extension.helloWorld",
+    "onView:accountTree",
+    "onView:projectTree"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "obs-tree-view",
+          "title": "Open Build Service",
+          "icon": "media/obs-logo.svg"
+        }
+      ]
+    },
+    "views": {
+      "obs-tree-view": [
+        {
+          "id": "projectTree",
+          "name": "Projects"
+        },
+        {
+          "id": "accountTree",
+          "name": "Accounts"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "obsAccount.importAccountsFromOsrc",
+        "title": "Import accounts from osc's configuration file",
+        "icon": "media/ic_export_import.svg"
+      },
+      {
+        "command": "extension.signIn",
+        "title": "Sign in to the Open Build Service"
+      },
+      {
+        "command": "obsAccount.modifyAccountProperty",
+        "title": "Modify this account property",
+        "when": "view == accountTree",
+        "icon": "media/Toicon-icon-lines-and-angles-edit.svg"
+      },
+      {
+        "command": "obsAccount.removeAccount",
+        "title": "Remove this account",
+        "when": "view == accountTree && viewItem == account",
+        "icon": "media/Remove_font_awesome.svg"
+      },
+      {
+        "command": "obsProject.addProjectToBookmarks",
+        "title": "Add a project to the bookmarked projects",
+        "icon": "media/Plus_font_awesome.svg"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "obsAccount.importAccountsFromOsrc",
+          "when": "view == accountTree"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "obsAccount.modifyAccountProperty",
+          "when": "view == accountTree && viewItem == accountPropertyElement",
+          "group": "inline"
+        },
+        {
+          "command": "obsAccount.modifyAccountProperty",
+          "when": "view == accountTree && viewItem == account",
+          "group": "inline"
+        },
+        {
+          "command": "obsAccount.removeAccount",
+          "when": "view == accountTree && viewItem == account",
+          "group": "inline"
+        },
+        {
+          "command": "obsProject.addProjectToBookmarks",
+          "when": "view == projectTree && viewItem == ObsServer",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Open Build Service"
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "yarn run compile",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "tslint --force --format verbose \"src/**/*.ts\"",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "yarn run compile",
+    "test": "node ./out/test/runTest.js",
+    "coverage": "COVERAGE=1 yarn run test && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
+    "clean": "rm -rf ./out ./coverage"
+  },
+  "dependencies": {
+    "keytar": "^5.0.0-beta.3",
+    "obs-ts": "https://gitlab.suse.de/dancermak/obs.ts.git"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.3",
+    "@types/chai-as-promised": "^7.1.2",
+    "@types/chai-things": "^0.0.34",
+    "@types/glob": "^7.1.1",
+    "@types/mocha": "^5.2.6",
+    "@types/node": "^12",
+    "@types/sinon": "^7.5.0",
+    "@types/vscode": "^1.37.0",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "chai-things": "^0.2.0",
+    "glob": "^7.1.4",
+    "mocha": "^6.1.4",
+    "nyc": "^14.1.1",
+    "sinon": "^7.5.0",
+    "ts-mock-imports": "^1.2.6",
+    "tslint": "^5.12.1",
+    "tslint-config-prettier": "^1.18.0",
+    "typescript": "^3.3.1",
+    "vscode-test": "^1.0.2"
+  }
+}
