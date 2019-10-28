@@ -4,6 +4,7 @@
   "description": "Wrapper for the Open Build Service",
   "version": "0.0.1",
   "publisher": "SUSE",
+  "license": "GPL-3.0-only",
   "repository": "https://gitlab.suse.de/dancermak/vscode-obs",
   "engines": {
     "vscode": "^1.37.0"
