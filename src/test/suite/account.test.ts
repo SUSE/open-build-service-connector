@@ -11,7 +11,9 @@ import { assert, fake, spy } from "sinon";
 import {
   AccountTreeElement,
   AccountTreeProvider,
-  AccountStorage
+  AccountStorage,
+  AccountPropertyTreeElement,
+  AccountPropertyAliasChildElement
 } from "../../accounts";
 
 use(chaiAsPromised);
@@ -68,6 +70,160 @@ describe("AccountTreeProvider", () => {
       assert.calledOnce(this.mockMemento.get);
       assert.notCalled(this.mockMemento.update);
       assert.notCalled(this.keytarGetPasswordMock);
+    });
+  });
+
+  describe("#getChildren", () => {
+    beforeEach(async function() {
+      this.callMe = setupFakeExistingAccount;
+      this.callMe();
+
+      this.otherFakePresentAccount = {
+        accountName: "boo",
+        aliases: ["b", "oo"],
+        apiUrl: "https://api.boo.xyz",
+        username: "booUser",
+        email: "boo@fear.xyz",
+        realname: "Boo Fearfull"
+      };
+
+      this.mockMemento.get = fake.returns([
+        this.fakePresentAccount,
+        this.otherFakePresentAccount
+      ]);
+
+      this.testAccount = new AccountTreeProvider(this.mockMemento);
+      await this.testAccount.initAccounts().should.be.fulfilled;
+    });
+
+    it("returns two top level entries", async function() {
+      const treeNodes = await this.testAccount.getChildren(undefined).should.be
+        .fulfilled;
+
+      treeNodes.should.be
+        .a("array")
+        .and.to.have.length(2)
+        .and.all.have.property("contextValue", "account")
+        .and.to.include.a.item.with.property(
+          "label",
+          this.fakePresentAccount.accountName
+        )
+        .and.to.include.a.item.with.property(
+          "label",
+          this.otherFakePresentAccount.accountName
+        );
+    });
+
+    it("returns only elements for defined account properties", async function() {
+      const rootElem = new AccountTreeElement(this.fakePresentAccount);
+      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
+        .fulfilled;
+
+      treeNodes.should.be
+        .a("array")
+        .and.have.length(3)
+        .and.all.have.property("contextValue")
+        .and.all.have.property("property")
+        .and.to.include.a.item.with.property(
+          "label",
+          `Url to the API: ${this.fakePresentAccount.apiUrl}`
+        )
+        .and.to.include.a.item.with.property("label", "password")
+        .and.to.include.a.item.with.property(
+          "label",
+          `username: ${this.fakePresentAccount.username}`
+        )
+        .and.all.have.property("parent");
+
+      treeNodes.forEach((node: AccountPropertyTreeElement) => {
+        node.should.have.property("parent").that.equals(rootElem);
+      });
+    });
+
+    it("creates AccountPropertyTreeElements with the correct contextValue", async function() {
+      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
+      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
+        .fulfilled;
+
+      treeNodes.should.be
+        .a("array")
+        .and.to.have.length(6)
+        .and.all.have.property("contextValue");
+
+      treeNodes
+        .find((node: AccountPropertyTreeElement) => node.property === "aliases")
+        .should.have.property(
+          "contextValue",
+          "immutableAccountPropertyElement"
+        );
+
+      treeNodes
+        .filter(
+          (node: AccountPropertyTreeElement) => node.property !== "aliases"
+        )
+        .should.have.length(5)
+        .and.to.all.have.property("contextValue", "accountPropertyElement");
+    });
+
+    it("creates elements for each alias", async function() {
+      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
+      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
+        .fulfilled;
+
+      treeNodes.should.include.a.item.with.property("label", "Aliases");
+
+      const aliasElements = await this.testAccount.getChildren(
+        treeNodes.find(
+          (node: AccountPropertyTreeElement) => node.property === "aliases"
+        )
+      ).should.be.fulfilled;
+
+      aliasElements.should.be
+        .a("array")
+        .and.to.have.length(2)
+        .and.all.have.property("contextValue", "accountAliasElement")
+        .and.to.include.a.item.with.property("alias", "b")
+        .and.to.include.a.item.with.property("alias", "oo");
+    });
+
+    it("returns nothing for non-alias properties", async function() {
+      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
+      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
+        .fulfilled;
+
+      const nonAliasElements = treeNodes.filter(
+        (node: AccountPropertyTreeElement) => node.property !== "aliases"
+      );
+      nonAliasElements.should.not.be.undefined;
+
+      await Promise.all(
+        nonAliasElements.map(async (elem: AccountPropertyTreeElement) => {
+          const children = await this.testAccount.getChildren(elem).should.be
+            .fulfilled;
+          children.should.be.a("array").and.have.length(0);
+        })
+      );
+    });
+
+    it("returns nothing for alias elements", async function() {
+      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
+      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
+        .fulfilled;
+
+      const aliasElement = treeNodes.find(
+        (node: AccountPropertyTreeElement) => node.property === "aliases"
+      );
+      aliasElement.should.not.be.undefined;
+
+      await Promise.all(
+        (await this.testAccount.getChildren(aliasElement)).map(
+          async (elem: AccountPropertyAliasChildElement) => {
+            const children = await this.testAccount.getChildren(elem).should.be
+              .fulfilled;
+            children.should.be.a("array").and.have.length(0);
+          }
+        )
+      );
     });
   });
 
