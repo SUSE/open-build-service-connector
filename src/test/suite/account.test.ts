@@ -8,17 +8,25 @@ import * as chaiThings from "chai-things";
 import { ImportMock } from "ts-mock-imports";
 import { assert, fake, spy } from "sinon";
 
-import { AccountTreeElement, AccountTreeProvider } from "../../accounts";
+import {
+  AccountTreeElement,
+  AccountTreeProvider,
+  AccountStorage
+} from "../../accounts";
 
 use(chaiAsPromised);
 use(chaiThings);
 should();
 
+/**
+ * Initialize a fake Memento and a fake existing account that the Memento
+ * returns.
+ */
 function setupFakeExistingAccount(this: any) {
   this.fakePresentAccount = {
     accountName: "foo",
     aliases: [],
-    apiUrl: "api.baz.org",
+    apiUrl: "https://api.baz.org",
     username: "fooUser"
   };
   this.mockMemento = {
@@ -41,7 +49,7 @@ describe("AccountTreeProvider", () => {
     );
   });
 
-  describe("No accounts stored", function() {
+  describe("No accounts stored", () => {
     beforeEach(function() {
       this.mockMemento = {
         get: fake.returns([]),
@@ -49,8 +57,9 @@ describe("AccountTreeProvider", () => {
       };
     });
 
-    it("returns no top level children", function() {
+    it("returns no top level children", async function() {
       const testAccount = new AccountTreeProvider(this.mockMemento);
+      await testAccount.initAccounts().should.be.fulfilled;
 
       expect(testAccount.getChildren(undefined))
         .to.eventually.be.a("array")
@@ -66,35 +75,32 @@ describe("AccountTreeProvider", () => {
     beforeEach(setupFakeExistingAccount);
 
     it("imports an account with a set password", async function() {
-      const fakeOscrcAccount = {
+      const fakeNewOscrcAccount = {
         aliases: [],
         username: "barUser",
         password: "barrr",
-        apiUrl: "api.bar.org"
+        apiUrl: "https://api.bar.org"
       };
 
       this.readAccountsFromOscrcMock.returns(
-        Promise.resolve([fakeOscrcAccount])
+        Promise.resolve([fakeNewOscrcAccount])
       );
 
       const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.importAccountsFromOsrc();
+      await testAccount.initAccounts().should.be.fulfilled;
+      await testAccount.importAccountsFromOsrc().should.be.fulfilled;
 
-      assert.calledOnce(this.mockMemento.get);
-
-      assert.calledOnce(this.mockMemento.update);
-      assert.notCalled(this.keytarGetPasswordMock);
       assert.calledOnce(this.keytarSetPasswordMock);
 
       expect(this.keytarSetPasswordMock.getCall(0).args).to.include.members([
-        "api.bar.org",
+        "https://api.bar.org",
         "barrr"
       ]);
       expect(this.mockMemento.update.getCall(0).args).to.deep.include([
         this.fakePresentAccount,
         {
-          accountName: "api.bar.org",
-          ...(({ password, ...others }) => ({ ...others }))(fakeOscrcAccount)
+          accountName: "https://api.bar.org",
+          ...(({ password, ...others }) => ({ ...others }))(fakeNewOscrcAccount)
         }
       ]);
     });
@@ -102,7 +108,7 @@ describe("AccountTreeProvider", () => {
     it("imports an account without a set password", async function() {
       const fakeOscrcAccount = {
         aliases: [],
-        apiUrl: "api.bar.org",
+        apiUrl: "https://api.bar.org",
         password: undefined,
         username: "barUser"
       };
@@ -112,18 +118,15 @@ describe("AccountTreeProvider", () => {
       );
 
       const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.importAccountsFromOsrc();
+      await testAccount.initAccounts().should.be.fulfilled;
+      await testAccount.importAccountsFromOsrc().should.be.fulfilled;
 
-      assert.calledOnce(this.mockMemento.get);
-
-      assert.calledOnce(this.mockMemento.update);
-      assert.notCalled(this.keytarGetPasswordMock);
       assert.notCalled(this.keytarSetPasswordMock);
 
       expect(this.mockMemento.update.getCall(0).args[1]).to.eql([
         this.fakePresentAccount,
         {
-          accountName: "api.bar.org",
+          accountName: "https://api.bar.org",
           ...(({ password, ...others }) => ({ ...others }))(fakeOscrcAccount)
         }
       ]);
@@ -132,7 +135,7 @@ describe("AccountTreeProvider", () => {
     it("doesn't import a present account", async function() {
       const fakeOscrcAccount = {
         aliases: [],
-        apiUrl: "api.baz.org",
+        apiUrl: "https://api.baz.org",
         password: undefined,
         username: "barUser"
       };
@@ -142,17 +145,18 @@ describe("AccountTreeProvider", () => {
       );
 
       const testAccount = new AccountTreeProvider(this.mockMemento);
+      await testAccount.initAccounts().should.be.fulfilled;
+
+      const curConEventSpy = spy();
+      testAccount.onConnectionChange(curConEventSpy);
+
       await testAccount.importAccountsFromOsrc().should.be.fulfilled;
 
-      assert.calledOnce(this.mockMemento.get);
-
-      assert.notCalled(this.mockMemento.update);
-      assert.notCalled(this.keytarGetPasswordMock);
-      assert.notCalled(this.keytarSetPasswordMock);
+      assert.notCalled(curConEventSpy);
     });
   });
 
-  describe("#removeAccount", function() {
+  describe("#removeAccount", () => {
     beforeEach(setupFakeExistingAccount);
 
     it("removes a present account", async function() {
@@ -160,8 +164,10 @@ describe("AccountTreeProvider", () => {
       this.keytarDeletePasswordMock.resolves(true);
 
       const testAccount = new AccountTreeProvider(this.mockMemento);
+      await testAccount.initAccounts().should.be.fulfilled;
+
       await testAccount.removeAccount(
-        new AccountTreeElement("foo", this.fakePresentAccount)
+        new AccountTreeElement(this.fakePresentAccount)
       ).should.be.fulfilled;
 
       assert.calledOnce(this.keytarDeletePasswordMock);
@@ -179,9 +185,10 @@ describe("AccountTreeProvider", () => {
       this.keytarDeletePasswordMock.resolves(false);
 
       const testAccount = new AccountTreeProvider(this.mockMemento);
+      await testAccount.initAccounts().should.be.fulfilled;
 
       await testAccount
-        .removeAccount(new AccountTreeElement("foo", this.fakePresentAccount))
+        .removeAccount(new AccountTreeElement(this.fakePresentAccount))
         .should.be.rejectedWith(
           `Cannot remove password for account ${this.fakePresentAccount.accountName}`
         );
@@ -215,13 +222,18 @@ describe("AccountTreeProvider", () => {
       expect(curConEventSpy.getCall(0).args).to.have.length(1);
       const curCons = curConEventSpy.getCall(0).args[0];
 
-      expect(curCons).to.have.property("connections");
-      expect([...curCons.connections.values()])
-        .to.have.length(1)
-        .and.to.include.an.item.with.property(
-          "username",
-          this.fakePresentAccount.username
-        );
+      expect(curCons).to.have.property("mapping");
+      const mappings: Array<[AccountStorage, obs.Connection | undefined]> = [
+        ...curCons.mapping.values()
+      ];
+      expect(mappings).to.have.length(1);
+      // AccountStorage
+      expect(mappings[0][0]).to.include({ ...this.fakePresentAccount });
+      // Connection is not undefined
+      expect(mappings[0][1]).to.have.property(
+        "url",
+        this.fakePresentAccount.apiUrl
+      );
     });
 
     it("sets the default connection when only one account is present", async function() {
@@ -236,8 +248,8 @@ describe("AccountTreeProvider", () => {
       const curCons = curConEventSpy.getCall(0).args[0];
 
       expect(curCons)
-        .to.have.property("defaultConnection")
-        .that.has.property("username", this.fakePresentAccount.username);
+        .to.have.property("defaultApi")
+        .that.equals(obs.normalizeUrl(this.fakePresentAccount.apiUrl));
     });
 
     it("does nothing when called a second time", async function() {

@@ -1,10 +1,8 @@
-import * as vscode from "vscode";
-import { Project } from "obs-ts";
-import { CurrentConnections, AccountStorage } from "./accounts";
 import { assert } from "console";
-import { inspect } from "util";
+import { AccountStorage, ApiAccountMapping, ApiUrl } from "./accounts";
+import { Project } from "obs-ts";
+import * as vscode from "vscode";
 
-type ApiUrl = string;
 const projectBookmarkStorageKey: string = "vscodeObs.ProjectTree.Projects";
 
 class ObsServerTreeElement extends vscode.TreeItem {
@@ -53,7 +51,7 @@ export class ProjectTreeProvider
 
   private bookmarkedProjects: Map<ApiUrl, string[]>;
 
-  private currentConnections: CurrentConnections;
+  private currentConnections: ApiAccountMapping;
 
   private onDidChangeTreeDataEmitter: vscode.EventEmitter<
     ProjectTreeItem | undefined
@@ -61,21 +59,20 @@ export class ProjectTreeProvider
 
   constructor(
     public globalState: vscode.Memento,
-    onAccountChange: vscode.Event<CurrentConnections>
+    onAccountChange: vscode.Event<ApiAccountMapping>
   ) {
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
     this.bookmarkedProjects = new Map(
       globalState.get<Array<[ApiUrl, string[]]>>(projectBookmarkStorageKey, [])
     );
-    console.log(this.bookmarkedProjects);
     this.currentConnections = {
-      connections: new Map(),
-      defaultConnection: undefined
+      mapping: new Map(),
+      defaultApi: undefined
     };
 
     onAccountChange(curCon => {
       this.currentConnections = curCon;
-      this.onDidChangeTreeDataEmitter.fire();
+      this.refresh();
     }, this);
   }
 
@@ -93,23 +90,22 @@ export class ProjectTreeProvider
     // - 1 account => don't show a server top level entry
     // - >1 accounts => show an entry for each server first
     if (element === undefined) {
-      if (this.currentConnections.connections.size === 0) {
+      if (this.currentConnections.mapping.size === 0) {
         return Promise.resolve([]);
-      } else if (this.currentConnections.connections.size === 1) {
-        const accounts = [...this.currentConnections.connections.keys()];
+      } else if (this.currentConnections.mapping.size === 1) {
+        const accounts = [...this.currentConnections.mapping.values()];
         assert(accounts.length === 1);
-        return this.getProjectTreeElements(accounts[0]);
+        return this.getProjectTreeElements(accounts[0][0]);
       } else {
-        const accounts = [...this.currentConnections.connections.keys()];
+        const accounts = [...this.currentConnections.mapping.values()];
         return Promise.resolve(
-          accounts.map(acc => {
+          accounts.map(([acc, _con]) => {
             return new ObsServerTreeElement(acc);
           })
         );
       }
     }
 
-    console.log(inspect(element));
     if (isObsServerTreeElement(element)) {
       return this.getProjectTreeElements(element.account);
     }
@@ -133,8 +129,6 @@ export class ProjectTreeProvider
       }
     });
 
-    console.log(`projectName: ${projectName}`);
-
     if (projectName === undefined) {
       return;
     }
@@ -142,7 +136,6 @@ export class ProjectTreeProvider
   }
 
   private async saveBookmarkedProjects(): Promise<void> {
-    console.log([...this.bookmarkedProjects.entries()]);
     await this.globalState.update(projectBookmarkStorageKey, [
       ...this.bookmarkedProjects.entries()
     ]);
@@ -159,13 +152,31 @@ export class ProjectTreeProvider
     const curAccountBookmarks = this.bookmarkedProjects.get(account.apiUrl);
     assert(curAccountBookmarks !== undefined);
 
-    console.log(curAccountBookmarks);
     // Project has already been added
     if (
       curAccountBookmarks!.find(projName => projectName === projName) !==
       undefined
     ) {
       return;
+    }
+
+    // Try to fetch the project, if we get an error, don't add it (unless the
+    // user really wants it...)
+    try {
+      await Project.getProject(
+        this.currentConnections.mapping.get(account.apiUrl)![1]!,
+        projectName
+      );
+    } catch (err) {
+      const selected = await vscode.window.showErrorMessage(
+        `Adding a bookmark of the project ${projectName} for the account ${account.accountName} failed with: ${err}.`,
+        "Add anyway",
+        "Cancel"
+      );
+      if (selected === undefined || selected === "Cancel") {
+        return;
+      }
+      assert(selected === "Add anyway");
     }
 
     curAccountBookmarks!.push(projectName);
@@ -180,8 +191,6 @@ export class ProjectTreeProvider
     account: AccountStorage
   ): Thenable<ProjectTreeElement[]> {
     const projects = this.bookmarkedProjects.get(account.apiUrl);
-    console.log("projects");
-    console.log(inspect(projects));
 
     return projects === undefined
       ? Promise.resolve([])
@@ -192,7 +201,7 @@ export class ProjectTreeProvider
                 // FIXME: handle failures
                 await Project.getProject(
                   // FIXME: handle failure
-                  this.currentConnections.connections.get(account)!,
+                  this.currentConnections.mapping.get(account.apiUrl)![1]!,
                   proj
                 )
               )
