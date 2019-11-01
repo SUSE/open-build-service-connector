@@ -42,6 +42,11 @@
     },
     "commands": [
       {
+        "command": "obsProject.removeBookmark",
+        "title": "Remove this Bookmark",
+        "icon": "media/Remove_font_awesome.svg"
+      },
+      {
         "command": "obsAccount.importAccountsFromOsrc",
         "title": "Import accounts from osc's configuration file",
         "icon": "media/ic_export_import.svg"
@@ -94,6 +99,11 @@
         {
           "command": "obsProject.addProjectToBookmarks",
           "when": "view == projectTree && viewItem == ObsServer",
+          "group": "inline"
+        },
+        {
+          "command": "obsProject.removeBookmark",
+          "when": "view == projectTree && viewItem == project",
           "group": "inline"
         }
       ]

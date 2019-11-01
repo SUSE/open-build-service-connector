@@ -1,11 +1,11 @@
 import { assert } from "console";
-import { AccountStorage, ApiAccountMapping, ApiUrl } from "./accounts";
 import { Project } from "obs-ts";
 import * as vscode from "vscode";
+import { AccountStorage, ApiAccountMapping, ApiUrl } from "./accounts";
 
 const projectBookmarkStorageKey: string = "vscodeObs.ProjectTree.Projects";
 
-class ObsServerTreeElement extends vscode.TreeItem {
+export class ObsServerTreeElement extends vscode.TreeItem {
   public contextValue = "ObsServer";
 
   constructor(public account: AccountStorage) {
@@ -13,24 +13,24 @@ class ObsServerTreeElement extends vscode.TreeItem {
   }
 }
 
-function isObsServerTreeElement(
+export function isObsServerTreeElement(
   treeItem: ProjectTreeItem
 ): treeItem is ObsServerTreeElement {
-  return (
-    (treeItem as ObsServerTreeElement).account !== undefined &&
-    treeItem.contextValue === "ObsServer"
-  );
+  return treeItem.contextValue === "ObsServer";
 }
 
-class ProjectTreeElement extends vscode.TreeItem {
+export class ProjectTreeElement extends vscode.TreeItem {
   public contextValue = "project";
 
-  constructor(public project: Project.Project) {
+  constructor(
+    public readonly project: Project.Project,
+    public readonly account: AccountStorage
+  ) {
     super(project.name, vscode.TreeItemCollapsibleState.Collapsed);
   }
 }
 
-function isProjectTreeElement(
+export function isProjectTreeElement(
   treeItem: ProjectTreeItem
 ): treeItem is ProjectTreeElement {
   return (treeItem as ProjectTreeElement).project !== undefined;
@@ -39,11 +39,23 @@ function isProjectTreeElement(
 class PackageTreeElement extends vscode.TreeItem {}
 class FileTreeElement extends vscode.TreeItem {}
 
-type ProjectTreeItem =
+export type ProjectTreeItem =
   | ObsServerTreeElement
   | ProjectTreeElement
   | PackageTreeElement
   | FileTreeElement;
+
+export function getProjectOfTreeItem(
+  treeItem: ProjectTreeItem
+): Project.Project | undefined {
+  if (isObsServerTreeElement(treeItem)) {
+    return undefined;
+  }
+  if (isProjectTreeElement(treeItem)) {
+    return treeItem.project;
+  }
+  return undefined;
+}
 
 export class ProjectTreeProvider
   implements vscode.TreeDataProvider<ProjectTreeItem> {
@@ -66,14 +78,33 @@ export class ProjectTreeProvider
       globalState.get<Array<[ApiUrl, string[]]>>(projectBookmarkStorageKey, [])
     );
     this.currentConnections = {
-      mapping: new Map(),
-      defaultApi: undefined
+      defaultApi: undefined,
+      mapping: new Map()
     };
 
     onAccountChange(curCon => {
       this.currentConnections = curCon;
       this.refresh();
     }, this);
+  }
+
+  public async removeBookmark(element?: ProjectTreeItem): Promise<void> {
+    // do nothing if the command was somehow invoked on the wrong tree item
+    if (element === undefined || !isProjectTreeElement(element)) {
+      // FIXME: log this
+      return;
+    }
+    const apiUrl = element.account.apiUrl;
+    const projects = this.bookmarkedProjects.get(apiUrl);
+    if (projects === undefined) {
+      // FIXME: log this
+      return;
+    }
+    this.bookmarkedProjects.set(
+      apiUrl,
+      projects.filter(projName => projName !== element.project.name)
+    );
+    await this.saveBookmarkedProjects();
   }
 
   public refresh(): void {
@@ -139,6 +170,7 @@ export class ProjectTreeProvider
     await this.globalState.update(projectBookmarkStorageKey, [
       ...this.bookmarkedProjects.entries()
     ]);
+    this.refresh();
   }
 
   private async addProjectToBookmarks(
@@ -203,7 +235,8 @@ export class ProjectTreeProvider
                   // FIXME: handle failure
                   this.currentConnections.mapping.get(account.apiUrl)![1]!,
                   proj
-                )
+                ),
+                account
               )
           )
         );

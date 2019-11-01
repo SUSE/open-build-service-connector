@@ -44,6 +44,12 @@ export async function activate(
     projectTreeProvider
   );
 
+  vscode.commands.registerCommand(
+    "obsProject.removeBookmark",
+    projectTreeProvider.removeBookmark,
+    projectTreeProvider
+  );
+
   const unimportedAccountsPresent = await accountTreeProvider.unimportedAccountsPresent();
 
   if (unimportedAccountsPresent) {
