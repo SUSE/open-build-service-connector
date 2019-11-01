@@ -37,6 +37,10 @@
         {
           "id": "accountTree",
           "name": "Accounts"
+        },
+        {
+          "id": "repositoryTree",
+          "name": "Repositories"
         }
       ]
     },

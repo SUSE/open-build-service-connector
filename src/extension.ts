@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 
 import { AccountTreeProvider } from "./accounts";
 import { ProjectTreeProvider } from "./project";
+import { RepositoryTreeProvider } from "./repository";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -31,6 +32,15 @@ export async function activate(
     showCollapseAll,
     treeDataProvider: projectTreeProvider
   });
+
+  const repoTreeProvider = new RepositoryTreeProvider(
+    projectTree.onDidChangeSelection
+  );
+  const repoTree = vscode.window.createTreeView("repositoryTree", {
+    showCollapseAll,
+    treeDataProvider: repoTreeProvider
+  });
+
   vscode.commands.registerCommand(
     "obsAccount.importAccountsFromOsrc",
     accountTreeProvider.importAccountsFromOsrc,
