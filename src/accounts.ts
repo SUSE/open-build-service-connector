@@ -517,6 +517,7 @@ export class AccountTreeProvider
       accountsToStore.push(acc);
     });
     await this.globalState.update(accountStorageKey, accountsToStore);
+    this.onConnectionChangeEmitter.fire(this.apiAccountMap);
     this.refresh();
   }
 }
