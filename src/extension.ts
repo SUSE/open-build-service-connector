@@ -11,6 +11,8 @@ import { ProjectTreeProvider } from "./project";
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
+  const showCollapseAll = true;
+
   const accountTreeProvider = new AccountTreeProvider(context.globalState);
 
   const projectTreeProvider = new ProjectTreeProvider(
@@ -20,7 +22,15 @@ export async function activate(
 
   await accountTreeProvider.initAccounts();
 
-  vscode.window.registerTreeDataProvider("accountTree", accountTreeProvider);
+  const accountTree = vscode.window.createTreeView("accountTree", {
+    showCollapseAll,
+    treeDataProvider: accountTreeProvider
+  });
+
+  const projectTree = vscode.window.createTreeView("projectTree", {
+    showCollapseAll,
+    treeDataProvider: projectTreeProvider
+  });
   vscode.commands.registerCommand(
     "obsAccount.importAccountsFromOsrc",
     accountTreeProvider.importAccountsFromOsrc,
@@ -37,7 +47,6 @@ export async function activate(
     accountTreeProvider
   );
 
-  vscode.window.registerTreeDataProvider("projectTree", projectTreeProvider);
   vscode.commands.registerCommand(
     "obsProject.addProjectToBookmarks",
     projectTreeProvider.addProjectToBookmarksTreeButton,
