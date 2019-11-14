@@ -1,5 +1,5 @@
 import { assert } from "console";
-import { Project } from "obs-ts";
+import { Project, getProject } from "obs-ts";
 import * as vscode from "vscode";
 import { AccountStorage, ApiAccountMapping, ApiUrl } from "./accounts";
 
@@ -23,7 +23,7 @@ export class ProjectTreeElement extends vscode.TreeItem {
   public contextValue = "project";
 
   constructor(
-    public readonly project: Project.Project,
+    public readonly project: Project,
     public readonly account: AccountStorage
   ) {
     super(project.name, vscode.TreeItemCollapsibleState.Collapsed);
@@ -47,7 +47,7 @@ export type ProjectTreeItem =
 
 export function getProjectOfTreeItem(
   treeItem: ProjectTreeItem
-): Project.Project | undefined {
+): Project | undefined {
   if (isObsServerTreeElement(treeItem)) {
     return undefined;
   }
@@ -195,7 +195,7 @@ export class ProjectTreeProvider
     // Try to fetch the project, if we get an error, don't add it (unless the
     // user really wants it...)
     try {
-      await Project.getProject(
+      await getProject(
         this.currentConnections.mapping.get(account.apiUrl)![1]!,
         projectName
       );
@@ -231,7 +231,7 @@ export class ProjectTreeProvider
             async proj =>
               new ProjectTreeElement(
                 // FIXME: handle failures
-                await Project.getProject(
+                await getProject(
                   // FIXME: handle failure
                   this.currentConnections.mapping.get(account.apiUrl)![1]!,
                   proj

@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 
-import { Project } from "obs-ts";
+import { Arch, Path, Project, Repository } from "obs-ts";
 import { getProjectOfTreeItem, ProjectTreeItem } from "./project";
 
 class RepositoryRootElement extends vscode.TreeItem {
   public contextValue = "repositoryRoot";
 
-  constructor(public repository: Project.Repository) {
+  constructor(public repository: Repository) {
     super(repository.name, vscode.TreeItemCollapsibleState.Collapsed);
   }
 }
@@ -20,7 +20,7 @@ function isRepositoryRootElement(
 class RepositoryPathRootElement extends vscode.TreeItem {
   public contextValue = "pathRoot";
 
-  constructor(public paths: Project.Path[]) {
+  constructor(public paths: Path[]) {
     super("Paths", vscode.TreeItemCollapsibleState.Collapsed);
   }
 }
@@ -34,7 +34,7 @@ function isRepositoryPathRootElement(
 class RepositoryPathElement extends vscode.TreeItem {
   public contextValue = "repositoryPath";
 
-  constructor(public path: Project.Path) {
+  constructor(public path: Path) {
     super(
       `${path.project}/${path.repository}`,
       vscode.TreeItemCollapsibleState.None
@@ -45,7 +45,7 @@ class RepositoryPathElement extends vscode.TreeItem {
 class RepositoryArchRootElement extends vscode.TreeItem {
   public contextValue = "architectureRoot";
 
-  constructor(public architectures: Project.Arch[]) {
+  constructor(public architectures: Arch[]) {
     super("Architectures", vscode.TreeItemCollapsibleState.Collapsed);
   }
 }
@@ -59,7 +59,7 @@ function isRepositoryArchRootElement(
 class RepositoryArchElement extends vscode.TreeItem {
   public contextValue = "architecture";
 
-  constructor(public architecture: Project.Arch) {
+  constructor(public architecture: Arch) {
     super(architecture, vscode.TreeItemCollapsibleState.None);
   }
 }
@@ -75,7 +75,7 @@ export class RepositoryTreeProvider
   implements vscode.TreeDataProvider<RepositoryElement> {
   public onDidChangeTreeData: vscode.Event<RepositoryElement | undefined>;
 
-  public project: Project.Project | undefined;
+  public project: Project | undefined;
 
   private onDidChangeTreeDataEmitter: vscode.EventEmitter<
     RepositoryElement | undefined
