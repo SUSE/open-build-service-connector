@@ -1,10 +1,10 @@
 import * as keytar from "keytar";
 import * as obs from "obs-ts";
 
-import { afterEach, beforeEach, describe, it } from "mocha";
-import { expect, use, should } from "chai";
+import { expect, should, use } from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import * as chaiThings from "chai-things";
+import { afterEach, beforeEach, describe, it } from "mocha";
 import { ImportMock } from "ts-mock-imports";
 import { assert, fake, spy } from "sinon";
 
@@ -16,8 +16,8 @@ import {
   AccountPropertyAliasChildElement
 } from "../../accounts";
 
-use(chaiAsPromised);
 use(chaiThings);
+use(chaiAsPromised);
 should();
 
 /**
@@ -28,7 +28,7 @@ function setupFakeExistingAccount(this: any) {
   this.fakePresentAccount = {
     accountName: "foo",
     aliases: [],
-    apiUrl: "https://api.baz.org",
+    apiUrl: "https://api.baz.org/",
     username: "fooUser"
   };
   this.mockMemento = {
