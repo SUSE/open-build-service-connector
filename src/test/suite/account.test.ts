@@ -1,19 +1,17 @@
-import * as keytar from "keytar";
-import * as obs from "obs-ts";
-
 import { expect, should, use } from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import * as chaiThings from "chai-things";
+import * as keytar from "keytar";
 import { afterEach, beforeEach, describe, it } from "mocha";
-import { ImportMock } from "ts-mock-imports";
+import * as obs from "obs-ts";
 import { assert, fake, spy } from "sinon";
-
+import { ImportMock } from "ts-mock-imports";
 import {
-  AccountTreeElement,
-  AccountTreeProvider,
-  AccountStorage,
+  AccountPropertyAliasChildElement,
   AccountPropertyTreeElement,
-  AccountPropertyAliasChildElement
+  AccountStorage,
+  AccountTreeElement,
+  AccountTreeProvider
 } from "../../accounts";
 
 use(chaiThings);
@@ -202,7 +200,7 @@ describe("AccountTreeProvider", () => {
             .fulfilled;
           children.should.be.a("array").and.have.length(0);
         })
-      );
+      ).should.be.fulfilled;
     });
 
     it("returns nothing for alias elements", async function() {

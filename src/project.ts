@@ -1,5 +1,5 @@
-import { assert } from "console";
-import { Project, getProject } from "obs-ts";
+import * as assert from "assert";
+import { getProject, Project } from "obs-ts";
 import * as vscode from "vscode";
 import { AccountStorage, ApiAccountMapping, ApiUrl } from "./accounts";
 
@@ -130,7 +130,7 @@ export class ProjectTreeProvider
       } else {
         const accounts = [...this.currentConnections.mapping.values()];
         return Promise.resolve(
-          accounts.map(([acc, _con]) => {
+          accounts.map(([acc, _]) => {
             return new ObsServerTreeElement(acc);
           })
         );

@@ -1,8 +1,7 @@
 "use strict";
 
-import { assert } from "console";
+import * as assert from "assert";
 import * as vscode from "vscode";
-
 import { AccountTreeProvider } from "./accounts";
 import { ProjectTreeProvider } from "./project";
 import { RepositoryTreeProvider } from "./repository";

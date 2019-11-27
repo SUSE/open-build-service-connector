@@ -1,6 +1,6 @@
+import * as assert from "assert";
+import { Arch, BaseRepository, Path, Project } from "obs-ts";
 import * as vscode from "vscode";
-
-import { Arch, Path, Project, Repository } from "obs-ts";
 import { getProjectOfTreeItem, ProjectTreeItem } from "./project";
 
 class RepositoryRootElement extends vscode.TreeItem {

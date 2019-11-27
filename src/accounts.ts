@@ -1,17 +1,15 @@
 "use strict";
 
-import { assert } from "console";
+import * as assert from "assert";
 import * as keytar from "keytar";
-import * as path from "path";
-import * as vscode from "vscode";
-
 import {
   Account,
   Connection,
   normalizeUrl,
   readAccountsFromOscrc
 } from "obs-ts";
-
+import * as path from "path";
+import * as vscode from "vscode";
 import { setDifference } from "./util";
 
 /**
@@ -269,7 +267,7 @@ export class AccountTreeProvider
     // top level element => list of accounts
     if (element === undefined) {
       const accountElements: AccountTreeElement[] = [];
-      this.apiAccountMap.mapping.forEach(([acc, _con], _apiUrl) => {
+      this.apiAccountMap.mapping.forEach(([acc, _], __) => {
         accountElements.push(new AccountTreeElement(acc));
       });
       return Promise.resolve(accountElements);
