@@ -13,7 +13,7 @@ async function main() {
     // Passed to --extensionTestsPath
     const extensionTestsPath = path.resolve(__dirname, "./suite/index");
 
-    const launchArgs: string[] = [];
+    const launchArgs = ["--disable-extensions"];
 
     // vscode insiders must be launched with --no-sandbox when running as root
     // (this should only happen on the CI anyway)
@@ -32,7 +32,6 @@ async function main() {
       version: process.env.VSCODE_VERSION
     });
   } catch (err) {
-    console.error("Failed to run tests");
     process.exit(1);
   }
 }
