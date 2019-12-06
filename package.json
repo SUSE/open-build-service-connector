@@ -13,12 +13,71 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:extension.helloWorld",
-    "onView:accountTree",
-    "onView:projectTree"
+    "onView:projectTree",
+    "onView:repositoryTree"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Open Build Service",
+      "properties": {
+        "vscode-obs.accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "An account for an instance of the Open Build Service",
+            "properties": {
+              "accountName": {
+                "type": "string",
+                "description": "A name for this account"
+              },
+              "apiUrl": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              },
+              "realname": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "isDefault": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "username",
+              "apiUrl"
+            ]
+          },
+          "scope": "application",
+          "default": [],
+          "description": "Accounts for instances of the Open Build Service"
+        },
+        "vscode-obs.checkUnimportedAccounts": {
+          "type": "boolean",
+          "description": "Specify whether the extension will check for accounts in your .oscrc that have not been imported into VSCode",
+          "default": true,
+          "scope": "application"
+        },
+        "vscode-obs.logLevel": {
+          "type": "string",
+          "description": "Default logging level used",
+          "enum": [
+            "trace",
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "fatal"
+          ],
+          "default": "info"
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -33,10 +92,6 @@
         {
           "id": "projectTree",
           "name": "Projects"
-        },
-        {
-          "id": "accountTree",
-          "name": "Accounts"
         },
         {
           "id": "repositoryTree",
@@ -56,19 +111,17 @@
         "icon": "media/ic_export_import.svg"
       },
       {
-        "command": "extension.signIn",
-        "title": "Sign in to the Open Build Service"
+        "command": "obsAccount.setAccountPassword",
+        "title": "Set the password of a Build Service Account"
       },
       {
         "command": "obsAccount.modifyAccountProperty",
         "title": "Modify this account property",
-        "when": "view == accountTree",
         "icon": "media/Toicon-icon-lines-and-angles-edit.svg"
       },
       {
         "command": "obsAccount.removeAccount",
-        "title": "Remove this account",
-        "when": "view == accountTree && viewItem == account",
+        "title": "Remove an account from the settings",
         "icon": "media/Remove_font_awesome.svg"
       },
       {
@@ -111,9 +164,6 @@
           "group": "inline"
         }
       ]
-    },
-    "configuration": {
-      "title": "Open Build Service"
     }
   },
   "scripts": {
@@ -123,9 +173,10 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile",
-    "test": "node ./out/test/runTest.js",
-    "coverage": "COVERAGE=1 yarn run test && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
-    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation",
+    "test": "./runTests.sh",
+    "precoverage": "yarn run compile",
+    "coverage": "COVERAGE=1 ./runTests.sh && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
+    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources",
     "cleandeps": "rm -rf node_modules/",
     "package": "vsce package --yarn",
     "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --out ./documentation src/"
@@ -135,6 +186,7 @@
     "config-ini-parser": "^1.2.2",
     "keytar": "^5.0.0-beta.3",
     "obs-ts": "https://gitlab.suse.de/dancermak/obs.ts.git",
+    "pino": "^5.14.0",
     "xml2js": "^0.4.22"
   },
   "devDependencies": {
@@ -144,6 +196,7 @@
     "@types/glob": "^7.1.1",
     "@types/mocha": "^5.2.6",
     "@types/node": "^12",
+    "@types/pino": "^5.8.13",
     "@types/sinon": "^7.5.0",
     "@types/vscode": "^1.37.0",
     "chai": "^4.2.0",
@@ -152,12 +205,13 @@
     "glob": "^7.1.4",
     "mocha": "^6.1.4",
     "nyc": "^14.1.1",
+    "pino-pretty": "^3.5.0",
     "sinon": "^7.5.0",
     "ts-mock-imports": "^1.2.6",
     "tslint": "^5.12.1",
     "tslint-config-prettier": "^1.18.0",
     "typedoc": "^0.15.0",
-    "typescript": "^3.3.1",
+    "typescript": "^3.7.0",
     "vsce": "^1.68.0",
     "vscode-test": "^1.0.2"
   }

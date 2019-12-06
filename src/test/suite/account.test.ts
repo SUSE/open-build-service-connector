@@ -4,38 +4,103 @@ import * as chaiThings from "chai-things";
 import * as keytar from "keytar";
 import { afterEach, beforeEach, describe, it } from "mocha";
 import * as obs from "obs-ts";
-import { assert, fake, spy } from "sinon";
+import * as pino from "pino";
+import { createSandbox, match, SinonSandbox } from "sinon";
 import { ImportMock } from "ts-mock-imports";
+import * as vscode from "vscode";
 import {
-  AccountPropertyAliasChildElement,
-  AccountPropertyTreeElement,
+  AccountManager,
   AccountStorage,
-  AccountTreeElement,
-  AccountTreeProvider
+  ApiAccountMapping,
+  configurationAccounts,
+  configurationCheckUnimportedAccounts,
+  configurationExtensionName
 } from "../../accounts";
 
 use(chaiThings);
 use(chaiAsPromised);
 should();
 
-/**
- * Initialize a fake Memento and a fake existing account that the Memento
- * returns.
- */
-function setupFakeExistingAccount(this: any) {
-  this.fakePresentAccount = {
-    accountName: "foo",
-    aliases: [],
-    apiUrl: "https://api.baz.org/",
-    username: "fooUser"
-  };
-  this.mockMemento = {
-    get: fake.returns([this.fakePresentAccount]),
-    update: fake.returns(Promise.resolve())
-  };
+const logger = pino({ level: "trace" }, pino.destination("./logfile.json"));
+
+const fakeAccount1 = {
+  accountName: "foo",
+  apiUrl: "https://api.baz.org/",
+  username: "fooUser"
+};
+
+const fakeAccount2 = {
+  accountName: "bar",
+  apiUrl: "https://api.obs.xyz/",
+  username: "barUser"
+};
+
+async function addFakeAcountsToConfig(
+  accounts: AccountStorage[]
+): Promise<void> {
+  await vscode.workspace
+    .getConfiguration(configurationExtensionName)
+    .update(configurationAccounts, accounts, vscode.ConfigurationTarget.Global);
 }
 
-describe("AccountTreeProvider", () => {
+async function waitForEvent<T>(
+  event: vscode.Event<T>
+): Promise<vscode.Disposable> {
+  return new Promise(resolve => {
+    const disposable = event(_ => {
+      resolve(disposable);
+    });
+  });
+}
+
+async function executeAndWaitForEvent<T, ET>(
+  func: () => Thenable<T>,
+  event: vscode.Event<ET>
+): Promise<T> {
+  const [res, disposable] = await Promise.all([func(), waitForEvent(event)]);
+  disposable.dispose();
+  return res;
+}
+
+function extractApiAccountMapFromSpy(
+  onConnectionChangeSpy: sinon.SinonSpy,
+  call: number = 0
+): ApiAccountMapping {
+  return onConnectionChangeSpy.getCall(call).args[0] as ApiAccountMapping;
+}
+
+class FakeAccountFixture {
+  public sandbox: SinonSandbox;
+  constructor(public readonly fakeAccounts: AccountStorage[]) {
+    this.sandbox = createSandbox();
+  }
+
+  public async beforeEach(context: Mocha.Context) {
+    await addFakeAcountsToConfig(this.fakeAccounts);
+
+    context.sandbox = this.sandbox;
+
+    context.curConEventSpy = this.sandbox.spy();
+
+    context.vscodeWindow = {
+      showErrorMessage: this.sandbox.stub(),
+      showInformationMessage: this.sandbox.stub(),
+      showInputBox: this.sandbox.stub(),
+      showQuickPick: this.sandbox.stub()
+    };
+
+    context.mngr = new AccountManager(logger, context.vscodeWindow);
+    context.mngr.onConnectionChange(context.curConEventSpy);
+  }
+
+  public afterEach(context: Mocha.Context) {
+    context.mngr.dispose();
+
+    this.sandbox.restore();
+  }
+}
+
+describe("AccountManager", () => {
   beforeEach(function() {
     this.keytarGetPasswordMock = ImportMock.mockFunction(keytar, "getPassword");
     this.keytarSetPasswordMock = ImportMock.mockFunction(keytar, "setPassword");
@@ -47,378 +112,713 @@ describe("AccountTreeProvider", () => {
       obs,
       "readAccountsFromOscrc"
     );
+
+    this.accountSettingsBackup = vscode.workspace
+      .getConfiguration(configurationExtensionName)
+      .get<AccountStorage[]>(configurationAccounts, []);
   });
 
-  describe("No accounts stored", () => {
-    beforeEach(function() {
-      this.mockMemento = {
-        get: fake.returns([]),
-        update: fake.returns(Promise.resolve())
-      };
-    });
+  afterEach(async function() {
+    this.keytarGetPasswordMock.restore();
+    this.keytarSetPasswordMock.restore();
+    this.keytarDeletePasswordMock.restore();
+    this.readAccountsFromOscrcMock.restore();
 
-    it("returns no top level children", async function() {
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.initAccounts().should.be.fulfilled;
-
-      expect(testAccount.getChildren(undefined))
-        .to.eventually.be.a("array")
-        .and.to.have.length(0);
-
-      assert.calledOnce(this.mockMemento.get);
-      assert.notCalled(this.mockMemento.update);
-      assert.notCalled(this.keytarGetPasswordMock);
-    });
+    await vscode.workspace
+      .getConfiguration(configurationExtensionName)
+      .update(
+        configurationAccounts,
+        this.accountSettingsBackup,
+        vscode.ConfigurationTarget.Global
+      );
   });
 
-  describe("#getChildren", () => {
+  describe("No accounts present", () => {
+    const fixture = new FakeAccountFixture([]);
+
     beforeEach(async function() {
-      this.callMe = setupFakeExistingAccount;
-      this.callMe();
-
-      this.otherFakePresentAccount = {
-        accountName: "boo",
-        aliases: ["b", "oo"],
-        apiUrl: "https://api.boo.xyz",
-        username: "booUser",
-        email: "boo@fear.xyz",
-        realname: "Boo Fearfull"
-      };
-
-      this.mockMemento.get = fake.returns([
-        this.fakePresentAccount,
-        this.otherFakePresentAccount
-      ]);
-
-      this.testAccount = new AccountTreeProvider(this.mockMemento);
-      await this.testAccount.initAccounts().should.be.fulfilled;
+      await fixture.beforeEach(this);
     });
 
-    it("returns two top level entries", async function() {
-      const treeNodes = await this.testAccount.getChildren(undefined).should.be
-        .fulfilled;
-
-      treeNodes.should.be
-        .a("array")
-        .and.to.have.length(2)
-        .and.all.have.property("contextValue", "account")
-        .and.to.include.a.item.with.property(
-          "label",
-          this.fakePresentAccount.accountName
-        )
-        .and.to.include.a.item.with.property(
-          "label",
-          this.otherFakePresentAccount.accountName
-        );
+    afterEach(function() {
+      fixture.afterEach(this);
     });
 
-    it("returns only elements for defined account properties", async function() {
-      const rootElem = new AccountTreeElement(this.fakePresentAccount);
-      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
-        .fulfilled;
+    it("AccountManager has no connections", async function() {
+      await this.mngr.initializeMapping().should.be.fulfilled;
 
-      treeNodes.should.be
-        .a("array")
-        .and.have.length(3)
-        .and.all.have.property("contextValue")
-        .and.all.have.property("property")
-        .and.to.include.a.item.with.property(
-          "label",
-          `Url to the API: ${this.fakePresentAccount.apiUrl}`
-        )
-        .and.to.include.a.item.with.property("label", "password")
-        .and.to.include.a.item.with.property(
-          "label",
-          `username: ${this.fakePresentAccount.username}`
-        )
-        .and.all.have.property("parent");
+      this.sandbox.assert.calledOnce(this.curConEventSpy);
 
-      treeNodes.forEach((node: AccountPropertyTreeElement) => {
-        node.should.have.property("parent").that.equals(rootElem);
+      expect(this.curConEventSpy.getCall(0).args[0]).to.deep.equal({
+        defaultApi: undefined,
+        mapping: new Map()
       });
     });
 
-    it("creates AccountPropertyTreeElements with the correct contextValue", async function() {
-      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
-      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
-        .fulfilled;
+    it("fires the onConnectionChange Event when adding accounts", async function() {
+      await this.mngr.initializeMapping().should.be.fulfilled;
+      this.sandbox.assert.calledOnce(this.curConEventSpy);
 
-      treeNodes.should.be
-        .a("array")
-        .and.to.have.length(6)
-        .and.all.have.property("contextValue");
+      await executeAndWaitForEvent(
+        () => addFakeAcountsToConfig([fakeAccount2]),
+        this.mngr.onConnectionChange
+      );
 
-      treeNodes
-        .find((node: AccountPropertyTreeElement) => node.property === "aliases")
-        .should.have.property(
-          "contextValue",
-          "immutableAccountPropertyElement"
+      this.sandbox.assert.calledTwice(this.curConEventSpy);
+    });
+  });
+
+  describe("#configurationChangeListener", () => {
+    const fixture = new FakeAccountFixture([fakeAccount1, fakeAccount2]);
+
+    beforeEach(async function() {
+      await fixture.beforeEach(this);
+      await this.mngr.initializeMapping();
+      this.curConEventSpy.resetHistory();
+
+      this.vscodeWindow.showErrorMessage.resolves();
+    });
+
+    afterEach(function() {
+      fixture.afterEach(this);
+    });
+
+    const runRejectionTest = async (
+      ctx: Mocha.Context,
+      faultyAccounts: AccountStorage[]
+    ) => {
+      // change the configuration to something invalid => fires the
+      // onDidChangeConfiguration event, our listener intercepts that and rolls
+      // the config back, firing the event again
+      await executeAndWaitForEvent(
+        () => addFakeAcountsToConfig(faultyAccounts),
+        vscode.workspace.onDidChangeConfiguration
+      );
+
+      await waitForEvent(vscode.workspace.onDidChangeConfiguration);
+
+      ctx.sandbox.assert.calledOnce(ctx.vscodeWindow.showErrorMessage);
+      ctx.sandbox.assert.notCalled(ctx.curConEventSpy);
+    };
+
+    it("rejects invalid urls", async function() {
+      await runRejectionTest(this, [
+        { accountName: "foo", username: "bar", apiUrl: "" }
+      ]);
+
+      expect(this.vscodeWindow.showErrorMessage.getCall(0).args[0])
+        .to.be.a("string")
+        .and.to.match(/invalid url/i);
+    });
+
+    it("rejects empty usernames", async function() {
+      await runRejectionTest(this, [
+        {
+          accountName: "foo",
+          apiUrl: "https://api.opensuse.org",
+          username: ""
+        }
+      ]);
+
+      expect(this.vscodeWindow.showErrorMessage.getCall(0).args[0])
+        .to.be.a("string")
+        .and.to.match(/username.*empty/i);
+    });
+
+    it("rejects two default accounts", async function() {
+      await runRejectionTest(this, [
+        {
+          accountName: "foo",
+          apiUrl: "https://api.opensuse.org",
+          isDefault: true,
+          username: "foo"
+        },
+        {
+          accountName: "bar",
+          apiUrl: "https://api.opensuse.org",
+          isDefault: true,
+          username: "baz"
+        }
+      ]);
+
+      expect(this.vscodeWindow.showErrorMessage.getCall(0).args[0])
+        .to.be.a("string")
+        .and.to.match(/more than one default account/i);
+    });
+  });
+
+  describe("import Accounts From ~/.config/osc/osrc", () => {
+    const fixture = new FakeAccountFixture([fakeAccount1, fakeAccount2]);
+
+    const setCheckForUnimportedAccounts = async (
+      setting: boolean
+    ): Promise<void> =>
+      // executeAndWaitForEvent(
+      //  async () =>
+      vscode.workspace
+        .getConfiguration(configurationExtensionName)
+        .update(
+          configurationCheckUnimportedAccounts,
+          setting,
+          vscode.ConfigurationTarget.Global
+        ); //,
+    //vscode.workspace.onDidChangeConfiguration
+    //);
+
+    beforeEach(async function() {
+      await fixture.beforeEach(this);
+      this.unimportedAccountsSetting = vscode.workspace
+        .getConfiguration(configurationExtensionName)
+        .get(configurationCheckUnimportedAccounts);
+    });
+
+    afterEach(async function() {
+      fixture.afterEach(this);
+      await vscode.workspace
+        .getConfiguration(configurationExtensionName)
+        .update(
+          configurationCheckUnimportedAccounts,
+          this.unimportedAccountsSetting,
+          vscode.ConfigurationTarget.Global
+        );
+    });
+
+    describe("#importAccountsFromOsrc", () => {
+      it("imports an account with a set password", async function() {
+        let apiUrl = "https://api.bar.org";
+        const password = "barrr";
+        const fakeNewOscrcAccount = {
+          aliases: [],
+          apiUrl,
+          password,
+          username: "barUser"
+        };
+        // ensure that everything that follows uses the normalized url
+        apiUrl = obs.normalizeUrl(apiUrl);
+
+        this.keytarGetPasswordMock.resolves(password);
+        this.readAccountsFromOscrcMock.resolves([fakeNewOscrcAccount]);
+
+        await this.mngr.initializeMapping().should.be.fulfilled;
+        this.curConEventSpy.resetHistory();
+
+        await executeAndWaitForEvent(
+          async () => this.mngr.importAccountsFromOsrc(),
+          this.mngr.onConnectionChange
         );
 
-      treeNodes
-        .filter(
-          (node: AccountPropertyTreeElement) => node.property !== "aliases"
-        )
-        .should.have.length(5)
-        .and.to.all.have.property("contextValue", "accountPropertyElement");
+        this.sandbox.assert.calledWith(
+          this.keytarSetPasswordMock.firstCall,
+          match.string,
+          apiUrl,
+          password
+        );
+        this.sandbox.assert.calledWithMatch(
+          this.keytarGetPasswordMock,
+          match.string,
+          apiUrl
+        );
+
+        this.sandbox.assert.calledOnce(this.curConEventSpy);
+        expect(this.curConEventSpy.getCall(0).args[0])
+          .to.have.property("mapping")
+          .that.is.a("Map");
+
+        // the event listener will get the current apiUrl to account map
+        const curCons = extractApiAccountMapFromSpy(this.curConEventSpy);
+        expect([...curCons.mapping.keys()])
+          .to.have.length(3)
+          .and.include(apiUrl);
+
+        // the map should contain a mapping for our apiUrl and the Connection
+        // should have a set value
+        let accountStorageAndConnection = curCons.mapping.get(apiUrl);
+        expect(accountStorageAndConnection)
+          .to.be.an("array")
+          .that.has.length(2);
+        accountStorageAndConnection = accountStorageAndConnection!;
+
+        expect(accountStorageAndConnection[0]).to.deep.equal({
+          accountName: apiUrl,
+          apiUrl,
+          username: "barUser"
+        });
+
+        let con = accountStorageAndConnection[1];
+        expect(con).to.not.be.undefined;
+
+        con = con!;
+        expect(con).to.deep.include({
+          password,
+          url: apiUrl
+        });
+      });
+
+      it("imports an account without a set password", async function() {
+        const fakeOscrcAccount = {
+          aliases: [],
+          apiUrl: "https://api.bar.org",
+          username: "barUser"
+        };
+
+        this.readAccountsFromOscrcMock.resolves([fakeOscrcAccount]);
+
+        await this.mngr.initializeMapping().should.be.fulfilled;
+        this.curConEventSpy.resetHistory();
+
+        await executeAndWaitForEvent(
+          () => this.mngr.importAccountsFromOsrc(),
+          this.mngr.onConnectionChange
+        );
+
+        this.sandbox.assert.notCalled(this.keytarSetPasswordMock);
+
+        this.sandbox.assert.calledOnce(this.curConEventSpy);
+        const curCons = this.curConEventSpy.getCall(0)
+          .args[0] as ApiAccountMapping;
+
+        const apiUrl = obs.normalizeUrl(fakeOscrcAccount.apiUrl);
+
+        expect([...curCons.mapping.keys()])
+          .to.have.length(3)
+          .and.to.contain(apiUrl);
+        // Connection object should be undefined, as it doesn't know the password
+        expect(curCons.mapping.get(apiUrl)![1]).to.be.undefined;
+      });
+
+      it("doesn't import a present account", async function() {
+        this.readAccountsFromOscrcMock.resolves([fakeAccount1]);
+
+        await this.mngr.initializeMapping().should.be.fulfilled;
+        this.curConEventSpy.resetHistory();
+
+        await this.mngr.importAccountsFromOsrc();
+
+        this.sandbox.assert.notCalled(this.curConEventSpy);
+      });
     });
 
-    it("creates elements for each alias", async function() {
-      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
-      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
-        .fulfilled;
-
-      treeNodes.should.include.a.item.with.property("label", "Aliases");
-
-      const aliasElements = await this.testAccount.getChildren(
-        treeNodes.find(
-          (node: AccountPropertyTreeElement) => node.property === "aliases"
-        )
-      ).should.be.fulfilled;
-
-      aliasElements.should.be
-        .a("array")
-        .and.to.have.length(2)
-        .and.all.have.property("contextValue", "accountAliasElement")
-        .and.to.include.a.item.with.property("alias", "b")
-        .and.to.include.a.item.with.property("alias", "oo");
-    });
-
-    it("returns nothing for non-alias properties", async function() {
-      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
-      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
-        .fulfilled;
-
-      const nonAliasElements = treeNodes.filter(
-        (node: AccountPropertyTreeElement) => node.property !== "aliases"
-      );
-      nonAliasElements.should.not.be.undefined;
-
-      await Promise.all(
-        nonAliasElements.map(async (elem: AccountPropertyTreeElement) => {
-          const children = await this.testAccount.getChildren(elem).should.be
-            .fulfilled;
-          children.should.be.a("array").and.have.length(0);
-        })
-      ).should.be.fulfilled;
-    });
-
-    it("returns nothing for alias elements", async function() {
-      const rootElem = new AccountTreeElement(this.otherFakePresentAccount);
-      const treeNodes = await this.testAccount.getChildren(rootElem).should.be
-        .fulfilled;
-
-      const aliasElement = treeNodes.find(
-        (node: AccountPropertyTreeElement) => node.property === "aliases"
-      );
-      aliasElement.should.not.be.undefined;
-
-      await Promise.all(
-        (await this.testAccount.getChildren(aliasElement)).map(
-          async (elem: AccountPropertyAliasChildElement) => {
-            const children = await this.testAccount.getChildren(elem).should.be
-              .fulfilled;
-            children.should.be.a("array").and.have.length(0);
-          }
-        )
-      );
-    });
-  });
-
-  describe("#importAccountsFromOsrc", function() {
-    beforeEach(setupFakeExistingAccount);
-
-    it("imports an account with a set password", async function() {
+    describe("#promptForUninmportedAccount", () => {
+      const apiUrl = "https://api.bar.org";
+      const newPassword = "barrr";
       const fakeNewOscrcAccount = {
         aliases: [],
-        username: "barUser",
-        password: "barrr",
-        apiUrl: "https://api.bar.org"
-      };
-
-      this.readAccountsFromOscrcMock.returns(
-        Promise.resolve([fakeNewOscrcAccount])
-      );
-
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.initAccounts().should.be.fulfilled;
-      await testAccount.importAccountsFromOsrc().should.be.fulfilled;
-
-      assert.calledOnce(this.keytarSetPasswordMock);
-
-      expect(this.keytarSetPasswordMock.getCall(0).args).to.include.members([
-        "https://api.bar.org",
-        "barrr"
-      ]);
-      expect(this.mockMemento.update.getCall(0).args).to.deep.include([
-        this.fakePresentAccount,
-        {
-          accountName: "https://api.bar.org",
-          ...(({ password, ...others }) => ({ ...others }))(fakeNewOscrcAccount)
-        }
-      ]);
-    });
-
-    it("imports an account without a set password", async function() {
-      const fakeOscrcAccount = {
-        aliases: [],
-        apiUrl: "https://api.bar.org",
-        password: undefined,
+        apiUrl,
+        password: newPassword,
         username: "barUser"
       };
 
-      this.readAccountsFromOscrcMock.returns(
-        Promise.resolve([fakeOscrcAccount])
-      );
+      beforeEach(async function() {
+        await setCheckForUnimportedAccounts(true);
 
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.initAccounts().should.be.fulfilled;
-      await testAccount.importAccountsFromOsrc().should.be.fulfilled;
+        await this.mngr.initializeMapping();
+        this.sandbox.assert.notCalled(this.readAccountsFromOscrcMock);
+        this.curConEventSpy.resetHistory();
+      });
 
-      assert.notCalled(this.keytarSetPasswordMock);
+      it("does nothing when the user does not wish to be prompted for uninmported accounts", async function() {
+        await setCheckForUnimportedAccounts(false);
 
-      expect(this.mockMemento.update.getCall(0).args[1]).to.eql([
-        this.fakePresentAccount,
-        {
-          accountName: "https://api.bar.org",
-          ...(({ password, ...others }) => ({ ...others }))(fakeOscrcAccount)
-        }
-      ]);
-    });
+        await this.mngr.promptForUninmportedAccount().should.be.fulfilled;
 
-    it("doesn't import a present account", async function() {
-      const fakeOscrcAccount = {
-        aliases: [],
-        apiUrl: "https://api.baz.org",
-        password: undefined,
-        username: "barUser"
-      };
+        this.sandbox.assert.notCalled(this.vscodeWindow.showInformationMessage);
+      });
 
-      this.readAccountsFromOscrcMock.returns(
-        Promise.resolve([fakeOscrcAccount])
-      );
+      it("checks for uninmported accounts, but does not prompt the user if none are to be imported", async function() {
+        this.readAccountsFromOscrcMock.resolves([fakeAccount1]);
 
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.initAccounts().should.be.fulfilled;
+        await this.mngr.promptForUninmportedAccount().should.be.fulfilled;
 
-      const curConEventSpy = spy();
-      testAccount.onConnectionChange(curConEventSpy);
+        this.sandbox.assert.notCalled(this.vscodeWindow.showInformationMessage);
+        this.sandbox.assert.calledOnce(this.readAccountsFromOscrcMock);
+      });
 
-      await testAccount.importAccountsFromOsrc().should.be.fulfilled;
+      it("does nothing if the user let's the prompt time out", async function() {
+        this.readAccountsFromOscrcMock.resolves([fakeNewOscrcAccount]);
+        this.vscodeWindow.showInformationMessage.resolves();
 
-      assert.notCalled(curConEventSpy);
+        await this.mngr.promptForUninmportedAccount().should.be.fulfilled;
+
+        this.sandbox.assert.calledOnce(
+          this.vscodeWindow.showInformationMessage
+        );
+        this.sandbox.assert.calledWith(
+          this.vscodeWindow.showInformationMessage,
+          match("not been imported into Visual Studio Code"),
+          "Import accounts now",
+          "Never show this message again"
+        );
+        this.sandbox.assert.calledOnce(this.readAccountsFromOscrcMock);
+        this.sandbox.assert.notCalled(this.keytarSetPasswordMock);
+      });
+
+      it("writes the config if the user never wants to get bothered again", async function() {
+        this.readAccountsFromOscrcMock.resolves([fakeNewOscrcAccount]);
+        this.vscodeWindow.showInformationMessage.resolves(
+          "Never show this message again"
+        );
+
+        await this.mngr.promptForUninmportedAccount().should.be.fulfilled;
+
+        this.sandbox.assert.calledOnce(
+          this.vscodeWindow.showInformationMessage
+        );
+
+        this.sandbox.assert.calledOnce(this.readAccountsFromOscrcMock);
+        this.sandbox.assert.notCalled(this.keytarSetPasswordMock);
+
+        expect(
+          vscode.workspace
+            .getConfiguration(configurationExtensionName)
+            .get(configurationCheckUnimportedAccounts)
+        ).to.be.false;
+      });
+
+      it("actually imports the account if the user wants to", async function() {
+        this.readAccountsFromOscrcMock.resolves([fakeNewOscrcAccount]);
+        this.vscodeWindow.showInformationMessage.resolves(
+          "Import accounts now"
+        );
+
+        await this.mngr.promptForUninmportedAccount().should.be.fulfilled;
+
+        this.sandbox.assert.calledOnce(
+          this.vscodeWindow.showInformationMessage
+        );
+
+        this.sandbox.assert.calledOnce(this.readAccountsFromOscrcMock);
+        this.sandbox.assert.calledOnce(this.keytarSetPasswordMock);
+        this.sandbox.assert.calledWith(
+          this.keytarSetPasswordMock.firstCall,
+          match.string,
+          obs.normalizeUrl(apiUrl),
+          newPassword
+        );
+
+        expect(
+          vscode.workspace
+            .getConfiguration(configurationExtensionName)
+            .get(configurationCheckUnimportedAccounts)
+        ).to.be.true;
+      });
     });
   });
 
-  describe("#removeAccount", () => {
-    beforeEach(setupFakeExistingAccount);
+  describe("#removeAccountPassword", () => {
+    const fixture = new FakeAccountFixture([fakeAccount1, fakeAccount2]);
 
-    it("removes a present account", async function() {
+    beforeEach(async function() {
+      await fixture.beforeEach(this);
+      await this.mngr.initializeMapping();
+    });
+
+    afterEach(function() {
+      fixture.afterEach(this);
+    });
+
+    it("removes a present password", async function() {
       // removal succeeds
       this.keytarDeletePasswordMock.resolves(true);
 
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.initAccounts().should.be.fulfilled;
+      await this.mngr.removeAccountPassword(fakeAccount1.apiUrl).should.be
+        .fulfilled;
 
-      await testAccount.removeAccount(
-        new AccountTreeElement(this.fakePresentAccount)
-      ).should.be.fulfilled;
-
-      assert.calledOnce(this.keytarDeletePasswordMock);
-      assert.calledOnce(this.mockMemento.get);
-      assert.calledOnce(this.mockMemento.update);
-
-      expect(this.keytarDeletePasswordMock.getCall(0).args).to.deep.include(
-        this.fakePresentAccount.apiUrl
+      this.sandbox.assert.calledWith(
+        this.keytarDeletePasswordMock.firstCall,
+        match.string,
+        fakeAccount1.apiUrl
       );
-      expect(this.mockMemento.update.getCall(0).args[1]).to.eql([]);
     });
 
     it("reports an error when password removal fails", async function() {
       // pw removal fails
       this.keytarDeletePasswordMock.resolves(false);
 
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.initAccounts().should.be.fulfilled;
+      await this.mngr.removeAccountPassword(fakeAccount1.apiUrl).should.be
+        .rejected;
+    });
 
-      await testAccount
-        .removeAccount(new AccountTreeElement(this.fakePresentAccount))
-        .should.be.rejectedWith(
-          `Cannot remove password for account ${this.fakePresentAccount.accountName}`
-        );
+    it("does nothing when the apiUrl does not exist", async function() {
+      await this.mngr.removeAccountPassword("https://bla.xyz").should.be
+        .fulfilled;
 
-      assert.calledOnce(this.keytarDeletePasswordMock);
+      this.sandbox.assert.notCalled(this.keytarDeletePasswordMock);
     });
   });
 
-  describe("#initAccounts", () => {
-    beforeEach(function() {
-      this.callMe = setupFakeExistingAccount;
-      this.callMe();
+  describe("#initializeMapping", () => {
+    const fixture = new FakeAccountFixture([fakeAccount1]);
+
+    beforeEach(async function() {
+      await fixture.beforeEach(this);
       this.keytarGetPasswordMock.resolves("fooPw");
     });
 
-    it("populates the currentConnetions and fires the event", async function() {
-      const curConEventSpy = spy();
-
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      testAccount.onConnectionChange(curConEventSpy);
-      await testAccount.initAccounts().should.be.fulfilled;
-
-      // password was retrieved?
-      assert.calledOnce(this.keytarGetPasswordMock);
-      expect(this.keytarGetPasswordMock.getCall(0).args[1]).to.eql(
-        this.fakePresentAccount.apiUrl
-      );
-
-      // did the EventEmitter fire?
-      assert.calledOnce(curConEventSpy);
-      expect(curConEventSpy.getCall(0).args).to.have.length(1);
-      const curCons = curConEventSpy.getCall(0).args[0];
-
-      expect(curCons).to.have.property("mapping");
-      const mappings: Array<[AccountStorage, obs.Connection | undefined]> = [
-        ...curCons.mapping.values()
-      ];
-      expect(mappings).to.have.length(1);
-      // AccountStorage
-      expect(mappings[0][0]).to.include({ ...this.fakePresentAccount });
-      // Connection is not undefined
-      expect(mappings[0][1]).to.have.property(
-        "url",
-        this.fakePresentAccount.apiUrl
-      );
-    });
-
-    it("sets the default connection when only one account is present", async function() {
-      const curConEventSpy = spy();
-
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      testAccount.onConnectionChange(curConEventSpy);
-      await testAccount.initAccounts().should.be.fulfilled;
-
-      // did the EventEmitter fire?
-      assert.calledOnce(curConEventSpy);
-      const curCons = curConEventSpy.getCall(0).args[0];
-
-      expect(curCons)
-        .to.have.property("defaultApi")
-        .that.equals(obs.normalizeUrl(this.fakePresentAccount.apiUrl));
+    afterEach(function() {
+      fixture.afterEach(this);
     });
 
     it("does nothing when called a second time", async function() {
-      const testAccount = new AccountTreeProvider(this.mockMemento);
-      await testAccount.initAccounts().should.be.fulfilled;
-      await testAccount.initAccounts().should.be.fulfilled;
+      await this.mngr.initializeMapping().should.be.fulfilled;
+      this.sandbox.assert.calledOnce(this.curConEventSpy);
 
-      assert.calledOnce(this.keytarGetPasswordMock);
+      this.curConEventSpy.resetHistory();
+
+      await this.mngr.initializeMapping().should.be.fulfilled;
+      this.sandbox.assert.notCalled(this.curConEventSpy);
+    });
+
+    it("populates the Connetions and fires the event", async function() {
+      await this.mngr.initializeMapping().should.be.fulfilled;
+
+      // password was retrieved?
+      this.sandbox.assert.calledOnce(this.keytarGetPasswordMock);
+      expect(this.keytarGetPasswordMock.getCall(0).args[1]).to.eql(
+        fakeAccount1.apiUrl
+      );
+
+      // did the EventEmitter fire?
+      this.sandbox.assert.calledOnce(this.curConEventSpy);
+      expect(this.curConEventSpy.getCall(0).args).to.have.length(1);
+      const curCons = this.curConEventSpy.getCall(0).args[0];
+
+      expect(curCons)
+        .to.have.property("mapping")
+        .that.is.a("Map");
+      const mappings: Array<[AccountStorage, obs.Connection | undefined]> = [
+        ...curCons.mapping.values()
+      ];
+
+      expect(mappings).to.have.length(1);
+      // AccountStorage
+      expect(mappings[0][0]).to.include({ ...fakeAccount1 });
+      // Connection is not undefined
+      expect(mappings[0][1]).to.have.property("url", fakeAccount1.apiUrl);
+    });
+
+    it("sets the default connection when only one account is present", async function() {
+      await this.mngr.initializeMapping().should.be.fulfilled;
+
+      // did the EventEmitter fire?
+      this.sandbox.assert.calledOnce(this.curConEventSpy);
+      const curCons = this.curConEventSpy.getCall(0).args[0];
+
+      expect(curCons)
+        .to.have.property("defaultApi")
+        .that.equals(obs.normalizeUrl(fakeAccount1.apiUrl));
     });
   });
 
-  afterEach(function() {
-    this.keytarGetPasswordMock.restore();
-    this.keytarSetPasswordMock.restore();
-    this.keytarDeletePasswordMock.restore();
-    this.readAccountsFromOscrcMock.restore();
+  describe("#dispose", () => {
+    const fixture = new FakeAccountFixture([fakeAccount1, fakeAccount2]);
+
+    beforeEach(async function() {
+      await fixture.beforeEach(this);
+      this.keytarGetPasswordMock.resolves("barPw");
+
+      // the configurationChangeListener will try to remove the passwords of the
+      // two present accounts
+      this.keytarDeletePasswordMock.resolves(true);
+    });
+
+    afterEach(function() {
+      fixture.afterEach(this);
+    });
+
+    it("stops the onConnectionChangeEmitter", async function() {
+      await this.mngr.initializeMapping();
+
+      this.sandbox.assert.calledOnce(this.curConEventSpy);
+      this.curConEventSpy.resetHistory();
+
+      await executeAndWaitForEvent(
+        () => addFakeAcountsToConfig([]),
+        this.mngr.onConnectionChange
+      );
+
+      this.sandbox.assert.calledOnce(this.curConEventSpy);
+
+      this.mngr.dispose();
+
+      this.curConEventSpy.resetHistory();
+      await addFakeAcountsToConfig([fakeAccount1]);
+      this.sandbox.assert.notCalled(this.curConEventSpy);
+    });
+  });
+
+  describe("accounts without a password", () => {
+    const fixture = new FakeAccountFixture([fakeAccount1, fakeAccount2]);
+
+    beforeEach(async function() {
+      await fixture.beforeEach(this);
+
+      await this.mngr.initializeMapping();
+      this.keytarGetPasswordMock.resetHistory();
+
+      // this.keytarGetPasswordMock.onCall(0).resolves("foo");
+      // this.keytarGetPasswordMock.onCall(1).resolves(null);
+    });
+
+    afterEach(function() {
+      fixture.afterEach(this);
+    });
+
+    describe("#findAccountsWithoutPassword", () => {
+      it("finds the account with no password in the keyring", async function() {
+        this.keytarGetPasswordMock.onCall(0).resolves("foo");
+        this.keytarGetPasswordMock.onCall(1).resolves(null);
+
+        await this.mngr
+          .findAccountsWithoutPassword()
+          .should.be.fulfilled.and.eventually.deep.equal([fakeAccount2]);
+
+        this.sandbox.assert.calledTwice(this.keytarGetPasswordMock);
+      });
+    });
+
+    describe("#promptForNotPresentAccountPasswords", () => {
+      it("doesn't prompt the user when all accounts have a password", async function() {
+        this.keytarGetPasswordMock.resolves("foo");
+
+        await this.mngr.promptForNotPresentAccountPasswords().should.be
+          .fulfilled;
+
+        this.sandbox.assert.notCalled(this.vscodeWindow.showInformationMessage);
+      });
+
+      it("does nothing when the prompt times out", async function() {
+        this.keytarGetPasswordMock.resolves(null);
+
+        this.vscodeWindow.showInformationMessage.resolves(undefined);
+
+        await this.mngr.promptForNotPresentAccountPasswords().should.be
+          .fulfilled;
+
+        this.sandbox.assert.calledWith(
+          this.vscodeWindow.showInformationMessage.firstCall,
+          "The following accounts have no password set: foo, bar. Would you like to set them now?",
+          "Yes",
+          "No"
+        );
+
+        this.sandbox.assert.notCalled(this.vscodeWindow.showInputBox);
+      });
+
+      it("does nothing when the user selects no", async function() {
+        this.keytarGetPasswordMock.resolves(null);
+
+        this.vscodeWindow.showInformationMessage.resolves("No");
+
+        await this.mngr.promptForNotPresentAccountPasswords().should.be
+          .fulfilled;
+
+        this.sandbox.assert.calledOnce(
+          this.vscodeWindow.showInformationMessage
+        );
+
+        this.sandbox.assert.notCalled(this.vscodeWindow.showInputBox);
+      });
+
+      it("prompts the user for a single password and writes it to the keytar", async function() {
+        this.keytarGetPasswordMock.onCall(0).resolves("foo");
+        this.keytarGetPasswordMock.onCall(1).resolves(null);
+
+        const newPassword = "blaBla";
+        this.vscodeWindow.showInformationMessage.resolves("Yes");
+        this.vscodeWindow.showInputBox.resolves(newPassword);
+
+        await this.mngr.promptForNotPresentAccountPasswords().should.be
+          .fulfilled;
+        this.sandbox.assert.calledWith(
+          this.vscodeWindow.showInformationMessage.firstCall,
+          "The following account has no password set: bar. Would you like to set it now?",
+          "Yes",
+          "No"
+        );
+
+        this.sandbox.assert.calledOnce(this.vscodeWindow.showInputBox);
+        expect(
+          this.vscodeWindow.showInputBox.getCall(0).args[0]
+        ).to.deep.include({
+          password: true,
+          prompt: "add a password for the account ".concat(fakeAccount2.apiUrl)
+        });
+
+        this.sandbox.assert.calledOnce(this.keytarSetPasswordMock);
+        this.sandbox.assert.calledWith(
+          this.keytarSetPasswordMock.firstCall,
+          match.string,
+          fakeAccount2.apiUrl,
+          newPassword
+        );
+      });
+
+      it("prompts the user for a single password and doesn't put it into the keytar if the user cancels", async function() {
+        this.keytarGetPasswordMock.onCall(0).resolves("foo");
+        this.keytarGetPasswordMock.onCall(1).resolves(null);
+
+        this.vscodeWindow.showInformationMessage.resolves("Yes");
+        this.vscodeWindow.showInputBox.resolves(undefined);
+
+        await this.mngr.promptForNotPresentAccountPasswords().should.be
+          .fulfilled;
+
+        this.sandbox.assert.notCalled(this.keytarSetPasswordMock);
+      });
+    });
+
+    describe("#interactivelySetAccountPassword", async function() {
+      it("presents a QuickPick if no apiUrl is passed as an argument and sets the account password", async function() {
+        const toChangeApi = fakeAccount1.apiUrl;
+        const newPw = "dtruiae";
+        this.curConEventSpy.resetHistory();
+
+        this.vscodeWindow.showQuickPick.resolves(fakeAccount1.accountName);
+        this.vscodeWindow.showInputBox.resolves(newPw);
+
+        await this.mngr.interactivelySetAccountPassword().should.be.fulfilled;
+
+        this.sandbox.assert.calledOnce(this.vscodeWindow.showQuickPick);
+        this.sandbox.assert.calledWith(
+          this.vscodeWindow.showQuickPick.firstCall,
+          [fakeAccount1.accountName, fakeAccount2.accountName]
+        );
+
+        this.sandbox.assert.calledOnce(this.keytarSetPasswordMock);
+        this.sandbox.assert.calledWith(
+          this.keytarSetPasswordMock.firstCall,
+          match.string,
+          toChangeApi,
+          newPw
+        );
+
+        this.sandbox.assert.calledOnce(this.curConEventSpy);
+        const curCon = extractApiAccountMapFromSpy(this.curConEventSpy);
+        expect(curCon.mapping.get(toChangeApi))
+          .to.be.an("array")
+          .and.have.length(2);
+        expect(curCon.mapping.get(toChangeApi)![1]).to.deep.include({
+          password: newPw,
+          url: toChangeApi
+        });
+      });
+
+      it("doesn't set the password if the user cancels the QuickPick", async function() {
+        this.curConEventSpy.resetHistory();
+
+        this.vscodeWindow.showQuickPick.resolves(undefined);
+
+        await this.mngr.interactivelySetAccountPassword().should.be.fulfilled;
+
+        this.sandbox.assert.calledOnce(this.vscodeWindow.showQuickPick);
+        this.sandbox.assert.calledWith(
+          this.vscodeWindow.showQuickPick.firstCall,
+          [fakeAccount1.accountName, fakeAccount2.accountName]
+        );
+
+        this.sandbox.assert.notCalled(this.keytarSetPasswordMock);
+        this.sandbox.assert.notCalled(this.curConEventSpy);
+      });
+    });
   });
 });

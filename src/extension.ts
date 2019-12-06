@@ -1,9 +1,11 @@
 "use strict";
 
-import * as assert from "assert";
+import { promises as fsPromises } from "fs";
+import { join } from "path";
+import * as pino from "pino";
 import * as vscode from "vscode";
-import { AccountTreeProvider } from "./accounts";
 import { ProjectTreeProvider } from "./project";
+import { AccountManager } from "./accounts";
 import { RepositoryTreeProvider } from "./repository";
 
 // this method is called when your extension is activated
@@ -13,7 +15,20 @@ export async function activate(
 ): Promise<void> {
   const showCollapseAll = true;
 
-  const accountTreeProvider = new AccountTreeProvider(context.globalState);
+  await fsPromises.mkdir(context.logPath, { recursive: true });
+  const dest = pino.destination(
+    join(context.logPath, `vscode-obs.${new Date().getTime()}.log`)
+  );
+  const logger = pino(
+    {
+      level: vscode.workspace
+        .getConfiguration("vscode-obs")
+        .get<pino.Level>("logLevel", "info")
+    },
+    dest
+  );
+
+  const accountManager = new AccountManager(logger);
 
   const projectTreeProvider = new ProjectTreeProvider(
     context.globalState,
@@ -40,26 +55,32 @@ export async function activate(
     treeDataProvider: repoTreeProvider
   });
 
-  vscode.commands.registerCommand(
-    "obsAccount.importAccountsFromOsrc",
-    accountTreeProvider.importAccountsFromOsrc,
-    accountTreeProvider
-  );
-  vscode.commands.registerCommand(
-    "obsAccount.modifyAccountProperty",
-    accountTreeProvider.modifyAccountProperty,
-    accountTreeProvider
-  );
-  vscode.commands.registerCommand(
-    "obsAccount.removeAccount",
-    accountTreeProvider.removeAccount,
-    accountTreeProvider
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "obsAccount.importAccountsFromOsrc",
+      accountManager.importAccountsFromOsrc,
+      accountManager
+    )
   );
 
   vscode.commands.registerCommand(
     "obsProject.addProjectToBookmarks",
     projectTreeProvider.addProjectToBookmarksTreeButton,
     projectTreeProvider
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "obsAccount.setAccountPassword",
+      accountManager.interactivelySetAccountPassword,
+      accountManager
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "obsAccount.removeAccount",
+      accountManager.removeAccountPassword,
+      accountManager
+    )
   );
 
   vscode.commands.registerCommand(
@@ -68,27 +89,10 @@ export async function activate(
     projectTreeProvider
   );
 
-  const unimportedAccountsPresent = await accountTreeProvider.unimportedAccountsPresent();
+  await accountManager.promptForUninmportedAccount();
+  await accountManager.promptForNotPresentAccountPasswords();
 
-  if (unimportedAccountsPresent) {
-    const importAccounts = "Import accounts now";
-    const neverShowAgain = "Never show this message again";
-    const selected = await vscode.window.showInformationMessage(
-      "There are accounts in your oscrc configuration file, that have not been imported into Visual Studio Code. Would you like to import them?",
-      importAccounts,
-      neverShowAgain
-    );
-    if (selected !== undefined) {
-      if (selected === importAccounts) {
-        await accountTreeProvider.importAccountsFromOsrc();
-      } else {
-        // TODO: flick a configuration option here
-        assert(selected === neverShowAgain);
-      }
-    }
-  }
-
-  //  context.subscriptions.push(disposable);
+  context.subscriptions.push(accountManager);
 }
 
 // this method is called when your extension is deactivated

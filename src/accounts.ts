@@ -8,25 +8,32 @@ import {
   normalizeUrl,
   readAccountsFromOscrc
 } from "obs-ts";
-import * as path from "path";
+import { Logger } from "pino";
+import { inspect } from "util";
 import * as vscode from "vscode";
+import { LoggingBase } from "./base-components";
 import { setDifference } from "./util";
 
 /**
- * # The Accounts Tree View
+ * # Accounts management
  *
- * The Account Tree View displays all stored accounts in a Tree View, where each
- * property is a leaf child element, except for the aliases (the aliases
- * themselves are the leaves).
+ * The accounts are stored by the user in their vscode configuration
+ * (`settings.json`) with the schema defined in `package.json`.
  *
- * ## Account storage
+ * The main functionality is provided by the [[AccountManager]] class: it
+ * ensures that the configuration stays sane and provides an event to which
+ * other components can listen to for changes in the config.
  *
- * Accounts are stored in an Array of Account objects. While we officially only
- * support one account per OBS instance, it does not really make sense to use a
- * hash table here, as the average number of accounts is going to be so low that
- * brute force searching is faster then hashing.
+ * The configuration is exported via the [[ApiAccountMapping]] interface. It
+ * provides a Map where each apiUrl is resolved to a [[AccountStorage]] and (if
+ * the password is known) to a [[Connection]].
  *
- * ### Credentials
+ * The [[AccountManager]] provides the [[AccountManager.onConnectionChange]]
+ * event, which fires every time that the `settings.json` change so that the
+ * [[ApiAccountMapping]] requires to be recreated.
+ *
+ *
+ * ## Credentials
  *
  * A user account for a OBS instance consist of the following required
  * information:
@@ -37,27 +44,34 @@ import { setDifference } from "./util";
  *
  * Unfortunately we cannot store all three fields in the OS' keychain via the
  * keytar module. Instead, we store everything **except** the password in
- * VSCode's globalState key-value store and the password in the keyring.
+ * VSCode's `settings.json` and the password in the keyring.
+ *
+ * The passwords are saved under the service name [[keytarServiceName]] and the
+ * account name is the normalized URL (via [[normalizeUrl]]) to the API.
  */
 
+/** Top level key for configuration options of this extension  */
+export const configurationExtensionName = "vscode-obs";
+
 /** Key under which the AccountStorage array is stored. */
-const accountStorageKey: string = "vscodeObs.AccountTree.Accounts";
+export const configurationAccounts = "accounts";
+
+/** Full key under which the AccountStorage array is stored */
+export const configurationAccountsFullName = `${configurationExtensionName}.${configurationAccounts}`;
+
+/**
+ * Key under which the setting is stored whether the extension should check for
+ * unimported Accounts on launch.
+ */
+export const configurationCheckUnimportedAccounts = "checkUnimportedAccounts";
 
 /** Service name under which the passwords are stored in the OS' keyring */
-const keytarServiceName: string = "vscodeObs";
+const keytarServiceName = configurationAccountsFullName;
 
 /** Type as which the URL to the API is stored */
 export type ApiUrl = string;
 
-/** properties or keys that are shared by OBS.Account and AccountStorage */
-type AccountSharedKeys =
-  | "aliases"
-  | "username"
-  | "realname"
-  | "email"
-  | "apiUrl";
-
-/** Type to store Buildservice accounts in VSCode's key-value storage */
+/** Type to store Buildservice accounts in VSCode's settings.json */
 export interface AccountStorage {
   /**
    * This is a human readable name for this account that will be displayed in
@@ -65,26 +79,507 @@ export interface AccountStorage {
    * are present).
    */
   accountName: string;
-  aliases: string[];
   username: string;
-  readonly apiUrl: string;
+  readonly apiUrl: ApiUrl;
   realname?: string;
   email?: string;
+  /** is this the "default" account to be used */
+  isDefault?: boolean;
 }
 
 /**
- * This object defines how each key of the AccountStorage interface is displayed
- * in the UI
+ * This interface defines a container for storing the mapping between the API
+ * URL and the respective accounts & the Connection used for this account.
  */
-const AccountStorageKeyUiNames = {
-  accountName: "Account Name",
-  aliases: "Aliases",
-  apiUrl: "Url to the API",
-  email: "email",
-  password: "password",
-  realname: "Real name",
-  username: "username"
-};
+export interface ApiAccountMapping {
+  /**
+   * Mapping URL to the API <=> Account + Connection
+   */
+  mapping: Map<ApiUrl, [AccountStorage, Connection | undefined]>;
+
+  /** The API that that will be used for searching via the menu. */
+  defaultApi: ApiUrl | undefined;
+}
+
+export interface VscodeWindow {
+  showInformationMessage: typeof vscode.window.showInformationMessage;
+
+  showErrorMessage: typeof vscode.window.showErrorMessage;
+
+  showQuickPick: typeof vscode.window.showQuickPick;
+
+  showInputBox: typeof vscode.window.showInputBox;
+}
+
+export class AccountManager extends LoggingBase {
+  /**
+   * Reads the AccountStorage from the provided workspace configuration and
+   * converts it to a [[ApiAccountMapping]].
+   *
+   * @param workspaceConfig  A WorkspaceConfiguration obtained via
+   *     [`vscode.workspace.getConfiguration`]
+   *     (https://code.visualstudio.com/api/references/vscode-api#workspace.getConfiguration)
+   *     with the `section` parameter set to the extensions configuration
+   *     prefix.
+   *
+   * @param createConnections  Flag whether the [[Connection]] objects should be
+   *     created for the returned [[ApiAccountMapping]] too. Note that this
+   *     incurs a read of the OS keyring and is thus only desirable if
+   *     absolutely necessary.
+   *
+   * @return
+   */
+  private static async getApiAccountMappingFromConfig(
+    workspaceConfig: vscode.WorkspaceConfiguration,
+    createConnections: boolean
+  ): Promise<ApiAccountMapping> {
+    const accounts = workspaceConfig.get<AccountStorage[]>(
+      configurationAccounts,
+      []
+    );
+
+    const res = {
+      defaultApi: undefined,
+      mapping: new Map<ApiUrl, [AccountStorage, Connection | undefined]>()
+    };
+
+    await Promise.all(
+      accounts.map(async acc => {
+        const con = createConnections ? await conFromAccount(acc) : undefined;
+        res.mapping.set(normalizeUrl(acc.apiUrl), [acc, con]);
+      })
+    );
+
+    return res;
+  }
+
+  /**
+   * Check that the given accounts are a valid as a whole.
+   *
+   * @return An error message when an issue was detected or undefined otherwise.
+   */
+  private static verifyConfiguration(
+    accounts: AccountStorage[]
+  ): string | undefined {
+    let defaultFound: boolean = false;
+
+    for (const acc of accounts) {
+      // check url
+      try {
+        normalizeUrl(acc.apiUrl);
+      } catch (TypeError) {
+        return `Got an invalid url: '${acc.apiUrl}'`;
+      }
+      // check only one default account is present
+      if (acc.isDefault) {
+        if (defaultFound) {
+          return `More than one default account present.`;
+        }
+        defaultFound = true;
+      }
+
+      if (acc.username === "") {
+        return "username must not be empty";
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Event that fires every time an account change results in a change of the
+   * Connection objects.
+   */
+  public readonly onConnectionChange: vscode.Event<ApiAccountMapping>;
+
+  /**
+   * The EventEmitter for changes in the accounts and thus resulting in changes
+   * in any of the Connection objects.
+   */
+  private onConnectionChangeEmitter: vscode.EventEmitter<
+    ApiAccountMapping
+  > = new vscode.EventEmitter<ApiAccountMapping>();
+
+  private apiAccountMap: ApiAccountMapping;
+  private disposables: vscode.Disposable[];
+
+  constructor(
+    logger: Logger,
+    private readonly vscodeWindow: VscodeWindow = vscode.window
+  ) {
+    super(logger);
+
+    this.logger.debug("Constructing an AccountManager");
+    this.apiAccountMap = { mapping: new Map(), defaultApi: undefined };
+    this.onConnectionChange = this.onConnectionChangeEmitter.event;
+    this.disposables = [this.onConnectionChangeEmitter];
+  }
+
+  public dispose(): void {
+    this.logger.trace("Disposing of an AccountManager");
+    this.disposables.forEach(disp => disp.dispose());
+  }
+
+  /**
+   * Post construction initialization function.
+   *
+   * It reads the mapping between the API URL and the Accounts from the
+   * configuration and constructs the appropriate connections when
+   * available.
+   * Upon completion, the [[onConnectionChange]] event is fired.
+   */
+  public async initializeMapping(): Promise<void> {
+    // do nothing if the accounts have already been initialized
+    if (this.apiAccountMap.mapping.size > 0) {
+      this.logger.trace(
+        "initializeMapping() has already been called, doing nothing"
+      );
+      return;
+    }
+
+    this.logger.trace("initializing the AccountManager");
+
+    this.apiAccountMap = await AccountManager.getApiAccountMappingFromConfig(
+      vscode.workspace.getConfiguration(configurationExtensionName),
+      true
+    );
+    if (this.apiAccountMap.mapping.size === 1) {
+      this.apiAccountMap.defaultApi = [...this.apiAccountMap.mapping.keys()][0];
+    }
+
+    this.onConnectionChangeEmitter.fire(this.apiAccountMap);
+
+    const eventDisposable = vscode.workspace.onDidChangeConfiguration(
+      this.configurationChangeListener,
+      this
+    );
+
+    this.disposables.push(eventDisposable);
+  }
+
+  public async promptForNotPresentAccountPasswords(): Promise<void> {
+    const accounts = await this.findAccountsWithoutPassword();
+
+    if (accounts.length === 0) {
+      return;
+    }
+
+    const msg =
+      accounts.length === 1
+        ? `The following account has no password set: ${accounts[0].accountName}. Would you like to set it now?`
+        : `The following accounts have no password set: ${accounts
+            .map(acc => acc.accountName)
+            .join(", ")}. Would you like to set them now?`;
+    const selected = await this.vscodeWindow.showInformationMessage(
+      msg,
+      "Yes",
+      "No"
+    );
+
+    if (selected === undefined || selected === "No") {
+      return;
+    }
+
+    accounts.forEach(async acc => {
+      this.interactivelySetAccountPassword(acc.apiUrl);
+    });
+  }
+
+  public async promptForUninmportedAccount(): Promise<void> {
+    const config = vscode.workspace.getConfiguration(
+      configurationExtensionName
+    );
+
+    if (!config.get<boolean>(configurationCheckUnimportedAccounts, true)) {
+      return;
+    }
+    const unimportedAccounts = await this.unimportedAccountsPresent();
+
+    if (unimportedAccounts !== undefined) {
+      const importAccounts = "Import accounts now";
+      const neverShowAgain = "Never show this message again";
+      const selected = await this.vscodeWindow.showInformationMessage(
+        "There are accounts in your oscrc configuration file, that have not been imported into Visual Studio Code. Would you like to import them?",
+        importAccounts,
+        neverShowAgain
+      );
+      if (selected !== undefined) {
+        if (selected === importAccounts) {
+          await this.importAccountsFromOsrc(unimportedAccounts);
+        } else {
+          assert(selected === neverShowAgain);
+
+          await config.update(
+            configurationCheckUnimportedAccounts,
+            false,
+            vscode.ConfigurationTarget.Global
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Imports all not yet present accounts from the user's `oscrc` into VSCode's
+   * settings.
+   */
+  public async importAccountsFromOsrc(
+    oscrcAccounts?: Account[]
+  ): Promise<void> {
+    if (oscrcAccounts === undefined) {
+      oscrcAccounts = await readAccountsFromOscrc();
+    }
+
+    let added: boolean = false;
+
+    await Promise.all(
+      oscrcAccounts.map(async acc => {
+        const { apiUrl, ...rest } = acc;
+        const fixedAcc = { apiUrl: normalizeUrl(apiUrl), ...rest };
+
+        if (!this.apiAccountMap.mapping.has(fixedAcc.apiUrl)) {
+          const accStorage = await accountStorageFromAccount(fixedAcc);
+          const con = await conFromAccount(accStorage);
+          this.apiAccountMap.mapping.set(fixedAcc.apiUrl, [accStorage, con]);
+          added = true;
+        }
+      })
+    );
+    // no point in calling update when nothing will be added...
+    if (added) {
+      this.updateAccountStorageConfig();
+    }
+  }
+
+  /** Command to set the password of an account */
+  public async interactivelySetAccountPassword(apiUrl?: ApiUrl): Promise<void> {
+    if (apiUrl === undefined) {
+      const allAccountsAndCons = [...this.apiAccountMap.mapping.values()];
+      const accName = await this.vscodeWindow.showQuickPick(
+        allAccountsAndCons.map(([acc, _]) => acc.accountName)
+      );
+      if (accName === undefined) {
+        return;
+      }
+
+      // we *must* find a result here, as the user cannot set a name themselves
+      apiUrl = allAccountsAndCons.find(
+        ([acc, _]) => acc.accountName === accName
+      )![0].apiUrl;
+    }
+
+    const newPw = await this.vscodeWindow.showInputBox({
+      password: true,
+      prompt: `add a password for the account ${apiUrl}`,
+      validateInput: val =>
+        val === "" ? "Password must not be empty" : undefined
+    });
+
+    const accountCon = this.apiAccountMap.mapping.get(apiUrl);
+
+    if (accountCon === undefined) {
+      this.logger.error(
+        "Did not get a Account & Connection for '%s', but it must exist",
+        apiUrl
+      );
+      return;
+    }
+    const account = accountCon[0];
+    assert(
+      account.apiUrl === normalizeUrl(account.apiUrl),
+      `Account ${
+        account.accountName
+      } has an apiUrl that is not normalized: is: '${
+        account.apiUrl
+      }', should be: '${normalizeUrl(account.apiUrl)}'`
+    );
+
+    if (newPw !== undefined) {
+      await writePasswordToKeyring(account, newPw);
+      this.apiAccountMap.mapping.set(apiUrl, [
+        account,
+        new Connection(account.username, newPw, apiUrl)
+      ]);
+
+      this.onConnectionChangeEmitter.fire(this.apiAccountMap);
+    }
+  }
+
+  /**
+   * Delete the password of the account with the given API URL.
+   */
+  public async removeAccountPassword(apiUrl: ApiUrl): Promise<void> {
+    const acc = this.apiAccountMap.mapping.get(normalizeUrl(apiUrl));
+
+    if (acc === undefined) {
+      this.logger.error(
+        `removeAccountPassword got called with the apiUrl ${apiUrl}, but no account exists for that url`
+      );
+      return;
+    }
+    await removePasswordFromKeyring(acc[0]);
+  }
+
+  public async findAccountsWithoutPassword(): Promise<AccountStorage[]> {
+    const accountsWithoutPw: AccountStorage[] = [];
+    await Promise.all(
+      [...this.apiAccountMap.mapping.values()].map(async ([acc, _]) => {
+        if ((await readPasswordFromKeyring(acc)) === undefined) {
+          accountsWithoutPw.push(acc);
+        }
+      })
+    );
+    return accountsWithoutPw;
+  }
+
+  private async configurationChangeListener(
+    confChangeEvent: vscode.ConfigurationChangeEvent
+  ): Promise<void> {
+    if (!confChangeEvent.affectsConfiguration(configurationAccountsFullName)) {
+      return;
+    }
+
+    this.logger.debug("Configuration change affecting us detected");
+
+    const wsConfig = vscode.workspace.getConfiguration(
+      configurationExtensionName
+    );
+    const newAccounts = wsConfig.get<AccountStorage[]>(
+      configurationAccounts,
+      []
+    );
+
+    this.logger.debug("new account settings from configuration: ", newAccounts);
+
+    // if the config is invalid => display an error message and revert it
+    const errMsg = AccountManager.verifyConfiguration(newAccounts);
+    if (errMsg !== undefined) {
+      this.logger.error("New configuration is faulty: %s", errMsg);
+
+      await this.vscodeWindow.showErrorMessage(errMsg, { modal: true });
+      await this.updateAccountStorageConfig();
+
+      return;
+    }
+
+    // check differences and react to that
+    const newApiAccountMap = await AccountManager.getApiAccountMappingFromConfig(
+      wsConfig,
+      false
+    );
+    const changedAccounts = await this.deleteRemovedAccounts(newApiAccountMap);
+    this.apiAccountMap = newApiAccountMap;
+
+    changedAccounts.forEach(async apiUrl => {
+      await this.interactivelySetAccountPassword(apiUrl);
+    });
+
+    this.onConnectionChangeEmitter.fire(this.apiAccountMap);
+  }
+
+  /**
+   * Check for Account differences between `newApiAccountMap` and the currently
+   * active map. If there are accounts in the currently active mapping that are
+   * no longer in `newApiAccountMap`, then their passwords are removed from the
+   * systems keyring.
+   *
+   * @return The API URLs of the accounts which got changed.
+   */
+  private async deleteRemovedAccounts(
+    newApiAccountMap: ApiAccountMapping
+  ): Promise<ApiUrl[]> {
+    // drop removed accounts
+    const promises: Array<Promise<void>> = [];
+    for (const apiUrl of this.apiAccountMap.mapping.keys()) {
+      // the account is gone, drop its password
+      if (!newApiAccountMap.mapping.has(apiUrl)) {
+        promises.push(this.removeAccountPassword(apiUrl));
+      }
+    }
+    await Promise.all(promises);
+
+    const changedAccounts: ApiUrl[] = [];
+
+    for (const [apiUrl, [acc]] of newApiAccountMap.mapping) {
+      // account got added, prompt user for password
+      if (!this.apiAccountMap.mapping.has(apiUrl)) {
+        assert(
+          normalizeUrl(apiUrl) === normalizeUrl(acc.apiUrl),
+          "apiAccountMap is invalid, AccountStorage.apiUrl and apiUrl do not match!"
+        );
+
+        changedAccounts.push(apiUrl);
+      } else {
+        const [_, oldCon] = this.apiAccountMap.mapping.get(apiUrl)!;
+        newApiAccountMap.mapping.set(apiUrl, [acc, oldCon]);
+      }
+    }
+    return changedAccounts;
+  }
+
+  /**
+   * Check whether there are accounts in the user's `oscrc`, which have not been
+   * imported into VSCode's settings.
+   *
+   * @return - undefined if no unimported accounts are present
+   *     - an array of accounts that have not yet been imported into vscode's
+   *       settings
+   */
+  private async unimportedAccountsPresent(): Promise<Account[] | undefined> {
+    this.logger.debug("Checking for unimported accounts");
+
+    const accounts = await readAccountsFromOscrc();
+    const oscrcAccountsApiUrls = accounts.map(acc => acc.apiUrl);
+    this.logger.trace("found the accounts in oscrc: %s", oscrcAccountsApiUrls);
+
+    const storedAccountsApiUrls = [...this.apiAccountMap.mapping.keys()];
+    this.logger.trace("have these accounts stored: %s", storedAccountsApiUrls);
+
+    const oscrcAccounts = new Set(oscrcAccountsApiUrls);
+    for (const storedAccount of this.apiAccountMap.mapping.keys()) {
+      oscrcAccounts.delete(storedAccount.toString());
+    }
+
+    const setDiff = setDifference(
+      new Set(oscrcAccountsApiUrls),
+      new Set(storedAccountsApiUrls)
+    );
+    this.logger.debug("found %s unimported accounts", setDiff.size);
+
+    if (setDiff.size > 0) {
+      const apiUrls = [...setDiff.values()];
+      const res = accounts.filter(
+        acc => apiUrls.find(url => url === acc.apiUrl) !== undefined
+      );
+      assert(setDiff.size === res.length);
+      return res;
+    } else {
+      return undefined;
+    }
+  }
+
+  /**
+   * Writes the currently present Accounts from [[apiAccountMap]] to VSCode's
+   * settings. It overwrites any present accounts and does not modify the stored
+   * passwords in the system keychain.
+   */
+  private async updateAccountStorageConfig(): Promise<void> {
+    const accounts: AccountStorage[] = [
+      ...this.apiAccountMap.mapping.values()
+    ].map(([acc, _]) => acc);
+
+    this.logger.debug(
+      "saving the following accounts to the system settings: %s",
+      inspect(accounts)
+    );
+
+    const conf = vscode.workspace.getConfiguration(configurationExtensionName);
+    await conf.update(
+      configurationAccounts,
+      accounts,
+      vscode.ConfigurationTarget.Global
+    );
+  }
+}
 
 /**
  * Converts a Account as returned from obs-ts into an [[AccountStorage]].
@@ -95,12 +590,13 @@ const AccountStorageKeyUiNames = {
 async function accountStorageFromAccount(
   account: Account
 ): Promise<AccountStorage> {
+  const { password, aliases, ...others } = account;
   const res: AccountStorage = {
-    accountName:
-      account.aliases.length === 0 ? account.apiUrl : account.aliases[0],
-    ...(({ password, ...others }) => ({ ...others }))(account)
+    accountName: aliases.length === 0 ? account.apiUrl : aliases[0],
+    ...others
   };
 
+  // FIXME: this shouldn't be done by this function...
   if (account.password !== undefined) {
     await writePasswordToKeyring(res, account.password);
   }
@@ -128,22 +624,9 @@ async function writePasswordToKeyring(
 
 async function readPasswordFromKeyring(
   account: AccountStorage
-): Promise<string | null> {
-  return keytar.getPassword(keytarServiceName, account.apiUrl);
-}
-
-/**
- * This interface defines a container for storing the mapping between the API
- * URL and the respective accounts & the Connection used for this account.
- */
-export interface ApiAccountMapping {
-  /**
-   * Mapping URL to the API <=> Account + Connection
-   */
-  mapping: Map<ApiUrl, [AccountStorage, Connection | undefined]>;
-
-  /** The API that that will be used for searching via the menu. */
-  defaultApi: ApiUrl | undefined;
+): Promise<string | undefined> {
+  const pw = await keytar.getPassword(keytarServiceName, account.apiUrl);
+  return pw === null ? undefined : pw;
 }
 
 /**
@@ -158,416 +641,7 @@ async function conFromAccount(
   account: AccountStorage
 ): Promise<Connection | undefined> {
   const password = await readPasswordFromKeyring(account);
-  return password === null
+  return password === undefined
     ? undefined
     : new Connection(account.username, password, account.apiUrl);
-}
-
-/**
- * Types of the nodes of the AccountTree
- */
-type TreeElement =
-  | AccountTreeElement
-  | AccountPropertyTreeElement
-  | AccountPropertyAliasChildElement;
-
-/**
- * Type guard for AccountPropertyTreeElement
- */
-function isAccountPropertyTreeElement(
-  arg: TreeElement
-): arg is AccountPropertyTreeElement {
-  return (arg as AccountPropertyTreeElement).property !== undefined;
-}
-
-/**
- * Type guard for AccountTreeElement
- */
-function isAccountTreeElement(arg: TreeElement): arg is AccountTreeElement {
-  return (arg as AccountTreeElement).account !== undefined;
-}
-
-/**
- * Type guard for AccountPropertyAliasChildElement
- */
-function isAccountPropertyAliasChildElement(
-  arg: TreeElement
-): arg is AccountPropertyAliasChildElement {
-  return (arg as AccountPropertyAliasChildElement).alias !== undefined;
-}
-
-/**
- * The main implementation class of the Account Tree View.
- */
-export class AccountTreeProvider
-  implements vscode.TreeDataProvider<TreeElement> {
-  /**
-   * The EventEmitter for changes in the accounts and thus resulting in changes
-   * of the Connection objects.
-   */
-  private onConnectionChangeEmitter: vscode.EventEmitter<
-    ApiAccountMapping
-  > = new vscode.EventEmitter<ApiAccountMapping>();
-
-  /**
-   * Event that fires every time an account change results in a change of the
-   * Connection objects.
-   */
-  public readonly onConnectionChange: vscode.Event<ApiAccountMapping> = this
-    .onConnectionChangeEmitter.event;
-
-  private apiAccountMap: ApiAccountMapping;
-
-  private onDidChangeTreeDataEmitter: vscode.EventEmitter<
-    TreeElement | undefined
-  > = new vscode.EventEmitter<TreeElement | undefined>();
-  public readonly onDidChangeTreeData: vscode.Event<
-    TreeElement | undefined
-  > = this.onDidChangeTreeDataEmitter.event;
-
-  public refresh(): void {
-    this.onDidChangeTreeDataEmitter.fire();
-  }
-
-  /**
-   * @param globalState The `vscode.ExtensionContext.globalState`, as passed to
-   *     the [[activate]] function.
-   */
-  constructor(public globalState: vscode.Memento) {
-    this.apiAccountMap = {
-      defaultApi: undefined,
-      mapping: new Map<ApiUrl, [AccountStorage, Connection | undefined]>()
-    };
-  }
-
-  /**
-   * Post construction initialization function.
-   *
-   * It reads the mapping between the API URL and the Accounts from the internal
-   * storage and constructs the appropriate connections when available.
-   */
-  public async initAccounts(): Promise<void> {
-    // do nothing if the accounts have already been initialized
-    if (this.apiAccountMap.mapping.size > 0) {
-      return;
-    }
-    this.apiAccountMap = await this.getApiAccountMapping();
-    if (this.apiAccountMap.mapping.size === 1) {
-      this.apiAccountMap.defaultApi = [...this.apiAccountMap.mapping.keys()][0];
-    }
-
-    this.onConnectionChangeEmitter.fire(this.apiAccountMap);
-  }
-
-  public getTreeItem(element: TreeElement): vscode.TreeItem {
-    return element;
-  }
-
-  public getChildren(element?: TreeElement): Thenable<TreeElement[]> {
-    // top level element => list of accounts
-    if (element === undefined) {
-      const accountElements: AccountTreeElement[] = [];
-      this.apiAccountMap.mapping.forEach(([acc, _], __) => {
-        accountElements.push(new AccountTreeElement(acc));
-      });
-      return Promise.resolve(accountElements);
-    }
-
-    // this should be unreachable, alias elements have no Children
-    // but better save than sorry
-    if (isAccountPropertyAliasChildElement(element)) {
-      return Promise.resolve([]);
-    }
-
-    // property element => no children except for the alias element
-    if (isAccountPropertyTreeElement(element)) {
-      if (element.property === "aliases") {
-        return Promise.resolve(
-          element.parent.account.aliases.map(alias => {
-            return new AccountPropertyAliasChildElement(element, alias);
-          })
-        );
-      }
-      return Promise.resolve([]);
-    }
-
-    assert(isAccountTreeElement(element));
-    // element can now only be an AccountTreeElement
-    // => create an array of AccountPropertyTreeElement containing the defined
-    //    properties
-    const keys: AccountSharedKeys[] = [
-      "apiUrl",
-      "username",
-      "realname",
-      "email"
-    ];
-    const properties: AccountPropertyTreeElement[] = [];
-    keys.forEach(key => {
-      if (element.account[key] !== undefined) {
-        properties.push(new AccountPropertyTreeElement(key, element));
-      }
-    });
-    if (element.account.aliases.length > 0) {
-      properties.push(new AccountPropertyTreeElement("aliases", element));
-    }
-    properties.push(new AccountPropertyTreeElement("password", element));
-
-    return Promise.resolve(properties);
-  }
-
-  /**
-   * Check whether there are accounts in the user's oscrc, which have not been
-   * imported into the extension's storage.
-   *
-   * @return True when there are accounts in `oscrc` which are not imported in
-   *     this extension.
-   */
-  public async unimportedAccountsPresent(): Promise<boolean> {
-    const oscrcAccountsApiUrls = (await readAccountsFromOscrc()).map(
-      acc => acc.apiUrl
-    );
-    const storedAccountsApiUrls: string[] = [];
-    for (const key of this.apiAccountMap.mapping.keys()) {
-      storedAccountsApiUrls.push(key.toString());
-    }
-
-    const oscrcAccounts = new Set(oscrcAccountsApiUrls);
-    for (const storedAccount of this.apiAccountMap.mapping.keys()) {
-      oscrcAccounts.delete(storedAccount.toString());
-    }
-    return (
-      setDifference(
-        new Set(oscrcAccountsApiUrls),
-        new Set(storedAccountsApiUrls)
-      ).size > 0
-    );
-  }
-
-  public async importAccountsFromOsrc(): Promise<void> {
-    const oscrcAccounts = await readAccountsFromOscrc();
-
-    let added: boolean = false;
-
-    await Promise.all(
-      oscrcAccounts.map(async acc => {
-        const normalized = normalizeUrl(acc.apiUrl);
-        if (!this.apiAccountMap.mapping.has(normalized)) {
-          const accStorage = await accountStorageFromAccount(acc);
-          const con = await conFromAccount(accStorage);
-          this.apiAccountMap.mapping.set(normalized, [accStorage, con]);
-          added = true;
-        }
-      })
-    );
-    // no point in calling update when nothing will be added...
-    if (added) {
-      await this.updateApiAccountMapping();
-    }
-  }
-
-  public async modifyAccountProperty(
-    accountProperty?: AccountPropertyTreeElement | AccountTreeElement
-  ): Promise<void> {
-    // do nothing in case this gets invoked via the global menu or on a alias element
-    if (accountProperty === undefined) {
-      return;
-    }
-
-    const property = isAccountPropertyTreeElement(accountProperty)
-      ? accountProperty.property
-      : "accountName";
-
-    const actualAccount = isAccountPropertyTreeElement(accountProperty)
-      ? accountProperty.parent.account
-      : accountProperty.account;
-
-    if (property === "aliases") {
-      return;
-    }
-
-    const newProperty = await vscode.window.showInputBox({
-      password: property === "password",
-      prompt: `New value for ${AccountStorageKeyUiNames[property]}`,
-      // FIXME: add a proper validator here
-      validateInput: () => undefined,
-      value: property === "password" ? undefined : actualAccount[property]
-    });
-
-    if (newProperty === undefined) {
-      return;
-    }
-
-    if (this.apiAccountMap.mapping.size === 0) {
-      await vscode.window.showErrorMessage("Error: no accounts are defined");
-      return;
-    }
-    const matchingAccountMapping = this.apiAccountMap.mapping.get(
-      normalizeUrl(actualAccount.apiUrl)
-    );
-    assert(matchingAccountMapping !== undefined);
-    const matchingAccount = matchingAccountMapping![0];
-
-    if (property === "password") {
-      await writePasswordToKeyring(matchingAccount, newProperty);
-      return;
-    } else if (property === "apiUrl") {
-      const newApiUrl = normalizeUrl(newProperty);
-
-      // if we change the apiUrl, then we need to remove and add the password in
-      // the keyring
-      // FIXME: can we use removeAccount here?
-      const pw = await readPasswordFromKeyring(matchingAccount);
-      await removePasswordFromKeyring(matchingAccount);
-
-      const newAccountStorage = {
-        apiUrl: newApiUrl,
-        ...(({ apiUrl, ...others }) => ({ ...others }))(matchingAccount)
-      };
-      let con: Connection | undefined;
-
-      if (pw !== null) {
-        await writePasswordToKeyring(newAccountStorage, pw);
-        con = await conFromAccount(newAccountStorage);
-        assert(con !== undefined);
-      }
-
-      this.apiAccountMap.mapping.set(newApiUrl, [newAccountStorage, con]);
-      const deleteRes = this.apiAccountMap.mapping.delete(
-        matchingAccount.apiUrl
-      );
-      assert(deleteRes);
-
-      if (this.apiAccountMap.defaultApi === matchingAccount.apiUrl) {
-        this.apiAccountMap.defaultApi = newApiUrl;
-      }
-    } else {
-      matchingAccount[property] = newProperty;
-      this.apiAccountMap.mapping.set(
-        normalizeUrl(actualAccount.apiUrl),
-        matchingAccountMapping!
-      );
-    }
-    await this.updateApiAccountMapping();
-  }
-
-  /**
-   * Removes the specified account from the internal storage and drops its
-   * password.
-   */
-  public async removeAccount(
-    accountElement: AccountTreeElement
-  ): Promise<void> {
-    const acc = this.apiAccountMap.mapping.get(
-      normalizeUrl(accountElement.account.apiUrl)
-    );
-    if (acc === undefined) {
-      // FIXME: log this
-      return;
-    }
-    await removePasswordFromKeyring(acc[0]);
-    const delRes = this.apiAccountMap.mapping.delete(
-      normalizeUrl(accountElement.account.apiUrl)
-    );
-    assert(delRes);
-
-    await this.updateApiAccountMapping();
-  }
-
-  public async findAccountsWithoutPassword(): Promise<AccountStorage[]> {
-    const accountsWithoutPw: AccountStorage[] = [];
-    await Promise.all(
-      [...this.apiAccountMap.mapping.values()].map(async ([acc, _con]) => {
-        if ((await readPasswordFromKeyring(acc)) === null) {
-          accountsWithoutPw.push(acc);
-        }
-      })
-    );
-    return accountsWithoutPw;
-  }
-
-  /**
-   * Reads the
-   */
-  private async getApiAccountMapping(): Promise<ApiAccountMapping> {
-    const accounts = this.globalState.get<AccountStorage[]>(
-      accountStorageKey,
-      []
-    );
-
-    const res = {
-      defaultApi: undefined,
-      mapping: new Map<string, [AccountStorage, Connection | undefined]>()
-    };
-
-    await Promise.all(
-      accounts.map(async acc => {
-        const con = await conFromAccount(acc);
-        res.mapping.set(normalizeUrl(acc.apiUrl), [acc, con]);
-      })
-    );
-
-    return res;
-  }
-
-  private async updateApiAccountMapping(): Promise<void> {
-    const accountsToStore: AccountStorage[] = [];
-    this.apiAccountMap.mapping.forEach(([acc, _con], _key) => {
-      accountsToStore.push(acc);
-    });
-    await this.globalState.update(accountStorageKey, accountsToStore);
-    this.onConnectionChangeEmitter.fire(this.apiAccountMap);
-    this.refresh();
-  }
-}
-
-/**
- * This element represents an account that is shown in the Account Tree View.
- */
-export class AccountTreeElement extends vscode.TreeItem {
-  public iconPath = path.join(
-    __filename,
-    "..",
-    "..",
-    "media",
-    "User_font_awesome.svg"
-  );
-
-  public contextValue = "account";
-
-  /** */
-  constructor(public account: AccountStorage) {
-    super(account.accountName, vscode.TreeItemCollapsibleState.Collapsed);
-  }
-}
-
-/**
- * This class represents a property of a stored account in the Account Tree View.
- */
-export class AccountPropertyTreeElement extends vscode.TreeItem {
-  constructor(
-    public property: AccountSharedKeys | "password",
-    public parent: AccountTreeElement
-  ) {
-    super(
-      property !== "password" && property !== "aliases"
-        ? `${AccountStorageKeyUiNames[property]}: ${parent.account[property]}`
-        : AccountStorageKeyUiNames[property],
-      property === "aliases"
-        ? vscode.TreeItemCollapsibleState.Collapsed
-        : undefined
-    );
-
-    this.contextValue =
-      property === "aliases"
-        ? "immutableAccountPropertyElement"
-        : "accountPropertyElement";
-  }
-}
-
-export class AccountPropertyAliasChildElement extends vscode.TreeItem {
-  public contextValue = "accountAliasElement";
-
-  constructor(public parent: AccountPropertyTreeElement, public alias: string) {
-    super(`${alias}`);
-  }
 }
