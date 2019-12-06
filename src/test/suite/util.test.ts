@@ -1,10 +1,20 @@
-import { describe, it } from "mocha";
-import { expect } from "chai";
+import mockFs = require("mock-fs");
 
-import { setDifference } from "../../util";
+import { expect, should } from "chai";
+import { existsSync } from "fs";
+import { afterEach, beforeEach, describe, it, xit } from "mocha";
+import { assert, stub } from "sinon";
+import {
+  loadMapFromMemento,
+  rmRf,
+  saveMapToMemento,
+  setDifference
+} from "../../util";
+
+should();
 
 describe("utilities", () => {
-  describe("setDifference", () => {
+  describe("#setDifference", () => {
     it("works for empty sets", () => {
       expect(setDifference(new Set(), new Set()))
         .to.be.a("set")
@@ -27,6 +37,80 @@ describe("utilities", () => {
         .to.be.a("set")
         .and.to.have.length(1)
         .and.to.include(1);
+    });
+  });
+
+  describe("load and save Map to Memento", () => {
+    beforeEach(function() {
+      this.mockMemento = {
+        get: stub(),
+        update: stub()
+      };
+    });
+
+    afterEach(function() {
+      this.mockMemento.get.resetHistory();
+      this.mockMemento.update.resetHistory();
+    });
+
+    it("calls get on loadMapFromMemento", function() {
+      this.mockMemento.get.returns([]);
+
+      expect(loadMapFromMemento(this.mockMemento, "foo"))
+        .to.be.a("Map")
+        .and.have.lengthOf(0);
+
+      assert.calledOnce(this.mockMemento.get);
+      assert.calledWith(this.mockMemento.get, "foo", []);
+    });
+
+    it("saveMapToMemento is the inverse to loadMapFromMemento", async function() {
+      this.mockMemento.update.resolves();
+
+      const testMap = new Map<string, number | string>();
+      testMap.set("one", 1);
+      testMap.set("two", 2);
+      testMap.set("cake", "a lie");
+
+      await saveMapToMemento(this.mockMemento, "bar", testMap).should.be
+        .fulfilled;
+
+      assert.calledOnce(this.mockMemento.update);
+      expect(this.mockMemento.update.getCall(0).args[0]).to.equal("bar");
+
+      this.mockMemento.get.returns(this.mockMemento.update.getCall(0).args[1]);
+
+      expect(loadMapFromMemento(this.mockMemento, "bar"))
+        .to.be.a("Map")
+        .and.deep.equal(testMap);
+
+      assert.calledOnce(this.mockMemento.get);
+      assert.calledWith(this.mockMemento.get, "bar");
+    });
+  });
+
+  describe("#rmRf", () => {
+    beforeEach(() => {
+      mockFs({
+        "fooDir/testFile": "It's something",
+        "fooDir/foo/bar/baz": "nested",
+        "fooDir/dturinae/asdf": "something",
+        thisShouldStay: "I'm still there"
+      });
+    });
+
+    afterEach(() => {
+      mockFs.restore();
+    });
+
+    // FIXME: this does not work as mock-fs doesn't support fs.Dirent:
+    // https://github.com/tschaub/mock-fs/issues/272#issuecomment-513847569
+    xit("removes the directory fooDir and all its contents", async () => {
+      expect(existsSync("fooDir")).to.be.true;
+
+      await rmRf("fooDir").should.be.fulfilled;
+
+      expect(existsSync("fooDir")).to.be.false;
     });
   });
 });
