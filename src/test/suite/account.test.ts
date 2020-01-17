@@ -1,10 +1,7 @@
-import { expect, should, use } from "chai";
-import * as chaiAsPromised from "chai-as-promised";
-import * as chaiThings from "chai-things";
+import { expect } from "chai";
 import * as keytar from "keytar";
 import { afterEach, beforeEach, describe, it } from "mocha";
 import * as obs from "obs-ts";
-import * as pino from "pino";
 import { createSandbox, match, SinonSandbox } from "sinon";
 import { ImportMock } from "ts-mock-imports";
 import * as vscode from "vscode";
@@ -16,12 +13,7 @@ import {
   configurationCheckUnimportedAccounts,
   configurationExtensionName
 } from "../../accounts";
-
-use(chaiThings);
-use(chaiAsPromised);
-should();
-
-const logger = pino({ level: "trace" }, pino.destination("./logfile.json"));
+import { executeAndWaitForEvent, logger, waitForEvent } from "./test-utils";
 
 const fakeAccount1 = {
   accountName: "foo",
@@ -41,25 +33,6 @@ async function addFakeAcountsToConfig(
   await vscode.workspace
     .getConfiguration(configurationExtensionName)
     .update(configurationAccounts, accounts, vscode.ConfigurationTarget.Global);
-}
-
-async function waitForEvent<T>(
-  event: vscode.Event<T>
-): Promise<vscode.Disposable> {
-  return new Promise(resolve => {
-    const disposable = event(_ => {
-      resolve(disposable);
-    });
-  });
-}
-
-async function executeAndWaitForEvent<T, ET>(
-  func: () => Thenable<T>,
-  event: vscode.Event<ET>
-): Promise<T> {
-  const [res, disposable] = await Promise.all([func(), waitForEvent(event)]);
-  disposable.dispose();
-  return res;
 }
 
 function extractApiAccountMapFromSpy(
@@ -100,7 +73,9 @@ class FakeAccountFixture {
   }
 }
 
-describe("AccountManager", () => {
+describe("AccountManager", function() {
+  this.timeout(5000);
+
   beforeEach(function() {
     this.keytarGetPasswordMock = ImportMock.mockFunction(keytar, "getPassword");
     this.keytarSetPasswordMock = ImportMock.mockFunction(keytar, "setPassword");
@@ -149,7 +124,7 @@ describe("AccountManager", () => {
 
       this.sandbox.assert.calledOnce(this.curConEventSpy);
 
-      expect(this.curConEventSpy.getCall(0).args[0]).to.deep.equal({
+      expect(extractApiAccountMapFromSpy(this.curConEventSpy)).to.deep.equal({
         defaultApi: undefined,
         mapping: new Map()
       });
@@ -320,7 +295,7 @@ describe("AccountManager", () => {
         );
 
         this.sandbox.assert.calledOnce(this.curConEventSpy);
-        expect(this.curConEventSpy.getCall(0).args[0])
+        expect(extractApiAccountMapFromSpy(this.curConEventSpy))
           .to.have.property("mapping")
           .that.is.a("Map");
 
@@ -332,19 +307,17 @@ describe("AccountManager", () => {
 
         // the map should contain a mapping for our apiUrl and the Connection
         // should have a set value
-        let accountStorageAndConnection = curCons.mapping.get(apiUrl);
-        expect(accountStorageAndConnection)
-          .to.be.an("array")
-          .that.has.length(2);
-        accountStorageAndConnection = accountStorageAndConnection!;
+        let instanceInfo = curCons.mapping.get(apiUrl);
+        expect(instanceInfo).to.not.be.undefined;
+        instanceInfo = instanceInfo!;
 
-        expect(accountStorageAndConnection[0]).to.deep.equal({
+        expect(instanceInfo.account).to.deep.equal({
           accountName: apiUrl,
           apiUrl,
           username: "barUser"
         });
 
-        let con = accountStorageAndConnection[1];
+        let con = instanceInfo.connection;
         expect(con).to.not.be.undefined;
 
         con = con!;
@@ -374,8 +347,7 @@ describe("AccountManager", () => {
         this.sandbox.assert.notCalled(this.keytarSetPasswordMock);
 
         this.sandbox.assert.calledOnce(this.curConEventSpy);
-        const curCons = this.curConEventSpy.getCall(0)
-          .args[0] as ApiAccountMapping;
+        const curCons = extractApiAccountMapFromSpy(this.curConEventSpy);
 
         const apiUrl = obs.normalizeUrl(fakeOscrcAccount.apiUrl);
 
@@ -383,7 +355,7 @@ describe("AccountManager", () => {
           .to.have.length(3)
           .and.to.contain(apiUrl);
         // Connection object should be undefined, as it doesn't know the password
-        expect(curCons.mapping.get(apiUrl)![1]).to.be.undefined;
+        expect(curCons.mapping.get(apiUrl)!.connection).to.be.undefined;
       });
 
       it("doesn't import a present account", async function() {
@@ -573,6 +545,7 @@ describe("AccountManager", () => {
 
       // password was retrieved?
       this.sandbox.assert.calledOnce(this.keytarGetPasswordMock);
+
       expect(this.keytarGetPasswordMock.getCall(0).args[1]).to.eql(
         fakeAccount1.apiUrl
       );
@@ -580,20 +553,21 @@ describe("AccountManager", () => {
       // did the EventEmitter fire?
       this.sandbox.assert.calledOnce(this.curConEventSpy);
       expect(this.curConEventSpy.getCall(0).args).to.have.length(1);
-      const curCons = this.curConEventSpy.getCall(0).args[0];
+      const curCons = extractApiAccountMapFromSpy(this.curConEventSpy);
 
       expect(curCons)
         .to.have.property("mapping")
         .that.is.a("Map");
-      const mappings: Array<[AccountStorage, obs.Connection | undefined]> = [
-        ...curCons.mapping.values()
-      ];
+      const mappings = [...curCons.mapping.values()];
 
       expect(mappings).to.have.length(1);
       // AccountStorage
-      expect(mappings[0][0]).to.include({ ...fakeAccount1 });
+      expect(mappings[0].account).to.deep.equal({ ...fakeAccount1 });
       // Connection is not undefined
-      expect(mappings[0][1]).to.have.property("url", fakeAccount1.apiUrl);
+      expect(mappings[0].connection).to.have.property(
+        "url",
+        fakeAccount1.apiUrl
+      );
     });
 
     it("sets the default connection when only one account is present", async function() {
@@ -601,7 +575,7 @@ describe("AccountManager", () => {
 
       // did the EventEmitter fire?
       this.sandbox.assert.calledOnce(this.curConEventSpy);
-      const curCons = this.curConEventSpy.getCall(0).args[0];
+      const curCons = extractApiAccountMapFromSpy(this.curConEventSpy);
 
       expect(curCons)
         .to.have.property("defaultApi")
@@ -767,7 +741,7 @@ describe("AccountManager", () => {
       });
     });
 
-    describe("#interactivelySetAccountPassword", async function() {
+    describe("#interactivelySetAccountPassword", () => {
       it("presents a QuickPick if no apiUrl is passed as an argument and sets the account password", async function() {
         const toChangeApi = fakeAccount1.apiUrl;
         const newPw = "dtruiae";
@@ -794,10 +768,11 @@ describe("AccountManager", () => {
 
         this.sandbox.assert.calledOnce(this.curConEventSpy);
         const curCon = extractApiAccountMapFromSpy(this.curConEventSpy);
-        expect(curCon.mapping.get(toChangeApi))
-          .to.be.an("array")
-          .and.have.length(2);
-        expect(curCon.mapping.get(toChangeApi)![1]).to.deep.include({
+        const instanceInfo = curCon.mapping.get(toChangeApi);
+
+        expect(instanceInfo).to.not.be.undefined;
+        expect(instanceInfo!.account).to.deep.equal(fakeAccount1);
+        expect(instanceInfo!.connection).to.deep.include({
           password: newPw,
           url: toChangeApi
         });

@@ -4,7 +4,10 @@ import * as assert from "assert";
 import * as keytar from "keytar";
 import {
   Account,
+  Arch,
   Connection,
+  Distribution,
+  fetchHostedDistributions,
   normalizeUrl,
   readAccountsFromOscrc
 } from "obs-ts";
@@ -12,7 +15,8 @@ import { Logger } from "pino";
 import { inspect } from "util";
 import * as vscode from "vscode";
 import { LoggingBase } from "./base-components";
-import { setDifference } from "./util";
+import { setDifference, tryFetchOrLog } from "./util";
+import { VscodeWindow } from "./vscode-dep";
 
 /**
  * # Accounts management
@@ -87,6 +91,14 @@ export interface AccountStorage {
   isDefault?: boolean;
 }
 
+export interface ObsInstance {
+  readonly account: AccountStorage;
+  readonly connection?: Connection;
+  readonly hostedDistributions?: readonly Distribution[];
+  readonly supportedArchitectures?: readonly Arch[];
+  readonly projectList?: readonly string[];
+}
+
 /**
  * This interface defines a container for storing the mapping between the API
  * URL and the respective accounts & the Connection used for this account.
@@ -95,64 +107,13 @@ export interface ApiAccountMapping {
   /**
    * Mapping URL to the API <=> Account + Connection
    */
-  mapping: Map<ApiUrl, [AccountStorage, Connection | undefined]>;
+  mapping: Map<ApiUrl, ObsInstance>;
 
   /** The API that that will be used for searching via the menu. */
   defaultApi: ApiUrl | undefined;
 }
 
-export interface VscodeWindow {
-  showInformationMessage: typeof vscode.window.showInformationMessage;
-
-  showErrorMessage: typeof vscode.window.showErrorMessage;
-
-  showQuickPick: typeof vscode.window.showQuickPick;
-
-  showInputBox: typeof vscode.window.showInputBox;
-}
-
 export class AccountManager extends LoggingBase {
-  /**
-   * Reads the AccountStorage from the provided workspace configuration and
-   * converts it to a [[ApiAccountMapping]].
-   *
-   * @param workspaceConfig  A WorkspaceConfiguration obtained via
-   *     [`vscode.workspace.getConfiguration`]
-   *     (https://code.visualstudio.com/api/references/vscode-api#workspace.getConfiguration)
-   *     with the `section` parameter set to the extensions configuration
-   *     prefix.
-   *
-   * @param createConnections  Flag whether the [[Connection]] objects should be
-   *     created for the returned [[ApiAccountMapping]] too. Note that this
-   *     incurs a read of the OS keyring and is thus only desirable if
-   *     absolutely necessary.
-   *
-   * @return
-   */
-  private static async getApiAccountMappingFromConfig(
-    workspaceConfig: vscode.WorkspaceConfiguration,
-    createConnections: boolean
-  ): Promise<ApiAccountMapping> {
-    const accounts = workspaceConfig.get<AccountStorage[]>(
-      configurationAccounts,
-      []
-    );
-
-    const res = {
-      defaultApi: undefined,
-      mapping: new Map<ApiUrl, [AccountStorage, Connection | undefined]>()
-    };
-
-    await Promise.all(
-      accounts.map(async acc => {
-        const con = createConnections ? await conFromAccount(acc) : undefined;
-        res.mapping.set(normalizeUrl(acc.apiUrl), [acc, con]);
-      })
-    );
-
-    return res;
-  }
-
   /**
    * Check that the given accounts are a valid as a whole.
    *
@@ -238,7 +199,7 @@ export class AccountManager extends LoggingBase {
 
     this.logger.trace("initializing the AccountManager");
 
-    this.apiAccountMap = await AccountManager.getApiAccountMappingFromConfig(
+    this.apiAccountMap = await this.getApiAccountMappingFromConfig(
       vscode.workspace.getConfiguration(configurationExtensionName),
       true
     );
@@ -338,8 +299,11 @@ export class AccountManager extends LoggingBase {
 
         if (!this.apiAccountMap.mapping.has(fixedAcc.apiUrl)) {
           const accStorage = await accountStorageFromAccount(fixedAcc);
-          const con = await conFromAccount(accStorage);
-          this.apiAccountMap.mapping.set(fixedAcc.apiUrl, [accStorage, con]);
+          this.apiAccountMap.mapping.set(
+            fixedAcc.apiUrl,
+            await this.obsInstanceFromAccountStorage(accStorage)
+          );
+
           added = true;
         }
       })
@@ -355,7 +319,7 @@ export class AccountManager extends LoggingBase {
     if (apiUrl === undefined) {
       const allAccountsAndCons = [...this.apiAccountMap.mapping.values()];
       const accName = await this.vscodeWindow.showQuickPick(
-        allAccountsAndCons.map(([acc, _]) => acc.accountName)
+        allAccountsAndCons.map(instancInfo => instancInfo.account.accountName)
       );
       if (accName === undefined) {
         return;
@@ -363,8 +327,8 @@ export class AccountManager extends LoggingBase {
 
       // we *must* find a result here, as the user cannot set a name themselves
       apiUrl = allAccountsAndCons.find(
-        ([acc, _]) => acc.accountName === accName
-      )![0].apiUrl;
+        instanceInfo => instanceInfo.account.accountName === accName
+      )!.account.apiUrl;
     }
 
     const newPw = await this.vscodeWindow.showInputBox({
@@ -374,16 +338,16 @@ export class AccountManager extends LoggingBase {
         val === "" ? "Password must not be empty" : undefined
     });
 
-    const accountCon = this.apiAccountMap.mapping.get(apiUrl);
+    const instanceInfo = this.apiAccountMap.mapping.get(apiUrl);
 
-    if (accountCon === undefined) {
+    if (instanceInfo === undefined) {
       this.logger.error(
         "Did not get a Account & Connection for '%s', but it must exist",
         apiUrl
       );
       return;
     }
-    const account = accountCon[0];
+    const account = instanceInfo.account;
     assert(
       account.apiUrl === normalizeUrl(account.apiUrl),
       `Account ${
@@ -395,10 +359,11 @@ export class AccountManager extends LoggingBase {
 
     if (newPw !== undefined) {
       await writePasswordToKeyring(account, newPw);
-      this.apiAccountMap.mapping.set(apiUrl, [
-        account,
-        new Connection(account.username, newPw, apiUrl)
-      ]);
+      const con = new Connection(account.username, newPw, apiUrl);
+      this.apiAccountMap.mapping.set(
+        apiUrl,
+        await this.obsInstanceFromAccountStorage(account, con)
+      );
 
       this.onConnectionChangeEmitter.fire(this.apiAccountMap);
     }
@@ -408,23 +373,25 @@ export class AccountManager extends LoggingBase {
    * Delete the password of the account with the given API URL.
    */
   public async removeAccountPassword(apiUrl: ApiUrl): Promise<void> {
-    const acc = this.apiAccountMap.mapping.get(normalizeUrl(apiUrl));
+    const instanceInfo = this.apiAccountMap.mapping.get(normalizeUrl(apiUrl));
 
-    if (acc === undefined) {
+    if (instanceInfo === undefined) {
       this.logger.error(
         `removeAccountPassword got called with the apiUrl ${apiUrl}, but no account exists for that url`
       );
       return;
     }
-    await removePasswordFromKeyring(acc[0]);
+    await removePasswordFromKeyring(instanceInfo.account);
   }
 
   public async findAccountsWithoutPassword(): Promise<AccountStorage[]> {
     const accountsWithoutPw: AccountStorage[] = [];
     await Promise.all(
-      [...this.apiAccountMap.mapping.values()].map(async ([acc, _]) => {
-        if ((await readPasswordFromKeyring(acc)) === undefined) {
-          accountsWithoutPw.push(acc);
+      [...this.apiAccountMap.mapping.values()].map(async instanceInfo => {
+        if (
+          (await readPasswordFromKeyring(instanceInfo.account)) === undefined
+        ) {
+          accountsWithoutPw.push(instanceInfo.account);
         }
       })
     );
@@ -462,7 +429,7 @@ export class AccountManager extends LoggingBase {
     }
 
     // check differences and react to that
-    const newApiAccountMap = await AccountManager.getApiAccountMappingFromConfig(
+    const newApiAccountMap = await this.getApiAccountMappingFromConfig(
       wsConfig,
       false
     );
@@ -499,18 +466,18 @@ export class AccountManager extends LoggingBase {
 
     const changedAccounts: ApiUrl[] = [];
 
-    for (const [apiUrl, [acc]] of newApiAccountMap.mapping) {
+    for (const [apiUrl, instanceInfo] of newApiAccountMap.mapping) {
       // account got added, prompt user for password
       if (!this.apiAccountMap.mapping.has(apiUrl)) {
         assert(
-          normalizeUrl(apiUrl) === normalizeUrl(acc.apiUrl),
+          normalizeUrl(apiUrl) === normalizeUrl(instanceInfo.account.apiUrl),
           "apiAccountMap is invalid, AccountStorage.apiUrl and apiUrl do not match!"
         );
 
         changedAccounts.push(apiUrl);
       } else {
-        const [_, oldCon] = this.apiAccountMap.mapping.get(apiUrl)!;
-        newApiAccountMap.mapping.set(apiUrl, [acc, oldCon]);
+        const oldInstanceInfo = this.apiAccountMap.mapping.get(apiUrl)!;
+        newApiAccountMap.mapping.set(apiUrl, oldInstanceInfo);
       }
     }
     return changedAccounts;
@@ -565,7 +532,7 @@ export class AccountManager extends LoggingBase {
   private async updateAccountStorageConfig(): Promise<void> {
     const accounts: AccountStorage[] = [
       ...this.apiAccountMap.mapping.values()
-    ].map(([acc, _]) => acc);
+    ].map(instanceInfo => instanceInfo.account);
 
     this.logger.debug(
       "saving the following accounts to the system settings: %s",
@@ -578,6 +545,74 @@ export class AccountManager extends LoggingBase {
       accounts,
       vscode.ConfigurationTarget.Global
     );
+  }
+
+  /**
+   * Reads the AccountStorage from the provided workspace configuration and
+   * converts it to a [[ApiAccountMapping]].
+   *
+   * @param workspaceConfig  A WorkspaceConfiguration obtained via
+   *     [`vscode.workspace.getConfiguration`]
+   *     (https://code.visualstudio.com/api/references/vscode-api#workspace.getConfiguration)
+   *     with the `section` parameter set to the extensions configuration
+   *     prefix.
+   *
+   * @param createConnections  Flag whether the [[Connection]] objects should be
+   *     created for the returned [[ApiAccountMapping]] too. Note that this
+   *     incurs a read of the OS keyring and is thus only desirable if
+   *     absolutely necessary.
+   *
+   * @return
+   */
+  private async getApiAccountMappingFromConfig(
+    workspaceConfig: vscode.WorkspaceConfiguration,
+    createConnections: boolean
+  ): Promise<ApiAccountMapping> {
+    const accounts = workspaceConfig.get<AccountStorage[]>(
+      configurationAccounts,
+      []
+    );
+
+    const res = {
+      defaultApi: undefined,
+      mapping: new Map<ApiUrl, ObsInstance>()
+    };
+
+    await Promise.all(
+      accounts.map(async acc => {
+        res.mapping.set(
+          normalizeUrl(acc.apiUrl),
+          createConnections
+            ? await this.obsInstanceFromAccountStorage(acc)
+            : { account: acc }
+        );
+      })
+    );
+
+    return res;
+  }
+
+  private async obsInstanceFromAccountStorage(
+    accStorage: AccountStorage,
+    con?: Connection
+  ): Promise<ObsInstance> {
+    if (con === undefined) {
+      con = await conFromAccount(accStorage);
+
+      if (con === undefined) {
+        return { account: accStorage };
+      }
+    }
+
+    const distros = await tryFetchOrLog(
+      () => fetchHostedDistributions(con!),
+      this.logger
+    );
+    return {
+      account: accStorage,
+      connection: con,
+      hostedDistributions: distros
+    };
   }
 }
 
