@@ -5,6 +5,7 @@ import { existsSync } from "fs";
 import { afterEach, beforeEach, describe, it, xit } from "mocha";
 import { assert, stub } from "sinon";
 import {
+  deepCopyProperties,
   loadMapFromMemento,
   rmRf,
   saveMapToMemento,
@@ -111,6 +112,36 @@ describe("utilities", () => {
       await rmRf("fooDir").should.be.fulfilled;
 
       expect(existsSync("fooDir")).to.be.false;
+    });
+  });
+
+  describe("#deepCopyPropierts", () => {
+    it("copies an object with nested properties", () => {
+      const obj = {
+        foo: "bar",
+        someValues: [1, 2, 890, 3, "baz"],
+        someObj: {
+          hello: "world",
+          aArray: [16, 28]
+        }
+      };
+      const newObj = deepCopyProperties(obj);
+      expect(newObj).to.deep.equal(obj);
+
+      newObj.someObj.hello = "all";
+      expect(newObj.someObj.hello).to.deep.equal("all");
+      expect(obj.someObj.hello).to.deep.equal("world");
+    });
+
+    it("does not copy functions", () => {
+      const objWithFunc = {
+        baz: () => 16,
+        foo: "bar"
+      };
+
+      expect(deepCopyProperties(objWithFunc))
+        .to.deep.equal({ foo: "bar" })
+        .and.to.not.have.property("baz");
     });
   });
 });

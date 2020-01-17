@@ -1,6 +1,6 @@
 import { promises as fsPromises } from "fs";
 import { join } from "path";
-import { Memento } from "vscode";
+import * as vscode from "vscode";
 
 /**
  * Returns the difference `setA - setB` (all elements from A that are not in B).
@@ -32,7 +32,7 @@ export function setDifference<T>(setA: Set<T>, setB: Set<T>): Set<T> {
  * @return  The Map that has been saved by [[saveMapToMemento]].
  */
 export function loadMapFromMemento<K, T>(
-  memento: Memento,
+  memento: vscode.Memento,
   storageKey: string
 ): Map<K, T> {
   return new Map(memento.get<Array<[K, T]>>(storageKey, []));
@@ -42,7 +42,7 @@ export function loadMapFromMemento<K, T>(
  * Save the Map `map` to the given `memento` as an array of Tuples of type `[K, T]`.
  */
 export async function saveMapToMemento<K, T>(
-  memento: Memento,
+  memento: vscode.Memento,
   storageKey: string,
   map: Map<K, T>
 ): Promise<void> {
@@ -63,4 +63,30 @@ export async function rmRf(dir: string): Promise<void> {
       }
     })
   );
+}
+
+/** Create a deep copy of `obj` omitting **all** functions. */
+export function deepCopyProperties<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+export async function apiCallReportWrapper<RT>(
+  apiCaller: () => Promise<RT>,
+  logger: Logger,
+  showErrorMessage: typeof vscode.window.showErrorMessage = vscode.window
+    .showErrorMessage
+): Promise<RT | undefined> {
+  try {
+    return apiCaller();
+  } catch (err) {
+    const errMsg = "Error performing an API call, got: ".concat(
+      err.status !== undefined && err.status.summary !== undefined
+        ? err.status.summary
+        : err
+    );
+
+    logger.error(errMsg);
+    await showErrorMessage(errMsg);
+    return undefined;
+  }
 }
