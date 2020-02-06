@@ -4,8 +4,8 @@ import { promises as fsPromises } from "fs";
 import { join } from "path";
 import * as pino from "pino";
 import * as vscode from "vscode";
-import { ProjectTreeProvider } from "./project";
 import { AccountManager } from "./accounts";
+import { ProjectTreeProvider, scheme } from "./project-view";
 import { RepositoryTreeProvider } from "./repository";
 
 // this method is called when your extension is activated
