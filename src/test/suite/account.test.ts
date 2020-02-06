@@ -13,19 +13,13 @@ import {
   configurationCheckUnimportedAccounts,
   configurationExtensionName
 } from "../../accounts";
-import { executeAndWaitForEvent, logger, waitForEvent } from "./test-utils";
-
-const fakeAccount1 = {
-  accountName: "foo",
-  apiUrl: "https://api.baz.org/",
-  username: "fooUser"
-};
-
-const fakeAccount2 = {
-  accountName: "bar",
-  apiUrl: "https://api.obs.xyz/",
-  username: "barUser"
-};
+import { fakeAccount1, fakeAccount2 } from "./test-data";
+import {
+  createStubbedVscodeWindow,
+  executeAndWaitForEvent,
+  logger,
+  waitForEvent
+} from "./test-utils";
 
 async function addFakeAcountsToConfig(
   accounts: AccountStorage[]
@@ -55,12 +49,7 @@ class FakeAccountFixture {
 
     context.curConEventSpy = this.sandbox.spy();
 
-    context.vscodeWindow = {
-      showErrorMessage: this.sandbox.stub(),
-      showInformationMessage: this.sandbox.stub(),
-      showInputBox: this.sandbox.stub(),
-      showQuickPick: this.sandbox.stub()
-    };
+    context.vscodeWindow = createStubbedVscodeWindow(this.sandbox);
 
     context.mngr = new AccountManager(logger, context.vscodeWindow);
     context.mngr.onConnectionChange(context.curConEventSpy);
