@@ -82,7 +82,7 @@
       "activitybar": [
         {
           "id": "obs-tree-view",
-          "title": "Open Build Service",
+          "title": "Open Build Service Project",
           "icon": "media/obs-logo.svg"
         }
       ]
@@ -177,31 +177,34 @@
           "dark": "media/add_circle.svg"
         }
       },
+      {
+        "command": "obsProject.refreshProject",
+        "title": "Refresh this Project",
+        "icon": "media/update.svg"
+      },
+      {
+        "command": "obsProject.showPackageFileContents",
+        "title": "Show this files' contents"
+      },
+      {
+        "command": "obsProject.updatePackage",
+        "title": "Update this packages contents and data",
+        "icon": "media/update.svg"
+      },
+      {
+        "command": "obsProject.getProjectFromUri",
+        "title": "Get the Project belonging the provided Uri from the project bookmarks"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "obsAccount.importAccountsFromOsrc",
-          "when": "view == accountTree"
+          "command": "obsRepository.addRepositoryFromDistro",
+          "when": "view == repositoryTree",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
-        {
-          "command": "obsAccount.modifyAccountProperty",
-          "when": "view == accountTree && viewItem == accountPropertyElement",
-          "group": "inline"
-        },
-        {
-          "command": "obsAccount.modifyAccountProperty",
-          "when": "view == accountTree && viewItem == account",
-          "group": "inline"
-        },
-        {
-          "command": "obsAccount.removeAccount",
-          "when": "view == accountTree && viewItem == account",
-          "group": "inline"
-        },
         {
           "command": "obsProject.addProjectToBookmarks",
           "when": "view == projectTree && viewItem == ObsServer",
@@ -209,6 +212,10 @@
         },
         {
           "command": "obsProject.removeBookmark",
+          "when": "view == projectTree && viewItem == project"
+        },
+        {
+          "command": "obsProject.refreshProject",
           "when": "view == projectTree && viewItem == project",
           "group": "inline"
         },
@@ -269,6 +276,7 @@
     "@types/chai-things": "^0.0.34",
     "@types/glob": "^7.1.1",
     "@types/mocha": "^5.2.6",
+    "@types/mock-fs": "^4.10.0",
     "@types/node": "^12",
     "@types/pino": "^5.8.13",
     "@types/sinon": "^7.5.0",
@@ -278,6 +286,7 @@
     "chai-things": "^0.2.0",
     "glob": "^7.1.4",
     "mocha": "^6.1.4",
+    "mock-fs": "^4.10.4",
     "nyc": "^14.1.1",
     "pino-pretty": "^3.5.0",
     "sinon": "^7.5.0",
