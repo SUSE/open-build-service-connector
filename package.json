@@ -128,6 +128,55 @@
         "command": "obsProject.addProjectToBookmarks",
         "title": "Add a project to the bookmarked projects",
         "icon": "media/Plus_font_awesome.svg"
+      },
+      {
+        "command": "obsRepository.addArchitecturesToRepo",
+        "title": "Add architectures to a repository",
+        "icon": {
+          "light": "media/add_circle_outline.svg",
+          "dark": "media/add_circle.svg"
+        }
+      },
+      {
+        "command": "obsRepository.removeArchitectureFromRepo",
+        "title": "Remove this architecture from the repository",
+        "icon": {
+          "light": "media/remove_circle_outline.svg",
+          "dark": "media/remove_circle.svg"
+        }
+      },
+      {
+        "command": "obsRepository.addPathToRepo",
+        "title": "Add a path from a Project to a repository",
+        "icon": {
+          "light": "media/add_circle_outline.svg",
+          "dark": "media/add_circle.svg"
+        }
+      },
+      {
+        "command": "obsRepository.removePathFromRepo",
+        "title": "Remove this path from the repository",
+        "icon": {
+          "light": "media/remove_circle_outline.svg",
+          "dark": "media/remove_circle.svg"
+        }
+      },
+      {
+        "command": "obsRepository.removeRepository",
+        "title": "Remove this repository",
+        "icon": {
+          "light": "media/remove_circle_outline.svg",
+          "dark": "media/remove_circle.svg"
+        }
+      },
+      {
+        "command": "obsRepository.addRepositoryFromDistro",
+        "title": "Add a repository from a Distribution",
+        "icon": {
+          "light": "media/add_circle_outline.svg",
+          "dark": "media/add_circle.svg"
+        }
+      },
       }
     ],
     "menus": {
@@ -161,6 +210,31 @@
         {
           "command": "obsProject.removeBookmark",
           "when": "view == projectTree && viewItem == project",
+          "group": "inline"
+        },
+        {
+          "command": "obsRepository.addArchitecturesToRepo",
+          "when": "view == repositoryTree && viewItem == architectureRoot",
+          "group": "inline"
+        },
+        {
+          "command": "obsRepository.removeArchitectureFromRepo",
+          "when": "view == repositoryTree && viewItem == architecture",
+          "group": "inline"
+        },
+        {
+          "command": "obsRepository.removeRepository",
+          "when": "view == repositoryTree && viewItem == repositoryRoot",
+          "group": "inline"
+        },
+        {
+          "command": "obsRepository.addPathToRepo",
+          "when": "view == repositoryTree && viewItem == pathRoot",
+          "group": "inline"
+        },
+        {
+          "command": "obsRepository.removePathFromRepo",
+          "when": "view == repositoryTree && viewItem == repositoryPath",
           "group": "inline"
         }
       ]
