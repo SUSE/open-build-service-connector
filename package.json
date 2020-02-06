@@ -256,8 +256,9 @@
     "pretest": "yarn run compile",
     "test": "./runTests.sh",
     "precoverage": "yarn run compile",
+    "mockLibsecret": "[ -e ./mocklibsecret/build/libsecret.so ] || (mkdir -p mocklibsecret/build && pushd mocklibsecret/build && meson .. && ninja)",
     "coverage": "COVERAGE=1 ./runTests.sh && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
-    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources",
+    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources ./mocklibsecret/build/",
     "cleandeps": "rm -rf node_modules/",
     "package": "vsce package --yarn",
     "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --out ./documentation src/"

@@ -47,6 +47,21 @@ tests_node_13:
   <<: *setup_env
   <<: *run_tests
 
+test_mocklibsecret:
+  image: opensuse/tumbleweed
+  stage: test
+  before_script:
+    - zypper --non-interactive in gcc meson ninja libsecret-devel glib2-devel nodejs npm python3
+    - npm install keytar
+  script:
+    - mkdir -p mocklibsecret/build
+    - pushd mocklibsecret/build
+    - meson ..
+    - ninja
+    - cd ..
+    - ./run_tests.py
+    - popd
+
 package:
   image: node:10
   stage: deploy
