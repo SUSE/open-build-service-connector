@@ -1,6 +1,8 @@
 import { promises as fsPromises } from "fs";
 import { join } from "path";
+import { Logger } from "pino";
 import * as vscode from "vscode";
+import * as assert from "assert";
 
 /**
  * Returns the difference `setA - setB` (all elements from A that are not in B).
@@ -89,4 +91,65 @@ export async function apiCallReportWrapper<RT>(
     await showErrorMessage(errMsg);
     return undefined;
   }
+}
+
+/**
+ * General purpose decorator for **async** functions that throw an exception
+ * that should be logged and optionally reported to the user.
+ */
+export function logAndReportExceptions(reportToUser: boolean = true) {
+  const reportFunc = async (decoratedObj: any, err: any) => {
+    const errMsg = "Error performing an API call, got: ".concat(
+      err.status !== undefined && err.status.summary !== undefined
+        ? err.status.summary
+        : err
+    );
+
+    (decoratedObj as any).logger.error(errMsg);
+    if (reportToUser) {
+      await (decoratedObj as any).vscodeWindow.showErrorMessage(errMsg);
+    }
+  };
+  return (
+    target: object,
+    key: string | symbol,
+    descriptor: PropertyDescriptor | undefined
+  ) => {
+    // save a reference to the original method this way we keep the values
+    // currently in the descriptor and don't overwrite what another decorator
+    // might have done to the descriptor.
+    if (descriptor === undefined) {
+      descriptor = Object.getOwnPropertyDescriptor(target, key);
+    }
+
+    assert(
+      descriptor !== undefined,
+      `Cannot decorate the property ${String(
+        key
+      )} from the target ${target}: cannot get the descriptor`
+    );
+    const originalMethod = descriptor!.value;
+
+    descriptor!.value = async function() {
+      const args = [];
+
+      for (let i = 0; i < arguments.length; i++) {
+        args[i - 0] = arguments[i];
+      }
+
+      try {
+        const res = originalMethod.apply(this, args);
+        if (res.then !== undefined) {
+          return await res;
+        } else {
+          return res;
+        }
+      } catch (err) {
+        reportFunc(this, err);
+        return undefined;
+      }
+    };
+
+    return descriptor;
+  };
 }
