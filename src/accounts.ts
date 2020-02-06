@@ -15,7 +15,7 @@ import { Logger } from "pino";
 import { inspect } from "util";
 import * as vscode from "vscode";
 import { LoggingBase } from "./base-components";
-import { setDifference, tryFetchOrLog } from "./util";
+import { logAndReportExceptions, setDifference } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 
 /**
@@ -315,6 +315,7 @@ export class AccountManager extends LoggingBase {
   }
 
   /** Command to set the password of an account */
+  @logAndReportExceptions(false)
   public async interactivelySetAccountPassword(apiUrl?: ApiUrl): Promise<void> {
     if (apiUrl === undefined) {
       const allAccountsAndCons = [...this.apiAccountMap.mapping.values()];
@@ -341,11 +342,9 @@ export class AccountManager extends LoggingBase {
     const instanceInfo = this.apiAccountMap.mapping.get(apiUrl);
 
     if (instanceInfo === undefined) {
-      this.logger.error(
-        "Did not get a Account & Connection for '%s', but it must exist",
-        apiUrl
+      throw new Error(
+        `Did not get a Account & Connection for '${apiUrl}', but it must exist`
       );
-      return;
     }
     const account = instanceInfo.account;
     assert(
@@ -604,14 +603,11 @@ export class AccountManager extends LoggingBase {
       }
     }
 
-    const distros = await tryFetchOrLog(
-      () => fetchHostedDistributions(con!),
-      this.logger
-    );
     return {
       account: accStorage,
-      connection: con,
-      hostedDistributions: distros
+      connection: con
+    };
+  }
     };
   }
 }
