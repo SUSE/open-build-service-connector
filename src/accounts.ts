@@ -608,6 +608,20 @@ export class AccountManager extends LoggingBase {
       connection: con
     };
   }
+
+  private async populateObsInstanceInfo(
+    instanceInfo: ObsInstance
+  ): Promise<ObsInstance> {
+    if (instanceInfo.connection === undefined) {
+      throw new Error(
+        `Cannot populate ObsInstance object for ${instanceInfo.account.apiUrl}: no connection present`
+      );
+    }
+    return {
+      ...instanceInfo,
+      hostedDistributions: await fetchHostedDistributions(
+        instanceInfo.connection
+      )
     };
   }
 }
