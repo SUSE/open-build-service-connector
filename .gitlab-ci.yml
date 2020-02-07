@@ -1,5 +1,6 @@
 stages:
   - test
+  - lint
   - deploy
 variables:
   DISPLAY: ':99.0'
@@ -46,6 +47,18 @@ tests_node_13:
   stage: test
   <<: *setup_env
   <<: *run_tests
+
+license_check:
+  image: opensuse/tumbleweed
+  stage: lint
+  script:
+    - export GOPATH="$(pwd)/golang"
+    - mkdir -p ${GOPATH}
+    - zypper --non-interactive ref
+    - zypper --non-interactive in fd go git
+    - go get -u github.com/google/addlicense
+    - ${GOPATH}/bin/addlicense -c "SUSE LLC" -l mit $(fd '.*(\.ts|\.js|\.py|\.c|\.build)$')
+    - git diff --exit-code
 
 test_mocklibsecret:
   image: opensuse/tumbleweed
