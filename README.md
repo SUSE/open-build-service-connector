@@ -11,14 +11,14 @@ This extension integrates your projects with the Open Build Service.
 ## Installation
 
 - install libsecret: `zypper in libsecret`
-- grab the latest build from
-  [Gitlab](https://gitlab.suse.de/dancermak/vscode-obs//builds/artifacts/master/download?job=tests_node_10)
-- decompress the archive and install the extension: `code --install-extension vscode-obs-*.vsix*`
-
+- grab the latest build from Gitlab:
+  [vscode-obs-0.0.1.vsix](https://gitlab.suse.de/dancermak/vscode-obs/-/jobs/artifacts/master/raw/vscode-obs-0.0.1.vsix?job=pages)
+- install the extension: `code --install-extension vscode-obs-*.vsix*`
 
 ## Requirements
 
 - libsecret
+- an account on a OBS instance
 
 ## Extension Settings
 
@@ -27,7 +27,5 @@ None yet
 ## Known Issues
 
 - Searching is not supported
-- Adding invalid projects to the list causes the list of projects to be empty
 
 ## Release Notes
-
