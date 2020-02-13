@@ -21,11 +21,11 @@
 
 import * as assert from "assert";
 import {
-  getProject,
-  Project,
   fetchPackage,
+  getProject,
   HistoryFetchType,
-  Package
+  Package,
+  Project
 } from "obs-ts";
 import { fetchFileContents, PackageFile } from "obs-ts/lib/file";
 import { Logger } from "pino";
@@ -38,7 +38,6 @@ import {
   saveMapToMemento
 } from "./util";
 import { VscodeWindow } from "./vscode-dep";
-import { inspect } from "util";
 
 const projectBookmarkStorageKey: string = "vscodeObs.ProjectTree.Projects";
 
@@ -569,25 +568,63 @@ export class ProjectTreeProvider extends LoggingBase
     }
   }
 
+  @logAndReportExceptions()
   public async addProjectToBookmarksTreeButton(
     serverOrBookmark?: ObsServerTreeElement | BookmarkedProjectsRootElement
   ): Promise<void> {
-    if (serverOrBookmark === undefined) {
-      this.logger.debug(
-        "addProjectToBookmarksTreeButton invoked without a parameter for serverOrBookmark"
-      );
-      return;
+    let apiUrl: string;
+
+    if (this.currentConnections.mapping.size === 0) {
+      throw new Error("No accounts are present, cannot add a bookmark");
     }
 
-    if (isBookmarkedProjectsRootElement(serverOrBookmark)) {
+    if (
+      serverOrBookmark === undefined ||
+      isBookmarkedProjectsRootElement(serverOrBookmark)
+    ) {
+      if (this.currentConnections.mapping.size > 1) {
+        const allInstances = [...this.currentConnections.mapping.values()];
+        const accountName = await this.vscodeWindow.showQuickPick(
+          allInstances.map(obsInstance => obsInstance.account.accountName),
+          {
+            canPickMany: false,
+            placeHolder:
+              "Pick an account for which the bookmark should be added"
+          }
+        );
+        if (accountName === undefined) {
+          return;
+        }
+
+        apiUrl = allInstances.find(
+          obsInstance => obsInstance.account.accountName === accountName
+        )!.account.apiUrl;
+      } else {
+        assert(
+          this.currentConnections.mapping.size === 1,
+          `Only one account must be present, but got ${this.currentConnections.mapping.size}`
+        );
+        assert(
+          this.currentConnections.defaultApi !== undefined,
+          "Only one account is stored, but it is not the default"
+        );
+        apiUrl = this.currentConnections.defaultApi!;
+      }
+    } else {
       assert(
-        this.currentConnections.mapping.size === 1,
-        `addProjectToBookmarksTreeButton was invoked on a BookmarkedProjectsRootElement, but the number of stored accounts is not 1, but got ${this.currentConnections.mapping.size} instead`
+        isObsServerTreeElement(serverOrBookmark),
+        `expected the element on which this function was invoked to be a ObsServerTreeElement, but got a ${serverOrBookmark.contextValue} instead`
       );
-      assert(
-        this.currentConnections.defaultApi !== undefined,
-        "Only one account is stored, but it is not the default"
-      );
+      apiUrl = serverOrBookmark.account.apiUrl;
+    }
+    const obsInstance = this.currentConnections.mapping.get(apiUrl);
+    if (obsInstance === undefined) {
+      this.logger.error("obsInstance is undefined for the account %s", apiUrl);
+      return;
+    }
+    if (obsInstance.connection === undefined) {
+      const errMsg = `The account for the buildservice instance ${apiUrl} is not configured properly: no password is specified`;
+      throw new Error(errMsg);
     }
 
     const projectName = await this.vscodeWindow.showInputBox({
@@ -604,19 +641,6 @@ export class ProjectTreeProvider extends LoggingBase
         "addProjectToBookmarksTreeButton invoked, but no project name was provided"
       );
       return;
-    }
-
-    const apiUrl = isBookmarkedProjectsRootElement(serverOrBookmark)
-      ? this.currentConnections.defaultApi!
-      : serverOrBookmark.account.apiUrl;
-    const obsInstance = this.currentConnections.mapping.get(apiUrl);
-    if (obsInstance === undefined) {
-      this.logger.error("obsInstance is undefined for the account %s", apiUrl);
-      return;
-    }
-    if (obsInstance.connection === undefined) {
-      const errMsg = `The account for the buildservice instance ${apiUrl} is not configured properly: no password is specified`;
-      throw new Error(errMsg);
     }
 
     let proj: Project | undefined;

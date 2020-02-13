@@ -127,7 +127,7 @@
       {
         "command": "obsProject.addProjectToBookmarks",
         "title": "Add a project to the bookmarked projects",
-        "icon": "media/Plus_font_awesome.svg"
+        "icon": "media/add.svg"
       },
       {
         "command": "obsRepository.addArchitecturesToRepo",
@@ -208,6 +208,11 @@
         {
           "command": "obsProject.addProjectToBookmarks",
           "when": "view == projectTree && viewItem == ObsServer",
+          "group": "inline"
+        },
+        {
+          "command": "obsProject.addProjectToBookmarks",
+          "when": "view == projectTree && viewItem == BookmarkedProjectsRoot",
           "group": "inline"
         },
         {
