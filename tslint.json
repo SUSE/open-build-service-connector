@@ -1,6 +1,7 @@
 {
   "extends": ["tslint:latest", "tslint-config-prettier"],
   "rules": {
+    "no-floating-promises": true,
     "interface-name": false,
     "max-classes-per-file": false,
     "no-string-throw": true,
