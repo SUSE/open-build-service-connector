@@ -1,71 +1,236 @@
 {
-  "name": "vscode-obs",
-  "displayName": "vscode-obs",
-  "description": "Wrapper for the Open Build Service",
-  "version": "0.0.1",
-  "publisher": "SUSE",
-  "license": "GPL-3.0-only",
-  "repository": "https://gitlab.suse.de/dancermak/vscode-obs",
-  "engines": {
-    "vscode": "^1.37.0"
+  "devDependencies": {
+    "vscode-test": "^1.0.2",
+    "vscode-extension-tester": "^2.1.0",
+    "vsce": "^1.68.0",
+    "typescript": "^3.7.0",
+    "typedoc": "^0.16",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint": "^6",
+    "ts-mock-imports": "^1.2.6",
+    "sinon": "^9",
+    "pino-pretty": "^3.5.0",
+    "nyc": "^15",
+    "mock-fs": "^4.10.4",
+    "mocha": "^7",
+    "glob": "^7.1.4",
+    "chai-things": "^0.2.0",
+    "chai-as-promised": "^7.1.1",
+    "chai": "^4.2.0",
+    "@types/vscode": "^1.37.0",
+    "@types/sinon": "^7.5.0",
+    "@types/pino": "^5.8.13",
+    "@types/node": "^13",
+    "@types/mock-fs": "^4.10.0",
+    "@types/mocha": "^7",
+    "@types/glob": "^7.1.1",
+    "@types/chai-things": "^0.0.34",
+    "@types/chai-as-promised": "^7.1.2",
+    "@types/chai": "^4.2.3"
   },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onView:projectTree",
-    "onView:repositoryTree"
-  ],
-  "main": "./out/extension.js",
+  "dependencies": {
+    "xml2js": "^0.4.22",
+    "pino": "^5.14.0",
+    "obs-ts": "https://gitlab.suse.de/dancermak/obs.ts.git",
+    "keytar": "^5.0.0-beta.3",
+    "config-ini-parser": "^1.2.2"
+  },
+  "_comment": "FIXME: need to drag in config-ini-parser and xml2js in from obs-ts, remove this once obs-ts has been properly released",
+  "scripts": {
+    "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --out ./documentation src/",
+    "package": "vsce package --yarn",
+    "cleandeps": "rm -rf node_modules/",
+    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources ./mocklibsecret/build/",
+    "coverage": "COVERAGE=1 ./runTests.sh && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
+    "test:ui": "yarn run compile && yarn run mockLibsecret && LD_PRELOAD=./mocklibsecret/build/libsecret.so node ./out/ui-tests/runTests.js",
+    "mockLibsecret": "[ -e ./mocklibsecret/build/libsecret.so ] || (mkdir -p mocklibsecret/build && pushd mocklibsecret/build && meson .. && ninja)",
+    "test:ui:old": "yarn run compile && extest setup-and-run --yarn './out/test-hooks/**/*.js'",
+    "precoverage": "yarn run compile",
+    "test": "./runTests.sh",
+    "pretest": "yarn run compile",
+    "watch": "tsc -watch -p ./",
+    "compile": "tsc -p ./",
+    "lint": "tslint --project ./tsconfig.json --force --format verbose \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "vscode:prepublish": "yarn run compile"
+  },
   "contributes": {
+    "menus": {
+      "view/item/context": [
+        {
+          "group": "inline",
+          "when": "view == projectTree && viewItem == ObsServer",
+          "command": "obsProject.addProjectToBookmarks"
+        },
+        {
+          "group": "inline",
+          "when": "view == projectTree && viewItem == BookmarkedProjectsRoot",
+          "command": "obsProject.addProjectToBookmarks"
+        },
+        {
+          "when": "view == projectTree && viewItem == project",
+          "command": "obsProject.removeBookmark"
+        },
+        {
+          "group": "inline",
+          "when": "view == projectTree && viewItem == project",
+          "command": "obsProject.refreshProject"
+        },
+        {
+          "group": "inline",
+          "when": "view == repositoryTree && viewItem == architectureRoot",
+          "command": "obsRepository.addArchitecturesToRepo"
+        },
+        {
+          "group": "inline",
+          "when": "view == repositoryTree && viewItem == architecture",
+          "command": "obsRepository.removeArchitectureFromRepo"
+        },
+        {
+          "group": "inline",
+          "when": "view == repositoryTree && viewItem == repositoryRoot",
+          "command": "obsRepository.removeRepository"
+        },
+        {
+          "group": "inline",
+          "when": "view == repositoryTree && viewItem == pathRoot",
+          "command": "obsRepository.addPathToRepo"
+        },
+        {
+          "group": "inline",
+          "when": "view == repositoryTree && viewItem == repositoryPath",
+          "command": "obsRepository.removePathFromRepo"
+        }
+      ],
+      "view/title": [
+        {
+          "group": "navigation",
+          "when": "view == repositoryTree",
+          "command": "obsRepository.addRepositoryFromDistro"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "icon": "media/Remove_font_awesome.svg",
+        "title": "Remove this Bookmark",
+        "command": "obsProject.removeBookmark"
+      },
+      {
+        "icon": "media/ic_export_import.svg",
+        "title": "Import accounts from osc's configuration file",
+        "command": "obsAccount.importAccountsFromOsrc"
+      },
+      {
+        "title": "Set the password of a Build Service Account",
+        "command": "obsAccount.setAccountPassword"
+      },
+      {
+        "icon": "media/Remove_font_awesome.svg",
+        "title": "Remove an account from the settings",
+        "command": "obsAccount.removeAccount"
+      },
+      {
+        "title": "Create a new account for the Open Build Service ",
+        "command": "obsAccount.newAccountWizzard"
+      },
+      {
+        "icon": "media/add.svg",
+        "title": "Add a project to the bookmarked projects",
+        "command": "obsProject.addProjectToBookmarks"
+      },
+      {
+        "icon": {
+          "dark": "media/add_circle.svg",
+          "light": "media/add_circle_outline.svg"
+        },
+        "title": "Add architectures to a repository",
+        "command": "obsRepository.addArchitecturesToRepo"
+      },
+      {
+        "icon": {
+          "dark": "media/remove_circle.svg",
+          "light": "media/remove_circle_outline.svg"
+        },
+        "title": "Remove this architecture from the repository",
+        "command": "obsRepository.removeArchitectureFromRepo"
+      },
+      {
+        "icon": {
+          "dark": "media/add_circle.svg",
+          "light": "media/add_circle_outline.svg"
+        },
+        "title": "Add a path from a Project to a repository",
+        "command": "obsRepository.addPathToRepo"
+      },
+      {
+        "icon": {
+          "dark": "media/remove_circle.svg",
+          "light": "media/remove_circle_outline.svg"
+        },
+        "title": "Remove this path from the repository",
+        "command": "obsRepository.removePathFromRepo"
+      },
+      {
+        "icon": {
+          "dark": "media/remove_circle.svg",
+          "light": "media/remove_circle_outline.svg"
+        },
+        "title": "Remove this repository",
+        "command": "obsRepository.removeRepository"
+      },
+      {
+        "icon": {
+          "dark": "media/add_circle.svg",
+          "light": "media/add_circle_outline.svg"
+        },
+        "title": "Add a repository from a Distribution",
+        "command": "obsRepository.addRepositoryFromDistro"
+      },
+      {
+        "icon": "media/update.svg",
+        "title": "Refresh this Project",
+        "command": "obsProject.refreshProject"
+      },
+      {
+        "title": "Show this files' contents",
+        "command": "obsProject.showPackageFileContents"
+      },
+      {
+        "icon": "media/update.svg",
+        "title": "Update this packages contents and data",
+        "command": "obsProject.updatePackage"
+      },
+      {
+        "title": "Get the Project belonging the provided Uri from the project bookmarks",
+        "command": "obsProject.getProjectFromUri"
+      }
+    ],
+    "views": {
+      "obs-tree-view": [
+        {
+          "name": "Projects",
+          "id": "projectTree"
+        },
+        {
+          "name": "Repositories",
+          "id": "repositoryTree"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "icon": "media/obs-logo.svg",
+          "title": "Open Build Service Project",
+          "id": "obs-tree-view"
+        }
+      ]
+    },
     "configuration": {
-      "title": "Open Build Service",
       "properties": {
-        "vscode-obs.accounts": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "description": "An account for an instance of the Open Build Service",
-            "properties": {
-              "accountName": {
-                "type": "string",
-                "description": "A name for this account"
-              },
-              "apiUrl": {
-                "type": "string"
-              },
-              "username": {
-                "type": "string"
-              },
-              "realname": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              },
-              "isDefault": {
-                "type": "boolean"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "username",
-              "apiUrl"
-            ]
-          },
-          "scope": "application",
-          "default": [],
-          "description": "Accounts for instances of the Open Build Service"
-        },
-        "vscode-obs.checkUnimportedAccounts": {
-          "type": "boolean",
-          "description": "Specify whether the extension will check for accounts in your .oscrc that have not been imported into VSCode",
-          "default": true,
-          "scope": "application"
-        },
         "vscode-obs.logLevel": {
-          "type": "string",
-          "description": "Default logging level used",
+          "default": "info",
           "enum": [
             "trace",
             "debug",
@@ -74,234 +239,77 @@
             "error",
             "fatal"
           ],
-          "default": "info"
-        }
-      }
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "obs-tree-view",
-          "title": "Open Build Service Project",
-          "icon": "media/obs-logo.svg"
-        }
-      ]
-    },
-    "views": {
-      "obs-tree-view": [
-        {
-          "id": "projectTree",
-          "name": "Projects"
+          "description": "Default logging level used",
+          "type": "string"
         },
-        {
-          "id": "repositoryTree",
-          "name": "Repositories"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "obsProject.removeBookmark",
-        "title": "Remove this Bookmark",
-        "icon": "media/Remove_font_awesome.svg"
-      },
-      {
-        "command": "obsAccount.importAccountsFromOsrc",
-        "title": "Import accounts from osc's configuration file",
-        "icon": "media/ic_export_import.svg"
-      },
-      {
-        "command": "obsAccount.setAccountPassword",
-        "title": "Set the password of a Build Service Account"
-      },
-      {
-        "command": "obsAccount.modifyAccountProperty",
-        "title": "Modify this account property",
-        "icon": "media/Toicon-icon-lines-and-angles-edit.svg"
-      },
-      {
-        "command": "obsAccount.removeAccount",
-        "title": "Remove an account from the settings",
-        "icon": "media/Remove_font_awesome.svg"
-      },
-      {
-        "command": "obsProject.addProjectToBookmarks",
-        "title": "Add a project to the bookmarked projects",
-        "icon": "media/add.svg"
-      },
-      {
-        "command": "obsRepository.addArchitecturesToRepo",
-        "title": "Add architectures to a repository",
-        "icon": {
-          "light": "media/add_circle_outline.svg",
-          "dark": "media/add_circle.svg"
-        }
-      },
-      {
-        "command": "obsRepository.removeArchitectureFromRepo",
-        "title": "Remove this architecture from the repository",
-        "icon": {
-          "light": "media/remove_circle_outline.svg",
-          "dark": "media/remove_circle.svg"
-        }
-      },
-      {
-        "command": "obsRepository.addPathToRepo",
-        "title": "Add a path from a Project to a repository",
-        "icon": {
-          "light": "media/add_circle_outline.svg",
-          "dark": "media/add_circle.svg"
-        }
-      },
-      {
-        "command": "obsRepository.removePathFromRepo",
-        "title": "Remove this path from the repository",
-        "icon": {
-          "light": "media/remove_circle_outline.svg",
-          "dark": "media/remove_circle.svg"
-        }
-      },
-      {
-        "command": "obsRepository.removeRepository",
-        "title": "Remove this repository",
-        "icon": {
-          "light": "media/remove_circle_outline.svg",
-          "dark": "media/remove_circle.svg"
-        }
-      },
-      {
-        "command": "obsRepository.addRepositoryFromDistro",
-        "title": "Add a repository from a Distribution",
-        "icon": {
-          "light": "media/add_circle_outline.svg",
-          "dark": "media/add_circle.svg"
-        }
-      },
-      {
-        "command": "obsProject.refreshProject",
-        "title": "Refresh this Project",
-        "icon": "media/update.svg"
-      },
-      {
-        "command": "obsProject.showPackageFileContents",
-        "title": "Show this files' contents"
-      },
-      {
-        "command": "obsProject.updatePackage",
-        "title": "Update this packages contents and data",
-        "icon": "media/update.svg"
-      },
-      {
-        "command": "obsProject.getProjectFromUri",
-        "title": "Get the Project belonging the provided Uri from the project bookmarks"
-      }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "obsRepository.addRepositoryFromDistro",
-          "when": "view == repositoryTree",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "obsProject.addProjectToBookmarks",
-          "when": "view == projectTree && viewItem == ObsServer",
-          "group": "inline"
+        "vscode-obs.checkUnimportedAccounts": {
+          "scope": "application",
+          "default": true,
+          "description": "Specify whether the extension will check for accounts in your .oscrc that have not been imported into VSCode",
+          "type": "boolean"
         },
-        {
-          "command": "obsProject.addProjectToBookmarks",
-          "when": "view == projectTree && viewItem == BookmarkedProjectsRoot",
-          "group": "inline"
-        },
-        {
-          "command": "obsProject.removeBookmark",
-          "when": "view == projectTree && viewItem == project"
-        },
-        {
-          "command": "obsProject.refreshProject",
-          "when": "view == projectTree && viewItem == project",
-          "group": "inline"
-        },
-        {
-          "command": "obsRepository.addArchitecturesToRepo",
-          "when": "view == repositoryTree && viewItem == architectureRoot",
-          "group": "inline"
-        },
-        {
-          "command": "obsRepository.removeArchitectureFromRepo",
-          "when": "view == repositoryTree && viewItem == architecture",
-          "group": "inline"
-        },
-        {
-          "command": "obsRepository.removeRepository",
-          "when": "view == repositoryTree && viewItem == repositoryRoot",
-          "group": "inline"
-        },
-        {
-          "command": "obsRepository.addPathToRepo",
-          "when": "view == repositoryTree && viewItem == pathRoot",
-          "group": "inline"
-        },
-        {
-          "command": "obsRepository.removePathFromRepo",
-          "when": "view == repositoryTree && viewItem == repositoryPath",
-          "group": "inline"
+        "vscode-obs.accounts": {
+          "description": "Accounts for instances of the Open Build Service",
+          "default": [],
+          "scope": "application",
+          "items": {
+            "required": [
+              "accountName",
+              "username",
+              "apiUrl"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "Your email address, that will be added to changelogs"
+              },
+              "realname": {
+                "type": "string",
+                "description": "Your real name, which will be added to changelogs"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username on the Open Build Service instance"
+              },
+              "apiUrl": {
+                "type": "string",
+                "description": "URL to the API of this instance of the Open Build Service. Note that this is **not** the URL to the web UI, but often https://api.MYINSTANCE.org/."
+              },
+              "accountName": {
+                "description": "A name (memorable) for this account",
+                "type": "string"
+              },
+              "serverCaCertificate": {
+                "description": "CA certificate of the server, if it has a custom certificate unknown to VSCode.",
+                "type": "string"
+              }
+            },
+            "description": "An account for an instance of the Open Build Service",
+            "type": "object"
+          },
+          "type": "array"
         }
-      ]
+      },
+      "title": "Open Build Service"
     }
   },
-  "scripts": {
-    "vscode:prepublish": "yarn run compile",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "lint": "tslint --force --format verbose \"src/**/*.ts\"",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "yarn run compile",
-    "test": "./runTests.sh",
-    "precoverage": "yarn run compile",
-    "mockLibsecret": "[ -e ./mocklibsecret/build/libsecret.so ] || (mkdir -p mocklibsecret/build && pushd mocklibsecret/build && meson .. && ninja)",
-    "coverage": "COVERAGE=1 ./runTests.sh && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
-    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources ./mocklibsecret/build/",
-    "cleandeps": "rm -rf node_modules/",
-    "package": "vsce package --yarn",
-    "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --out ./documentation src/"
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:projectTree",
+    "onView:repositoryTree"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "engines": {
+    "vscode": "^1.37.0"
   },
-  "_comment": "FIXME: need to drag in config-ini-parser and xml2js in from obs-ts, remove this once obs-ts has been properly released",
-  "dependencies": {
-    "config-ini-parser": "^1.2.2",
-    "keytar": "^5.0.0-beta.3",
-    "obs-ts": "https://gitlab.suse.de/dancermak/obs.ts.git",
-    "pino": "^5.14.0",
-    "xml2js": "^0.4.22"
-  },
-  "devDependencies": {
-    "@types/chai": "^4.2.3",
-    "@types/chai-as-promised": "^7.1.2",
-    "@types/chai-things": "^0.0.34",
-    "@types/glob": "^7.1.1",
-    "@types/mocha": "^5.2.6",
-    "@types/mock-fs": "^4.10.0",
-    "@types/node": "^12",
-    "@types/pino": "^5.8.13",
-    "@types/sinon": "^7.5.0",
-    "@types/vscode": "^1.37.0",
-    "chai": "^4.2.0",
-    "chai-as-promised": "^7.1.1",
-    "chai-things": "^0.2.0",
-    "glob": "^7.1.4",
-    "mocha": "^6.1.4",
-    "mock-fs": "^4.10.4",
-    "nyc": "^14.1.1",
-    "pino-pretty": "^3.5.0",
-    "sinon": "^7.5.0",
-    "ts-mock-imports": "^1.2.6",
-    "tslint": "^5.12.1",
-    "tslint-config-prettier": "^1.18.0",
-    "typedoc": "^0.15.0",
-    "typescript": "^3.7.0",
-    "vsce": "^1.68.0",
-    "vscode-test": "^1.0.2"
-  }
+  "repository": "https://gitlab.suse.de/dancermak/vscode-obs",
+  "license": "MIT",
+  "publisher": "SUSE",
+  "version": "0.0.1",
+  "description": "Wrapper for the Open Build Service",
+  "displayName": "vscode-obs",
+  "name": "vscode-obs"
 }
