@@ -19,11 +19,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import * as assert from "assert";
 import { promises as fsPromises } from "fs";
 import { join } from "path";
-import { Logger } from "pino";
 import * as vscode from "vscode";
-import * as assert from "assert";
 
 /**
  * Returns the difference `setA - setB` (all elements from A that are not in B).
@@ -94,18 +93,44 @@ export function deepCopyProperties<T>(obj: T): T {
 }
 
 /**
- * General purpose decorator for **async** functions that throw an exception
- * that should be logged and optionally reported to the user.
+ * General purpose decorator for member functions that throw an exception that
+ * should be logged and optionally reported to the user.
+ *
+ * This decorator can be used to wrap existing functions that report errors by
+ * throwing exceptions. It replaces the call to the original function with one
+ * that catches errors and logs them via the `this.logger.error()` method
+ * (i.e. the wrapped method should e.g. inherit from [[LoggingBase]]) thereby
+ * writing a full backtrace into the log. By default the error is also converted
+ * into a human readable string and presented to the user via
+ * `this.vscodeWindow.showErrorMessage`. This behavior can be turned off by
+ * setting `reportToUser` to `false`.
+ *
+ * ## Caution
+ *
+ * 1. This decorator will implicitly convert non-async functions into async
+ *    ones!
+ *    This is unfortunately necessary, as showing errors to the user is an
+ *    asynchronous operation.
+ *
+ * 2. If your method throws an exception, then the wrapped method will return
+ *    undefined.
+ *
+ * ## Error reporting
+ *
+ * This decorator always logs any caught exceptions in their raw form, i.e. you
+ * will get a full backtrace in the log.
+ * The user is only presented with the stringified form of the error via
+ * `.toString()` or with the `summary` entry if the error is a status_reply xml
+ * element returned by OBS.
  */
 export function logAndReportExceptions(reportToUser: boolean = true) {
   const reportFunc = async (decoratedObj: any, err: any) => {
-    const errMsg = "Error performing an API call, got: ".concat(
+    const errMsg =
       err.status !== undefined && err.status.summary !== undefined
-        ? err.status.summary
-        : err
-    );
+        ? "Error performing API call: ".concat(err.status.summary)
+        : err.toString();
 
-    (decoratedObj as any).logger.error(errMsg);
+    (decoratedObj as any).logger.error(err);
     if (reportToUser) {
       await (decoratedObj as any).vscodeWindow.showErrorMessage(errMsg);
     }
@@ -145,7 +170,7 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
           return res;
         }
       } catch (err) {
-        reportFunc(this, err);
+        await reportFunc(this, err);
         return undefined;
       }
     };

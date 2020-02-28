@@ -23,7 +23,7 @@ import mockFs = require("mock-fs");
 
 import { expect, should } from "chai";
 import { existsSync } from "fs";
-import { afterEach, beforeEach, describe, it, xit } from "mocha";
+import { afterEach, beforeEach, Context, describe, it, xit } from "mocha";
 import { Logger } from "pino";
 import { assert, createSandbox, SinonSandbox, SinonStub, stub } from "sinon";
 import { LoggingBase } from "../../base-components";
@@ -35,10 +35,17 @@ import {
   saveMapToMemento,
   setDifference
 } from "../../util";
-import { VscodeWindow } from "../../vscode-dep";
-import { createStubbedVscodeWindow } from "./test-utils";
+import {
+  castToAsyncFunc,
+  castToFunc,
+  createStubbedVscodeWindow
+} from "./test-utils";
 
 should();
+
+type MementoCtx = Context & {
+  mockMemento: { get: SinonStub; update: SinonStub };
+};
 
 describe("utilities", () => {
   describe("#setDifference", () => {
@@ -80,40 +87,51 @@ describe("utilities", () => {
       this.mockMemento.update.resetHistory();
     });
 
-    it("calls get on loadMapFromMemento", function() {
-      this.mockMemento.get.returns([]);
+    it(
+      "calls get on loadMapFromMemento",
+      castToFunc<MementoCtx>(function() {
+        this.mockMemento.get.returns([]);
 
-      expect(loadMapFromMemento(this.mockMemento, "foo"))
-        .to.be.a("Map")
-        .and.have.lengthOf(0);
+        expect(loadMapFromMemento(this.mockMemento, "foo"))
+          .to.be.a("Map")
+          .and.have.lengthOf(0);
 
-      assert.calledOnce(this.mockMemento.get);
-      assert.calledWith(this.mockMemento.get, "foo", []);
-    });
+        assert.calledOnce(this.mockMemento.get);
+        assert.calledWith(this.mockMemento.get, "foo", []);
+      })
+    );
 
-    it("saveMapToMemento is the inverse to loadMapFromMemento", async function() {
-      this.mockMemento.update.resolves();
+    it(
+      "saveMapToMemento is the inverse to loadMapFromMemento",
+      castToAsyncFunc<MementoCtx>(async function() {
+        this.mockMemento.update.resolves();
 
-      const testMap = new Map<string, number | string>();
-      testMap.set("one", 1);
-      testMap.set("two", 2);
-      testMap.set("cake", "a lie");
+        const testMap = new Map<string, number | string>();
+        testMap.set("one", 1);
+        testMap.set("two", 2);
+        testMap.set("cake", "a lie");
 
-      await saveMapToMemento(this.mockMemento, "bar", testMap).should.be
-        .fulfilled;
+        await saveMapToMemento(
+          this.mockMemento,
+          "bar",
+          testMap
+        ).should.be.fulfilled;
 
-      assert.calledOnce(this.mockMemento.update);
-      expect(this.mockMemento.update.getCall(0).args[0]).to.equal("bar");
+        assert.calledOnce(this.mockMemento.update);
+        expect(this.mockMemento.update.getCall(0).args[0]).to.equal("bar");
 
-      this.mockMemento.get.returns(this.mockMemento.update.getCall(0).args[1]);
+        this.mockMemento.get.returns(
+          this.mockMemento.update.getCall(0).args[1]
+        );
 
-      expect(loadMapFromMemento(this.mockMemento, "bar"))
-        .to.be.a("Map")
-        .and.deep.equal(testMap);
+        expect(loadMapFromMemento(this.mockMemento, "bar"))
+          .to.be.a("Map")
+          .and.deep.equal(testMap);
 
-      assert.calledOnce(this.mockMemento.get);
-      assert.calledWith(this.mockMemento.get, "bar");
-    });
+        assert.calledOnce(this.mockMemento.get);
+        assert.calledWith(this.mockMemento.get, "bar");
+      })
+    );
   });
 
   describe("#rmRf", () => {
@@ -133,11 +151,11 @@ describe("utilities", () => {
     // FIXME: this does not work as mock-fs doesn't support fs.Dirent:
     // https://github.com/tschaub/mock-fs/issues/272#issuecomment-513847569
     xit("removes the directory fooDir and all its contents", async () => {
-      expect(existsSync("fooDir")).to.be.true;
+      expect(existsSync("fooDir")).to.equal(true);
 
       await rmRf("fooDir").should.be.fulfilled;
 
-      expect(existsSync("fooDir")).to.be.false;
+      expect(existsSync("fooDir")).to.equal(false);
     });
   });
 
@@ -175,7 +193,9 @@ describe("utilities", () => {
     class ClassMakingApiCalls extends LoggingBase {
       public readonly sandbox: SinonSandbox;
       public loggingStub: { error: SinonStub };
-      public readonly vscodeWindow: VscodeWindow;
+      public readonly vscodeWindow: ReturnType<
+        typeof createStubbedVscodeWindow
+      >;
 
       constructor() {
         const sandbox = createSandbox();
@@ -187,10 +207,22 @@ describe("utilities", () => {
       }
 
       @logAndReportExceptions()
-      public async doesNothingOrThrows(throwUp: boolean, exception?: any) {
+      public async doesNothingOrThrowsAsync(
+        throwUp: boolean,
+        exception?: any
+      ): Promise<number> {
         if (throwUp) {
           throw exception ?? new Error("Barf");
         }
+        return 42;
+      }
+
+      @logAndReportExceptions()
+      public doesNothingOrThrows(throwUp: boolean): boolean {
+        if (throwUp) {
+          throw new Error("Tripple Barf");
+        }
+        return false;
       }
 
       @logAndReportExceptions(false)
@@ -201,6 +233,8 @@ describe("utilities", () => {
       }
     }
 
+    type TestClassCtx = Context & { testClass: ClassMakingApiCalls };
+
     beforeEach(function() {
       this.testClass = new ClassMakingApiCalls();
     });
@@ -209,51 +243,123 @@ describe("utilities", () => {
       this.testClass.sandbox.restore();
     });
 
-    it("reports the thrown exception", async function() {
-      await this.testClass.doesNothingOrThrows(true).should.be.fulfilled;
+    it(
+      "reports the thrown exception",
+      castToAsyncFunc<TestClassCtx>(async function() {
+        await this.testClass.doesNothingOrThrowsAsync(true).should.be.fulfilled;
 
-      assert.calledOnce(this.testClass.loggingStub.error);
-      assert.calledOnce(this.testClass.vscodeWindow.showErrorMessage);
+        assert.calledOnce(this.testClass.loggingStub.error);
+        assert.calledOnce(this.testClass.vscodeWindow.showErrorMessage);
 
-      const errMsg = "Error performing an API call, got: Error: Barf";
-      assert.calledWith(this.testClass.loggingStub.error.firstCall, errMsg);
-      assert.calledWith(
-        this.testClass.vscodeWindow.showErrorMessage.firstCall,
-        errMsg
-      );
-    });
+        // need to compare the errors by their .toString() as the Error class
+        // includes the current call stack
+        expect(
+          this.testClass.loggingStub.error.getCall(0).args[0].toString()
+        ).to.deep.equal(Error("Barf").toString());
 
-    it("reports the thrown ApiError in a more readable fashion", async function() {
-      const summary = "package not found";
-      await this.testClass.doesNothingOrThrows(true, {
-        status: { summary }
-      }).should.be.fulfilled;
+        const errMsg = "Error: Barf";
+        assert.calledWith(
+          this.testClass.vscodeWindow.showErrorMessage.firstCall,
+          errMsg
+        );
+      })
+    );
 
-      const errMsg = `Error performing an API call, got: ${summary}`;
-      assert.calledWith(this.testClass.loggingStub.error.firstCall, errMsg);
-      assert.calledWith(
-        this.testClass.vscodeWindow.showErrorMessage.firstCall,
-        errMsg
-      );
-    });
+    it(
+      "reports the thrown ApiError in a more readable fashion",
+      castToAsyncFunc<TestClassCtx>(async function() {
+        const summary = "package not found";
+        const err = {
+          status: { summary }
+        };
+        await this.testClass.doesNothingOrThrowsAsync(
+          true,
+          err
+        ).should.be.fulfilled;
 
-    it("does nothing when no exception is thrown", async function() {
-      await this.testClass.doesNothingOrThrows(false).should.be.fulfilled;
+        const errMsg = `Error performing API call: ${summary}`;
+        assert.calledWith(this.testClass.loggingStub.error.firstCall, err);
+        assert.calledWith(
+          this.testClass.vscodeWindow.showErrorMessage.firstCall,
+          errMsg
+        );
+      })
+    );
 
-      assert.notCalled(this.testClass.loggingStub.error);
-      assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
-    });
+    it(
+      "does nothing when no exception is thrown",
+      castToAsyncFunc<TestClassCtx>(async function() {
+        await this.testClass.doesNothingOrThrowsAsync(
+          false
+        ).should.be.fulfilled;
 
-    it("does not report the exception to the user but logs it", async function() {
-      await this.testClass.decoratedButNoUserReport(true).should.be.fulfilled;
+        assert.notCalled(this.testClass.loggingStub.error);
+        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
+      })
+    );
 
-      assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
+    it(
+      "does not report the exception to the user but logs it",
+      castToAsyncFunc<TestClassCtx>(async function() {
+        await this.testClass.decoratedButNoUserReport(true).should.be.fulfilled;
 
-      assert.calledOnce(this.testClass.loggingStub.error);
-      assert.calledWith(
-        this.testClass.loggingStub.error.firstCall,
-        "Error performing an API call, got: Error: BarfBarf"
-      );
-    });
+        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
+
+        assert.calledOnce(this.testClass.loggingStub.error);
+        expect(
+          this.testClass.loggingStub.error.getCall(0).args[0].toString()
+        ).to.deep.equal(Error("BarfBarf").toString());
+      })
+    );
+
+    it(
+      "reports exception for non-async functions",
+      castToFunc<TestClassCtx>(function() {
+        this.testClass.doesNothingOrThrows(true);
+
+        assert.calledOnce(this.testClass.vscodeWindow.showErrorMessage);
+
+        assert.calledOnce(this.testClass.loggingStub.error);
+        expect(
+          this.testClass.loggingStub.error.getCall(0).args[0].toString()
+        ).to.deep.equal(Error("Tripple Barf").toString());
+      })
+    );
+
+    it(
+      "correctly returns the return value if the method does not throw",
+      castToFunc<TestClassCtx>(async function() {
+        await this.testClass
+          .doesNothingOrThrows(false)
+          .should.be.fulfilled.and.eventually.equal(false);
+
+        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
+        assert.notCalled(this.testClass.loggingStub.error);
+      })
+    );
+
+    it(
+      "correctly returns the returned Promise value if the method does not throw",
+      castToAsyncFunc<TestClassCtx>(async function() {
+        await this.testClass
+          .doesNothingOrThrowsAsync(false)
+          .should.be.fulfilled.and.eventually.equal(42);
+
+        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
+        assert.notCalled(this.testClass.loggingStub.error);
+      })
+    );
+
+    it(
+      "returns undefined if the method throws",
+      castToAsyncFunc<TestClassCtx>(async function() {
+        await this.testClass
+          .doesNothingOrThrows(true)
+          .should.be.fulfilled.and.eventually.equal(undefined);
+        await this.testClass
+          .doesNothingOrThrowsAsync(true)
+          .should.be.fulfilled.and.eventually.equal(undefined);
+      })
+    );
   });
 });
