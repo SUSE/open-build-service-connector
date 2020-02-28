@@ -38,21 +38,27 @@ export const testLogger = pino(
 );
 
 export interface FakeEvent<T> {
-  listeners: Array<(e: T) => void>;
+  listeners: Array<(e: T) => any>;
 
-  fire: (e: T) => void;
+  fire: (e: T) => Promise<void>;
 
-  event: (listener: (e: T) => void) => vscode.Disposable;
+  event: (listener: (e: T) => any) => vscode.Disposable;
 }
 
 export function makeFakeEvent<T>(): FakeEvent<T> {
-  const listeners: Array<(e: T) => void> = [];
+  const listeners: Array<(e: T) => any> = [];
 
-  const fire = (e: T) => {
-    listeners.forEach(listener => listener(e));
+  const fire = async (e: T) => {
+    listeners.map(async listener => {
+      // const res = listener(e);
+      // if (res.then !== undefined) {
+      //   await res;
+      // }
+      await listener(e);
+    });
   };
 
-  const event = (listener: (e: T) => void) => {
+  const event = (listener: (e: T) => any) => {
     listeners.push(listener);
     return {
       dispose: () => {
@@ -91,8 +97,30 @@ export async function executeAndWaitForEvent<T, ET>(
   return res;
 }
 
+export type AccountMapInitializer =
+  | Map<ApiUrl, ValidAccount>
+  | Array<[ApiUrl, ValidAccount]>;
+
 export class FakeActiveAccounts implements ActiveAccounts {
-  constructor(public accountMap: Map<ApiUrl, ValidAccount> = new Map()) {}
+  public onAccountChangeEmitter = makeFakeEvent<ApiUrl[]>();
+  public onAccountChange = this.onAccountChangeEmitter.event;
+
+  public accountMap: Map<ApiUrl, ValidAccount>;
+
+  constructor(initialAccountMap?: AccountMapInitializer) {
+    if (initialAccountMap === undefined) {
+      this.accountMap = new Map();
+    } else if (Array.isArray(initialAccountMap)) {
+      this.accountMap = new Map(initialAccountMap);
+    } else {
+      this.accountMap = initialAccountMap;
+    }
+  }
+
+  public async addAccount(acc: ValidAccount) {
+    this.accountMap.set(acc.account.apiUrl, acc);
+    await this.onAccountChangeEmitter.fire(this.getAllApis());
+  }
 
   public getConfig(apiUrl: ApiUrl) {
     return this.accountMap.get(apiUrl);
@@ -102,6 +130,10 @@ export class FakeActiveAccounts implements ActiveAccounts {
     return [...this.accountMap.keys()];
   }
 }
+
+/** Sleep for at least the given time in ms */
+export const sleep = (ms: number) =>
+  new Promise(resolve => setTimeout(resolve, ms));
 
 export const castToFuncT = <FC, FT>(func: (this: FC) => void): FT =>
   (func as any) as FT;

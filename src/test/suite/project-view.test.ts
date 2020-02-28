@@ -199,7 +199,7 @@ describe("ProjectTreeProvider", () => {
         "returns a Bookmark element and an active project element",
         castToAsyncFunc<FixtureContext>(async function() {
           const projectTree: ProjectTreeProvider = this.fixture.createProjectTreeProvider();
-          this.fixture.fakeActiveProject.fire(testProject);
+          await this.fixture.fakeActiveProject.fire(testProject);
 
           const children = await projectTree.getChildren(undefined).should.be
             .fulfilled;
@@ -1159,7 +1159,7 @@ describe("ProjectTreeProvider", () => {
         );
 
         this.fixture.getProjectMock.resolves(fooProjWithPackages);
-        this.fixture.fakeActiveProject.fire(fooProj);
+        await this.fixture.fakeActiveProject.fire(fooProj);
 
         const projElem = new ProjectTreeElement(fooProj, false);
 
@@ -1224,7 +1224,7 @@ describe("ProjectTreeProvider", () => {
         );
 
         const fooProjTreeElem = new ProjectTreeElement(fooProj, false);
-        this.fixture.fakeActiveProject.fire(fooProj);
+        await this.fixture.fakeActiveProject.fire(fooProj);
 
         await projectTree.refreshProject(fooProjTreeElem).should.be.fulfilled;
 

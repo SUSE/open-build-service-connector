@@ -178,3 +178,46 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
     return descriptor;
   };
 }
+
+/**
+ * Wrapper for free functions that can throw exceptions that should just be
+ * logged and optionally reported to the user.
+ *
+ * @param reportObj  A object that has a `logger` property and optionally a
+ *     `vscodeWindow` one if `reportToUser` is `true`.
+ * @param reportToUser Flag whether any thrown exceptions should also be
+ *     displayed as error messages to the user via
+ *     `vscodeWindow.showErrorMessage`.
+ * @param func  A free function that should be called.
+ * @param args  Parameters that are passed to func.
+ *
+ * @return Either the return value of `func(args)` or `undefined` if an
+ *     exception was thrown.
+ */
+export function logAndReportExceptionsWrapper<RT>(
+  reportObj: any,
+  reportToUser: boolean = true,
+  func: (...args: any[]) => Promise<RT>,
+  ...args: any[]
+) {
+  const reportFunc = async (err: any) => {
+    const errMsg =
+      err.status !== undefined && err.status.summary !== undefined
+        ? "Error performing API call: ".concat(err.status.summary)
+        : err.toString();
+
+    reportObj.logger.error(err);
+    if (reportToUser) {
+      await (reportObj as any).vscodeWindow!.showErrorMessage(errMsg);
+    }
+  };
+
+  return async (): Promise<RT | undefined> => {
+    try {
+      return await func.apply(undefined, args);
+    } catch (err) {
+      await reportFunc(err);
+      return undefined;
+    }
+  };
+}

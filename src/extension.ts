@@ -27,6 +27,7 @@ import { AccountManager } from "./accounts";
 import { ProjectTreeProvider, UriScheme } from "./project-view";
 import { RepositoryTreeProvider } from "./repository";
 import { WorkspaceToProjectMatcher } from "./workspace";
+import { ObsServerInformation } from "./instance-info";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -90,6 +91,10 @@ export async function activate(
 
   [
     accountManager,
+    await ObsServerInformation.createObsServerInformation(
+      accountManager.activeAccounts,
+      accountManager.onAccountChange,
+      logger
     ),
     vscode.commands.registerCommand(
       "obsRepository.addArchitecturesToRepo",
