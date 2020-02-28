@@ -63,7 +63,8 @@ export async function activate(
 
   const projectTreeProvider = new ProjectTreeProvider(
     ws2Proj.onDidChangeActiveProject,
-    accountManager.onConnectionChange,
+    accountManager.onAccountChange,
+    accountManager.activeAccounts,
     context.globalState,
     logger
   );

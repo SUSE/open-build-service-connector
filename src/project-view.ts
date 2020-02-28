@@ -21,17 +21,23 @@
 
 import * as assert from "assert";
 import {
+  fetchFileContents,
   fetchPackage,
   getProject,
   HistoryFetchType,
   Package,
+  PackageFile,
   Project
 } from "obs-ts";
-import { fetchFileContents, PackageFile } from "obs-ts/lib/file";
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { AccountStorage, ApiAccountMapping, ApiUrl } from "./accounts";
-import { LoggingBase } from "./base-components";
+import {
+  AccountStorage,
+  ActiveAccounts,
+  ApiUrl,
+  promptUserForAccount
+} from "./accounts";
+import { ConnectionListenerLoggerBase } from "./base-components";
 import {
   loadMapFromMemento,
   logAndReportExceptions,
@@ -187,7 +193,7 @@ export function getProjectOfTreeItem(
   return undefined;
 }
 
-export class ProjectTreeProvider extends LoggingBase
+export class ProjectTreeProvider extends ConnectionListenerLoggerBase
   implements
     vscode.TreeDataProvider<ProjectTreeItem>,
     vscode.TextDocumentContentProvider {
@@ -228,11 +234,6 @@ export class ProjectTreeProvider extends LoggingBase
     Project[]
   >();
 
-  private currentConnections: ApiAccountMapping = {
-    defaultApi: undefined,
-    mapping: new Map()
-  };
-
   private onDidChangeTreeDataEmitter: vscode.EventEmitter<
     ProjectTreeItem | undefined
   > = new vscode.EventEmitter<ProjectTreeItem | undefined>();
@@ -241,17 +242,15 @@ export class ProjectTreeProvider extends LoggingBase
 
   constructor(
     onDidChangeActiveProject: vscode.Event<Project | undefined>,
-    onAccountChange: vscode.Event<ApiAccountMapping>,
+    onAccountChange: vscode.Event<ApiUrl[]>,
+    activeAccounts: ActiveAccounts,
     private globalState: vscode.Memento,
     logger: Logger,
     private vscodeWindow: VscodeWindow = vscode.window
   ) {
-    super(logger);
+    super(activeAccounts, onAccountChange, logger);
 
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
-
-    // FIXME: remove this as it deletes all bookmarks
-    // saveMapToMemento(globalState, projectBookmarkStorageKey, new Map());
 
     this.bookmarkedProjects = loadMapFromMemento(
       globalState,
@@ -259,15 +258,17 @@ export class ProjectTreeProvider extends LoggingBase
     );
     this.onDidChange = this.onDidChangeEmitter.event;
 
-    onAccountChange(curCon => {
-      this.currentConnections = curCon;
-      this.refresh();
-    }, this);
-
-    onDidChangeActiveProject(activeProject => {
-      this.activeProject = activeProject;
-      this.refresh();
-    });
+    [
+      this.onDidChangeTreeDataEmitter,
+      onDidChangeActiveProject(activeProject => {
+        this.activeProject = activeProject;
+        this.refresh();
+      }),
+      // tslint:disable-next-line: variable-name
+      onAccountChange(_apiUrls => {
+        this.refresh();
+      })
+    ].forEach(disposable => this.disposables.push(disposable));
   }
 
   /**
@@ -284,6 +285,7 @@ export class ProjectTreeProvider extends LoggingBase
 
   public async provideTextDocumentContent(
     uri: vscode.Uri,
+    // tslint:disable-next-line: variable-name
     _token: vscode.CancellationToken
   ): Promise<string> {
     const [
@@ -291,7 +293,7 @@ export class ProjectTreeProvider extends LoggingBase
       { projectName, packageName, name }
     ] = ProjectTreeProvider.uriToPackageFile(uri);
 
-    const con = this.currentConnections.mapping.get(apiUrl)?.connection;
+    const con = this.activeAccounts.getConfig(apiUrl)?.connection;
 
     if (con === undefined) {
       throw new Error(`No connection present for the account ${apiUrl}`);
@@ -375,20 +377,24 @@ export class ProjectTreeProvider extends LoggingBase
 
     if (
       isBookmarkedProjectsRootElement(element) &&
-      this.currentConnections.mapping.size > 1
+      this.activeAccounts.getAllApis().length > 1
     ) {
-      return [...this.currentConnections.mapping.entries()].map(
-        ([_apiUrl, obsInstance]) =>
-          new ObsServerTreeElement(obsInstance.account)
-      );
+      return this.activeAccounts
+        .getAllApis()
+        .map(
+          apiUrl =>
+            new ObsServerTreeElement(
+              this.activeAccounts.getConfig(apiUrl)!.account
+            )
+        );
     } else if (
       (isBookmarkedProjectsRootElement(element) &&
-        this.currentConnections.mapping.size === 1) ||
+        this.activeAccounts.getAllApis().length === 1) ||
       isObsServerTreeElement(element)
     ) {
       const apiUrl =
-        this.currentConnections.mapping.size === 1
-          ? this.currentConnections.defaultApi!
+        this.activeAccounts.getAllApis().length === 1
+          ? this.activeAccounts.getAllApis()[0]
           : (element as ObsServerTreeElement).account.apiUrl;
       const projects = this.bookmarkedProjects.get(apiUrl);
 
@@ -407,7 +413,8 @@ export class ProjectTreeProvider extends LoggingBase
     if (isProjectTreeElement(element)) {
       // the ProjectTreeElement contains a Project, but we try to get the one
       // from the bookmarks as it could be more up to date
-      // fallback to the one from the ProjectTreeElement otherwise
+      // fallback to the one from the ProjectTreeElement otherwise (important as
+      // the currently active project might not be bookmarked at all)
       const proj =
         this.bookmarkedProjects
           .get(element.project.apiUrl)
@@ -415,23 +422,23 @@ export class ProjectTreeProvider extends LoggingBase
             bookmarkedProj => bookmarkedProj.name === element.project.name
           ) ?? element.project;
 
-      // no packages? => try to fetch them if we have a connection for this API
-      // => save the new project in the bookmarks
+      // no packages? => try to fetch them if we have a valid account for this
+      // API => save the new project in the bookmarks
       // have packages? => don't update a thing and just return the elements
       if (proj.packages === undefined) {
-        const con = this.currentConnections.mapping.get(proj.apiUrl)
-          ?.connection;
+        const acc = this.activeAccounts.getConfig(proj.apiUrl);
 
-        if (con === undefined) {
-          this.logger.error(
-            "No connection for the API %s is present",
-            proj.apiUrl
-          );
+        if (acc === undefined) {
+          this.logger.error("No account is known for the API %s", proj.apiUrl);
           return [];
         }
 
         // now run the update
-        const projWithPackages = await getProject(con, proj.name, true);
+        const projWithPackages = await getProject(
+          acc.connection,
+          proj.name,
+          true
+        );
         assert(
           projWithPackages.packages !== undefined,
           `fetching the project ${element.project.name} resulted in no packages being fetched`
@@ -469,13 +476,13 @@ export class ProjectTreeProvider extends LoggingBase
       }
 
       // got no files? => try to update them
-      const con = this.currentConnections.mapping.get(apiUrl)?.connection;
-      if (con === undefined) {
-        this.logger.error("No connection for the API %s is present", apiUrl);
+      const acc = this.activeAccounts.getConfig(apiUrl);
+      if (acc === undefined) {
+        this.logger.error("No account for the API '%s' present", apiUrl);
         return [];
       } else {
         const pkgWithFiles = await fetchPackage(
-          con,
+          acc.connection,
           element.parent.project.name,
           element.pkg.name,
           { pkgContents: false, historyFetchType: HistoryFetchType.NoHistory }
@@ -512,7 +519,7 @@ export class ProjectTreeProvider extends LoggingBase
       );
     }
     const apiUrl = element.parent.project.apiUrl;
-    const con = this.currentConnections.mapping.get(apiUrl)?.connection;
+    const con = this.activeAccounts.getConfig(apiUrl)?.connection;
     if (con === undefined) {
       throw new Error(
         `Cannot refresh package ${element.pkg.name}, no Connection for it exists`
@@ -525,15 +532,7 @@ export class ProjectTreeProvider extends LoggingBase
       element.pkg.name,
       { pkgContents: false }
     );
-    let matchingPackage = this.bookmarkedProjects
-      .get(apiUrl)
-      ?.find(proj => proj.name === element.parent.project.name)
-      ?.packages?.find(projPkg => projPkg.name === element.pkg.name);
-
-    if (matchingPackage !== undefined) {
-      matchingPackage = pkg;
-      this.refresh();
-    }
+    await this.savePackageInBookmarks(apiUrl, pkg, true);
   }
 
   @logAndReportExceptions()
@@ -546,35 +545,29 @@ export class ProjectTreeProvider extends LoggingBase
       return;
     }
 
-    const instanceInfo = this.currentConnections.mapping.get(
-      element.project.apiUrl
-    );
-    if (instanceInfo === undefined || instanceInfo.connection === undefined) {
-      const errMsg = `Cannot update the project ${element.project.name}, the corresponding account is not configured properly`;
+    const account = this.activeAccounts.getConfig(element.project.apiUrl);
+    if (account === undefined) {
+      const errMsg = `Cannot update the project ${element.project.name}, the corresponding account does not exist`;
       throw new Error(errMsg);
     }
 
-    try {
-      const updated = await getProject(
-        instanceInfo.connection,
-        element.project.name
-      );
+    const updated = await getProject(account.connection, element.project.name);
+    if (element.bookmark) {
+      await this.saveProjectInBookmarks(updated, false);
+    } else {
+      assert(updated.name === this.activeProject?.name);
       this.activeProject = updated;
-      // await updateCheckedOutProject(this.activeProject, );
-      this.refresh();
-    } catch (err) {
-      const errMsg = `Could not fetch the project ${element.project.name} from ${element.project.apiUrl}`;
-      throw new Error(errMsg);
     }
+    this.refresh();
   }
 
   @logAndReportExceptions()
   public async addProjectToBookmarksTreeButton(
     serverOrBookmark?: ObsServerTreeElement | BookmarkedProjectsRootElement
   ): Promise<void> {
-    let apiUrl: string;
+    let apiUrl: ApiUrl;
 
-    if (this.currentConnections.mapping.size === 0) {
+    if (this.activeAccounts.getAllApis().length === 0) {
       throw new Error("No accounts are present, cannot add a bookmark");
     }
 
@@ -582,34 +575,15 @@ export class ProjectTreeProvider extends LoggingBase
       serverOrBookmark === undefined ||
       isBookmarkedProjectsRootElement(serverOrBookmark)
     ) {
-      if (this.currentConnections.mapping.size > 1) {
-        const allInstances = [...this.currentConnections.mapping.values()];
-        const accountName = await this.vscodeWindow.showQuickPick(
-          allInstances.map(obsInstance => obsInstance.account.accountName),
-          {
-            canPickMany: false,
-            placeHolder:
-              "Pick an account for which the bookmark should be added"
-          }
-        );
-        if (accountName === undefined) {
-          return;
-        }
-
-        apiUrl = allInstances.find(
-          obsInstance => obsInstance.account.accountName === accountName
-        )!.account.apiUrl;
-      } else {
-        assert(
-          this.currentConnections.mapping.size === 1,
-          `Only one account must be present, but got ${this.currentConnections.mapping.size}`
-        );
-        assert(
-          this.currentConnections.defaultApi !== undefined,
-          "Only one account is stored, but it is not the default"
-        );
-        apiUrl = this.currentConnections.defaultApi!;
+      const userSuppliedApiUrl = await promptUserForAccount(
+        this.activeAccounts,
+        "Pick an account for which the bookmark should be added",
+        this.vscodeWindow
+      );
+      if (userSuppliedApiUrl === undefined) {
+        return;
       }
+      apiUrl = userSuppliedApiUrl;
     } else {
       assert(
         isObsServerTreeElement(serverOrBookmark),
@@ -617,23 +591,19 @@ export class ProjectTreeProvider extends LoggingBase
       );
       apiUrl = serverOrBookmark.account.apiUrl;
     }
-    const obsInstance = this.currentConnections.mapping.get(apiUrl);
-    if (obsInstance === undefined) {
+    const account = this.activeAccounts.getConfig(apiUrl);
+    if (account === undefined) {
       this.logger.error("obsInstance is undefined for the account %s", apiUrl);
       return;
     }
-    if (obsInstance.connection === undefined) {
-      const errMsg = `The account for the buildservice instance ${apiUrl} is not configured properly: no password is specified`;
-      throw new Error(errMsg);
-    }
 
     const projectName = await this.vscodeWindow.showInputBox({
+      ignoreFocusOut: true,
       prompt: "Provide the name of the project that you want to add",
-      validateInput: projName => {
-        return /\s/.test(projName)
+      validateInput: projName =>
+        /\s/.test(projName)
           ? "The project name must not contain any whitespace"
-          : undefined;
-      }
+          : undefined
     });
 
     if (projectName === undefined) {
@@ -645,10 +615,10 @@ export class ProjectTreeProvider extends LoggingBase
 
     let proj: Project | undefined;
     try {
-      proj = await getProject(obsInstance.connection, projectName, true);
+      proj = await getProject(account.connection, projectName, true);
     } catch (err) {
       const selected = await this.vscodeWindow.showErrorMessage(
-        `Adding a bookmark for the project ${projectName} using the account ${obsInstance.account.accountName} failed with: ${err}.`,
+        `Adding a bookmark for the project ${projectName} using the account ${account.account.accountName} failed with: ${err}.`,
         "Add anyway",
         "Cancel"
       );
@@ -661,19 +631,30 @@ export class ProjectTreeProvider extends LoggingBase
     const bookmark: Project = { apiUrl, name: projectName };
 
     if (proj !== undefined) {
-      assert(proj.packages !== undefined);
-      const addAll = await this.vscodeWindow.showInformationMessage(
-        `This project has ${proj.packages?.length} packages, add them all?`,
-        "Yes",
-        "No"
+      assert(
+        proj.packages !== undefined && proj.apiUrl === apiUrl,
+        `received Project is invalid: packages are undefined (${proj.packages}) or the apiUrl does not match the provided value (${proj.apiUrl} vs ${apiUrl})`
       );
+
+      const addAll =
+        // FIXME: make this number configurable?
+        proj.packages!.length < 10
+          ? "Yes"
+          : await this.vscodeWindow.showInformationMessage(
+              `This project has ${proj.packages?.length} packages, add them all?`,
+              "Yes",
+              "No"
+            );
       if (addAll === undefined) {
         return;
       }
       if (addAll === "No") {
         const pkgs = await this.vscodeWindow.showQuickPick(
           proj.packages!.map(pkg => pkg.name),
-          { canPickMany: true, placeHolder: "Select packages to be bookmarked" }
+          {
+            canPickMany: true,
+            placeHolder: "Select packages to be bookmarked"
+          }
         );
         if (pkgs === undefined) {
           return;
@@ -682,13 +663,21 @@ export class ProjectTreeProvider extends LoggingBase
           name: pkgName,
           project: projectName
         }));
+      } else {
+        assert(
+          addAll === "Yes",
+          `variable addAll must equal 'Yes' but got ${addAll} instead`
+        );
+        bookmark.packages = proj.packages;
       }
     }
 
-    const currentBookmarks = this.bookmarkedProjects.get(apiUrl) ?? [];
-    currentBookmarks.push(bookmark);
-    this.bookmarkedProjects.set(apiUrl, currentBookmarks);
-    await this.saveBookmarkedProjects();
+    await this.saveProjectInBookmarks(bookmark, true);
+
+    // const currentBookmarks = this.bookmarkedProjects.get(apiUrl) ?? [];
+    // currentBookmarks.push(bookmark);
+    // this.bookmarkedProjects.set(apiUrl, currentBookmarks);
+    // await this.saveBookmarkedProjects();
   }
 
   private async saveBookmarkedProjects(
@@ -766,11 +755,12 @@ export class ProjectTreeProvider extends LoggingBase
       `package list of the project ${pkg.project} must not be undefined`
     );
     let pkgsOfProj = allProjects[matchingProjIndex].packages!;
+
     const matchingPkgIndex = pkgsOfProj.findIndex(
       savedPkg => savedPkg.name === pkg.name
     );
 
-    if (matchingProjIndex === -1) {
+    if (matchingPkgIndex === -1) {
       pkgsOfProj = pkgsOfProj.concat([pkg]);
     } else {
       pkgsOfProj[matchingPkgIndex] = pkg;
@@ -811,7 +801,7 @@ export class ProjectTreeProvider extends LoggingBase
     // user really wants it...)
     try {
       await getProject(
-        this.currentConnections.mapping.get(account.apiUrl)![1]!,
+        this.activeAccounts.mapping.get(account.apiUrl)![1]!,
         projectName
       );
     } catch (err) {}
@@ -837,7 +827,7 @@ export class ProjectTreeProvider extends LoggingBase
                 // FIXME: handle failures
                 await getProject(
                   // FIXME: handle failure
-                  this.currentConnections.mapping.get(account.apiUrl)![1]!,
+                  this.activeAccounts.mapping.get(account.apiUrl)![1]!,
                   proj
                 ),
                 account
