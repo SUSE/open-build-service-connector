@@ -19,39 +19,51 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { logger, makeFakeEvent } from "./test-utils";
-import { describe, it, beforeEach, afterEach } from "mocha";
-import { createSandbox } from "sinon";
+import { afterEach, beforeEach, describe, it, Context } from "mocha";
+import { ApiUrl } from "../../accounts";
 import { WorkspaceToProjectMatcher } from "../../workspace";
-import * as obs_ts from "obs-ts";
-import { ApiAccountMapping } from "../../accounts";
+import {
+  FakeActiveAccounts,
+  makeFakeEvent,
+  testLogger,
+  LoggingFixture
+} from "./test-utils";
 
-class WorkspaceToProjectMatcherFixture {
-  public readonly fakeCurrentConnection = makeFakeEvent<ApiAccountMapping>();
+class WorkspaceToProjectMatcherFixture extends LoggingFixture {
+  public readonly fakeActiveAccounts = makeFakeEvent<ApiUrl[]>();
 
-  public createWorkspaceToProjectMatcher(): WorkspaceToProjectMatcher {
+  constructor(ctx: Context) {
+    super();
+    super.beforeEach(ctx);
+  }
+
+  public async createWorkspaceToProjectMatcher(): Promise<
+    WorkspaceToProjectMatcher
+  > {
     const [
       ws2Proj,
       delayedInit
     ] = WorkspaceToProjectMatcher.createWorkspaceToProjectMatcher(
-      this.fakeCurrentConnection.event,
-      logger
+      new FakeActiveAccounts(),
+      this.fakeActiveAccounts.event,
+      testLogger
     );
+    await delayedInit(ws2Proj);
     return ws2Proj;
   }
 
-  public tearDown() {
-    // this.fakeCurrentConnection.
+  public afterEach(ctx: Context) {
+    super.afterEach(ctx);
   }
 }
 
 describe("WorkspaceToProjectMatcher", () => {
   beforeEach(function() {
-    this.fixture = new WorkspaceToProjectMatcherFixture();
+    this.fixture = new WorkspaceToProjectMatcherFixture(this);
   });
 
   afterEach(function() {
-    this.fixture.tearDown();
+    this.fixture.afterEach();
   });
 
   describe("#createWorkspaceToProjectMatcher", () => {

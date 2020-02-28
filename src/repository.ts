@@ -24,7 +24,6 @@ import {
   Arch,
   BaseRepository,
   Connection,
-  fetchHostedDistributions,
   getProjectMeta,
   modifyProjectMeta,
   Path,
@@ -33,9 +32,14 @@ import {
 } from "obs-ts";
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { ApiAccountMapping, ObsInstance } from "./accounts";
+import { ActiveAccounts, ApiUrl, ValidAccount } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
+import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
 import { deepCopyProperties, logAndReportExceptions } from "./util";
+import { VscodeWindow } from "./vscode-dep";
+
+// all architectures known by OBS in general
+const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
 
 /**
  * This class represents the root element of the repository tree.
@@ -153,28 +157,31 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
   constructor(
     onDidChangeActiveProject: vscode.Event<Project | undefined>,
-    onConnectionChange: vscode.Event<ApiAccountMapping>,
+    activeAccounts: ActiveAccounts,
+    onAccountChange: vscode.Event<ApiUrl[]>,
     logger: Logger,
-    private readonly vscodeWindow: {
-      showErrorMessage: typeof vscode.window.showErrorMessage;
-      showQuickPick: typeof vscode.window.showQuickPick;
-      showInputBox: typeof vscode.window.showInputBox;
-    } = vscode.window
+    private readonly vscodeWindow: VscodeWindow = vscode.window
   ) {
-    super(onConnectionChange, logger);
+    super(activeAccounts, onAccountChange, logger);
 
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
     this.activeProject = undefined;
 
-    onDidChangeActiveProject(activeProj => {
-      this.activeProject = activeProj;
-      this.logger.debug(
-        activeProj
-          ? `RepositoryTreeProvider was notified of the active project ${activeProj.name}`
-          : "RepositoryTreeProvider was notified that no project is active"
-      );
-      this.refresh();
-    }, this);
+    [
+      this.onDidChangeTreeDataEmitter,
+      onDidChangeActiveProject(activeProj => {
+        this.activeProject = activeProj;
+        this.logger.debug(
+          activeProj
+            ? `RepositoryTreeProvider was notified of the active project ${activeProj.name}`
+            : "RepositoryTreeProvider was notified that no project is active"
+        );
+        this.refresh();
+      }, this),
+      this.onAccountChange(_apiUrls => {
+        this.refresh();
+      }, this)
+    ].forEach(disposable => this.disposables.push(disposable));
   }
 
   public refresh(): void {
@@ -187,12 +194,12 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
   @logAndReportExceptions()
   public async addRepositoryFromDistro(): Promise<void> {
-    const instanceInfo = this.getInstanceInfoOfCurrentProject();
+    const account = this.getAccountOfCurrentProject();
 
     // FIXME: what should we do if we need to fetch the meta?
     if (this.activeProject!.meta === undefined) {
       this.activeProject!.meta = await getProjectMeta(
-        instanceInfo.connection!,
+        account.connection,
         this.activeProject!.name
       );
     }
@@ -201,9 +208,21 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       "The project meta must be defined at this point"
     );
 
-    const hostedDistros =
-      instanceInfo.hostedDistributions ??
-      (await fetchHostedDistributions(instanceInfo.connection!));
+    const instanceInfo = await vscode.commands.executeCommand<ObsInstance>(
+      GET_INSTANCE_INFO_COMMAND,
+      account.account.apiUrl
+    );
+    if (
+      instanceInfo === undefined ||
+      instanceInfo.hostedDistributions === undefined ||
+      instanceInfo.hostedDistributions.length === 0
+    ) {
+      throw new Error(
+        `Cannot add a repository from a distribution for the OBS instance '${account.account.apiUrl}': no distributions defined`
+      );
+    }
+
+    const hostedDistros = instanceInfo.hostedDistributions;
 
     const { repository, ...rest } = this.activeProject!.meta;
     const presentRepos = deepCopyProperties(repository) ?? [];
@@ -236,7 +255,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     });
 
     const newMeta = { ...rest, repository: presentRepos };
-    await modifyProjectMeta(instanceInfo.connection!, newMeta);
+    await modifyProjectMeta(account.connection!, newMeta);
     this.activeProject!.meta = newMeta;
 
     this.refresh();
@@ -251,7 +270,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     ) {
       return;
     }
-    const instanceInfo = this.getInstanceInfoOfCurrentProject();
+    const instanceInfo = this.getAccountOfCurrentProject();
 
     // repository must be defined and have length >= 1
     const { repository, ...rest } = this.activeProject!.meta!;
@@ -453,10 +472,8 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const activeProj = this.activeProject!;
     const repos = activeProj.meta!.repository!;
 
-    // console.log(inspect(this.currentConnections.mapping, { depth: null }));
-
-    const instanceInfo = this.currentConnections.mapping.get(activeProj.apiUrl);
-    if (instanceInfo === undefined || instanceInfo.connection === undefined) {
+    const account = this.activeAccounts.getConfig(activeProj.apiUrl);
+    if (account === undefined) {
       const errMsg = "Cannot modify the architectures of this repository: no account is configured for the API URL ".concat(
         activeProj.apiUrl
       );
@@ -464,7 +481,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       await vscode.window.showErrorMessage(errMsg);
       return;
     }
-    const activeCon: Connection = instanceInfo.connection;
+    const activeCon: Connection = account.connection;
 
     const expectedRepoName = element.repository.name;
 
@@ -525,6 +542,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
             : matchingRepo.arch.concat(archesToAdd as Arch[]);
       } else {
         const projToAdd = await vscode.window.showInputBox({
+          ignoreFocusOut: true,
           prompt: "Specify a project which repository should be added",
           validateInput: path =>
             path === "" ? "Path must not be empty" : undefined
@@ -571,7 +589,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const newMeta = deepCopyProperties(activeProj.meta!);
     newMeta.repository![matchingRepoIndex] = matchingRepo;
 
-    await modifyProjectMeta(instanceInfo.connection, newMeta);
+    await modifyProjectMeta(account.connection, newMeta);
     this.activeProject!.meta = newMeta;
 
     if (projFolder !== undefined) {
@@ -590,19 +608,17 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     );
   }
 
-  private getInstanceInfoOfCurrentProject(): ObsInstance {
+  private getAccountOfCurrentProject(): ValidAccount {
     if (this.activeProject === undefined) {
       throw new Error("No project is active, cannot add a repository");
     }
-    const instanceInfo = this.currentConnections.mapping.get(
-      this.activeProject.apiUrl
-    );
-    if (instanceInfo === undefined || instanceInfo.connection === undefined) {
+    const account = this.activeAccounts.getConfig(this.activeProject.apiUrl);
+    if (account === undefined) {
       throw new Error(
         `No account is properly configured to access the API ${this.activeProject.apiUrl}`
       );
     }
 
-    return instanceInfo;
+    return account;
   }
 }

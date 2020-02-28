@@ -29,7 +29,7 @@ import {
 import { join } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { ApiAccountMapping } from "./accounts";
+import { ActiveAccounts, ApiUrl } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { UriScheme } from "./project-view";
 
@@ -50,13 +50,18 @@ export interface WorkspaceProjects {
 
 export class WorkspaceToProjectMatcher extends ConnectionListenerLoggerBase {
   public static createWorkspaceToProjectMatcher(
-    onConnectionChange: vscode.Event<ApiAccountMapping>,
+    activeAccounts: ActiveAccounts,
+    onAccountChange: vscode.Event<ApiUrl[]>,
     logger: Logger
   ): [
     WorkspaceToProjectMatcher,
     (wsMatcher: WorkspaceToProjectMatcher) => Promise<void>
   ] {
-    const wsToProj = new WorkspaceToProjectMatcher(onConnectionChange, logger);
+    const wsToProj = new WorkspaceToProjectMatcher(
+      activeAccounts,
+      onAccountChange,
+      logger
+    );
 
     return [wsToProj, WorkspaceToProjectMatcher.delayedInit];
   }
@@ -71,7 +76,9 @@ export class WorkspaceToProjectMatcher extends ConnectionListenerLoggerBase {
 
     // we need to call this **after** the initial mapping has been setup,
     // otherwise this won't do a thing
-    wsMatcher.sendOnDidChangeActiveProjectEvent(vscode.window.activeTextEditor);
+    await wsMatcher.sendOnDidChangeActiveProjectEvent(
+      vscode.window.activeTextEditor
+    );
   }
 
   private static workspacesEqual(
@@ -100,10 +107,11 @@ export class WorkspaceToProjectMatcher extends ConnectionListenerLoggerBase {
   > = new Map();
 
   private constructor(
-    onConnectionChange: vscode.Event<ApiAccountMapping>,
+    activeAccounts: ActiveAccounts,
+    onAccountChange: vscode.Event<ApiUrl[]>,
     logger: Logger
   ) {
-    super(onConnectionChange, logger);
+    super(activeAccounts, onAccountChange, logger);
     this.onDidChangeActiveProject = this.onDidChangeActiveProjectEmitter.event;
 
     vscode.workspace.onDidChangeWorkspaceFolders(
@@ -185,11 +193,8 @@ export class WorkspaceToProjectMatcher extends ConnectionListenerLoggerBase {
 
         // refresh the project _meta in case our local copy is stale
         // but only if we actually have an active connection available
-        const instanceInfo = this.currentConnections.mapping.get(proj.apiUrl);
-        if (
-          instanceInfo !== undefined &&
-          instanceInfo.connection !== undefined
-        ) {
+        const instanceInfo = this.activeAccounts.getConfig(proj.apiUrl);
+        if (instanceInfo !== undefined) {
           this.logger.trace(
             "Fetching the _meta for Project %s via API %s",
             proj.name,

@@ -58,7 +58,8 @@ export async function activate(
     ws2Proj,
     delayedInit
   ] = WorkspaceToProjectMatcher.createWorkspaceToProjectMatcher(
-    accountManager.onConnectionChange,
+    accountManager.activeAccounts,
+    accountManager.onAccountChange,
     logger
   );
 
@@ -77,7 +78,8 @@ export async function activate(
 
   const repoTreeProvider = new RepositoryTreeProvider(
     ws2Proj.onDidChangeActiveProject,
-    accountManager.onConnectionChange,
+    accountManager.activeAccounts,
+    accountManager.onAccountChange,
     logger
   );
   context.subscriptions.push(
