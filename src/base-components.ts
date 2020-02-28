@@ -21,7 +21,7 @@
 
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { ApiAccountMapping } from "./accounts";
+import { ActiveAccounts, ApiUrl } from "./accounts";
 
 /** Base class for components that should have access to the logger */
 export class LoggingBase {
@@ -37,27 +37,20 @@ export class DisposableBase {
 }
 
 export class ConnectionListenerBase extends DisposableBase {
-  protected currentConnections: ApiAccountMapping = {
-    defaultApi: undefined,
-    mapping: new Map()
-  };
-
-  constructor(onConnectionChange: vscode.Event<ApiAccountMapping>) {
+  constructor(
+    protected readonly activeAccounts: ActiveAccounts,
+    protected readonly onAccountChange: vscode.Event<ApiUrl[]>
+  ) {
     super();
-
-    const disposable = onConnectionChange(apiAccountMapping => {
-      this.currentConnections = apiAccountMapping;
-    }, this);
-
-    this.disposables.push(disposable);
   }
 }
 
 export class ConnectionListenerLoggerBase extends ConnectionListenerBase {
   constructor(
-    onConnectionChange: vscode.Event<ApiAccountMapping>,
+    activeAccounts: ActiveAccounts,
+    onAccountChange: vscode.Event<ApiUrl[]>,
     protected readonly logger: Logger
   ) {
-    super(onConnectionChange);
+    super(activeAccounts, onAccountChange);
   }
 }

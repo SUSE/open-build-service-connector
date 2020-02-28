@@ -26,12 +26,13 @@ import { AsyncFunc, Context, Func } from "mocha";
 import * as pino from "pino";
 import { SinonSandbox } from "sinon";
 import * as vscode from "vscode";
+import { ActiveAccounts, ApiUrl, ValidAccount } from "../../accounts";
 
 use(chaiThings);
 use(chaiAsPromised);
 should();
 
-export const logger = pino(
+export const testLogger = pino(
   { level: "trace" },
   pino.destination("./logfile.json")
 );
@@ -53,7 +54,11 @@ export function makeFakeEvent<T>(): FakeEvent<T> {
 
   const event = (listener: (e: T) => void) => {
     listeners.push(listener);
-    return { dispose: () => {} };
+    return {
+      dispose: () => {
+        // do nothing on purpose
+      }
+    };
   };
 
   return { listeners, event, fire };
@@ -63,6 +68,7 @@ export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => ({
   showErrorMessage: sandbox.stub(),
   showInformationMessage: sandbox.stub(),
   showInputBox: sandbox.stub(),
+  showOpenDialog: sandbox.stub(),
   showQuickPick: sandbox.stub()
 });
 
@@ -85,6 +91,18 @@ export async function executeAndWaitForEvent<T, ET>(
   return res;
 }
 
+export class FakeActiveAccounts implements ActiveAccounts {
+  constructor(public accountMap: Map<ApiUrl, ValidAccount> = new Map()) {}
+
+  public getConfig(apiUrl: ApiUrl) {
+    return this.accountMap.get(apiUrl);
+  }
+
+  public getAllApis() {
+    return [...this.accountMap.keys()];
+  }
+}
+
 export const castToFuncT = <FC, FT>(func: (this: FC) => void): FT =>
   (func as any) as FT;
 
@@ -93,3 +111,13 @@ export const castToAsyncFunc = <FC>(func: (this: FC) => void): AsyncFunc =>
 
 export const castToFunc = <FC>(func: (this: FC) => void): Func =>
   castToFuncT<FC, Func>(func);
+
+export class LoggingFixture {
+  public beforeEach(ctx: Context) {
+    testLogger.info("Starting test %s", ctx.currentTest?.titlePath());
+  }
+
+  public afterEach(ctx: Context) {
+    testLogger.info("Finished test %s", ctx.currentTest?.titlePath());
+  }
+}

@@ -30,4 +30,6 @@ export interface VscodeWindow {
   showQuickPick: typeof vscode.window.showQuickPick;
 
   showInputBox: typeof vscode.window.showInputBox;
+
+  showOpenDialog: typeof vscode.window.showOpenDialog;
 }

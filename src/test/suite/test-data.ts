@@ -19,7 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { AccountStorage, ObsInstance } from "../../accounts";
+import { Connection } from "obs-ts";
+import { AccountStorage, ValidAccount } from "../../accounts";
 
 export const fakeAccount1: AccountStorage = {
   accountName: "foo",
@@ -33,10 +34,20 @@ export const fakeAccount2: AccountStorage = {
   username: "barUser"
 };
 
-export const fakeApi1Info: ObsInstance = {
-  account: fakeAccount1
+export const fakeApi1ValidAcc: ValidAccount = {
+  account: fakeAccount1,
+  connection: new Connection(
+    fakeAccount1.username,
+    fakeAccount1.username,
+    fakeAccount1.apiUrl
+  )
 };
 
-export const fakeApi2Info: ObsInstance = {
-  account: fakeAccount2
+export const fakeApi2ValidAcc: ValidAccount = {
+  account: fakeAccount2,
+  connection: new Connection(
+    fakeAccount2.username,
+    fakeAccount2.username,
+    fakeAccount2.apiUrl
+  )
 };

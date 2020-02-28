@@ -51,7 +51,7 @@ export async function activate(
     dest
   );
 
-  const accountManager = new AccountManager(logger);
+  const accountManager = await AccountManager.createAccountManager(logger);
 
   const [
     ws2Proj,
@@ -85,27 +85,10 @@ export async function activate(
     })
   );
 
-  await accountManager.initializeMapping();
   await delayedInit(ws2Proj);
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "obsAccount.importAccountsFromOsrc",
-      accountManager.importAccountsFromOsrc,
-      accountManager
-    )
-  );
-
   [
-    vscode.commands.registerCommand(
-      "obsAccount.setAccountPassword",
-      accountManager.interactivelySetAccountPassword,
-      accountManager
-    ),
-    vscode.commands.registerCommand(
-      "obsAccount.removeAccount",
-      accountManager.removeAccountPassword,
-      accountManager
+    accountManager,
     ),
     vscode.commands.registerCommand(
       "obsRepository.addArchitecturesToRepo",
@@ -172,12 +155,10 @@ export async function activate(
       "obsProject.showPackageFileContents",
       projectTreeProvider.showPackageFileContents,
       projectTreeProvider
-    ),
-
-    accountManager
+    )
   ].forEach(disposable => context.subscriptions.push(disposable));
 
-  await accountManager.promptForUninmportedAccount();
+  await accountManager.promptForUninmportedAccountsInOscrc();
   await accountManager.promptForNotPresentAccountPasswords();
 }
 
