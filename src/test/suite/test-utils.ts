@@ -22,6 +22,7 @@
 import { should, use } from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import * as chaiThings from "chai-things";
+import { AsyncFunc, Context, Func } from "mocha";
 import * as pino from "pino";
 import { SinonSandbox } from "sinon";
 import * as vscode from "vscode";
@@ -83,3 +84,12 @@ export async function executeAndWaitForEvent<T, ET>(
   disposable.dispose();
   return res;
 }
+
+export const castToFuncT = <FC, FT>(func: (this: FC) => void): FT =>
+  (func as any) as FT;
+
+export const castToAsyncFunc = <FC>(func: (this: FC) => void): AsyncFunc =>
+  castToFuncT<FC, AsyncFunc>(func);
+
+export const castToFunc = <FC>(func: (this: FC) => void): Func =>
+  castToFuncT<FC, Func>(func);
