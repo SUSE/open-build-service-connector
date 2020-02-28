@@ -93,27 +93,6 @@ export function deepCopyProperties<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-export async function apiCallReportWrapper<RT>(
-  apiCaller: () => Promise<RT>,
-  logger: Logger,
-  showErrorMessage: typeof vscode.window.showErrorMessage = vscode.window
-    .showErrorMessage
-): Promise<RT | undefined> {
-  try {
-    return apiCaller();
-  } catch (err) {
-    const errMsg = "Error performing an API call, got: ".concat(
-      err.status !== undefined && err.status.summary !== undefined
-        ? err.status.summary
-        : err
-    );
-
-    logger.error(errMsg);
-    await showErrorMessage(errMsg);
-    return undefined;
-  }
-}
-
 /**
  * General purpose decorator for **async** functions that throw an exception
  * that should be logged and optionally reported to the user.
