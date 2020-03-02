@@ -9,16 +9,23 @@ cache:
   paths:
     - node_modules/
     - .vscode-test
+    - .yarn-cache
 
 .node_env: &setup_env
   before_script:
     - apt -y update
     - apt -y install libsecret-1-dev libnss3 libgtk-3-0 libxss1 libasound2 jq xvfb
+    # install SUSE's trusted root certificate to be able to get obs.ts from gitlab.suse.de
     - curl http://ca.suse.de/certificates/ca/SUSE_Trust_Root.crt -o SUSE_Trust_Root.crt
     - "[[ $(openssl x509 -noout -fingerprint -sha512 -inform pem -in SUSE_Trust_Root.crt) = 'SHA512 Fingerprint=CC:73:71:70:7C:E0:AA:EC:EA:C0:E5:3B:9D:E7:ED:20:FF:B5:F2:28:E6:16:66:5D:03:6D:17:5F:59:05:99:00:C1:0B:7B:B7:D0:2A:14:21:84:A9:FC:7F:3D:D7:FC:C1:F5:BD:8A:A1:50:CE:E5:B7:7C:DA:13:72:DB:17:D5:56' ]]"
     - mv SUSE_Trust_Root.crt /usr/local/share/ca-certificates/
     - update-ca-certificates
+    # setup local yarn cache
+    - mkdir -p .yarn-cache
+    - yarn config set cache-folder $(pwd)/.yarn-cache
+    # the "reliable" package manager needs a few tries...
     - yarn install || yarn install || yarn install
+    # vscode doesn't start without X
     - "/usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &"
 
 .node_test: &run_tests
