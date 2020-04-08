@@ -20,17 +20,16 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 "use strict";
 
 const keytar = require("keytar");
 const assert = require("assert");
 
-let result = (async function() {
+let result = (async function () {
   const pw = await keytar.getPassword("foo", "bar");
   assert(
     process.env.MOCK_SECRET_PASSWORD_LOOKUP === undefined
-      ? pw === ""
+      ? pw === null
       : pw === process.env.MOCK_SECRET_PASSWORD_LOOKUP
   );
 
@@ -43,7 +42,7 @@ let result = (async function() {
   );
 
   await keytar.setPassword("foo", "bar", "baz");
-})().catch(err => {
+})().catch((err) => {
   console.error(`Test failed with: ${err}`);
   process.exitCode = 1;
 });
