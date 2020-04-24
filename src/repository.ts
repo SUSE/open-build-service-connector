@@ -24,7 +24,7 @@ import {
   Arch,
   BaseRepository,
   Connection,
-  getProjectMeta,
+  fetchProjectMeta,
   modifyProjectMeta,
   Path,
   Project,
@@ -200,7 +200,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
     // FIXME: what should we do if we need to fetch the meta?
     if (this.activeProject!.meta === undefined) {
-      this.activeProject!.meta = await getProjectMeta(
+      this.activeProject!.meta = await fetchProjectMeta(
         account.connection,
         this.activeProject!.name
       );
@@ -553,7 +553,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
           return;
         }
 
-        const projToAddMeta = await getProjectMeta(activeCon, projToAdd);
+        const projToAddMeta = await fetchProjectMeta(activeCon, projToAdd);
         if (projToAddMeta === undefined) {
           return;
         }
