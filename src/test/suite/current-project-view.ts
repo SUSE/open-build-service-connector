@@ -20,44 +20,10 @@
  */
 
 import { Context } from "mocha";
-import * as obs_ts from "obs-ts";
-import { createSandbox } from "sinon";
-import { ImportMock } from "ts-mock-imports";
-import { AccountMapInitializer, FakeAccountManager } from "./fakes";
-import { createStubbedVscodeWindow, LoggingFixture } from "./test-utils";
+import { ProjectViewFixture } from "./project-view.test";
 
-export class ProjectViewFixture extends LoggingFixture {
-  public fakeAccountManager?: FakeAccountManager;
-
-  public readonly sandbox = createSandbox();
-  public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
-
-  public readonly fetchProjectMock = ImportMock.mockFunction(
-    obs_ts,
-    "fetchProject"
-  );
-
-  public readonly fetchPackageMock = ImportMock.mockFunction(
-    obs_ts,
-    "fetchPackage"
-  );
-
-  // constructor(ctx: Context) {
-  //   super(ctx);
-  // }
-
-  public createFakeAccountManager(
-    initialAccountMap?: AccountMapInitializer
-  ): void {
-    this.fakeAccountManager = new FakeAccountManager(initialAccountMap);
-  }
-
-  public afterEach(ctx: Context) {
-    this.sandbox.restore();
-    this.fetchProjectMock.restore();
-    this.fetchPackageMock.restore();
-
-    super.afterEach(ctx);
-    this.dispose();
+class CurrentProjectTreeProviderFixture extends ProjectViewFixture {
+  constructor(ctx: Context) {
+    super(ctx);
   }
 }
