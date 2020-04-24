@@ -44,7 +44,7 @@ const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
 /**
  * This class represents the root element of the repository tree.
  */
-class RepositoryRootElement extends vscode.TreeItem {
+class RepositoryRootTreeElement extends vscode.TreeItem {
   public readonly contextValue = "repositoryRoot";
 
   constructor(public readonly repository: BaseRepository) {
@@ -54,11 +54,12 @@ class RepositoryRootElement extends vscode.TreeItem {
 
 function isRepositoryRootElement(
   treeElement: RepositoryElement
-): treeElement is RepositoryRootElement {
+): treeElement is RepositoryRootTreeElement {
   return treeElement.contextValue === "repositoryRoot";
 }
 
-class RepositoryPathRootElement extends vscode.TreeItem {
+/** Root element of the paths of a Repository */
+class RepositoryPathRootTreeElement extends vscode.TreeItem {
   public readonly contextValue = "pathRoot";
 
   constructor(public readonly repository: BaseRepository) {
@@ -73,11 +74,12 @@ class RepositoryPathRootElement extends vscode.TreeItem {
 
 function isRepositoryPathRootElement(
   treeElement: RepositoryElement
-): treeElement is RepositoryPathRootElement {
+): treeElement is RepositoryPathRootTreeElement {
   return treeElement.contextValue === "pathRoot";
 }
 
-class RepositoryPathElement extends vscode.TreeItem {
+/** An entry in the RepositoryTree representing a path entry. */
+class RepositoryPathTreeElement extends vscode.TreeItem {
   public readonly contextValue = "repositoryPath";
 
   constructor(
@@ -93,7 +95,7 @@ class RepositoryPathElement extends vscode.TreeItem {
 
 function isRepositoryPathElement(
   treeElement: RepositoryElement
-): treeElement is RepositoryPathElement {
+): treeElement is RepositoryPathTreeElement {
   return treeElement.contextValue === "repositoryPath";
 }
 
@@ -101,7 +103,7 @@ function isRepositoryPathElement(
  * This element represents the node which children are all architectures of the
  * repository.
  */
-class RepositoryArchRootElement extends vscode.TreeItem {
+class RepositoryArchRootTreeElement extends vscode.TreeItem {
   public readonly contextValue = "architectureRoot";
 
   constructor(public readonly repository: BaseRepository) {
@@ -116,12 +118,12 @@ class RepositoryArchRootElement extends vscode.TreeItem {
 
 function isRepositoryArchRootElement(
   treeElement: RepositoryElement
-): treeElement is RepositoryArchRootElement {
+): treeElement is RepositoryArchRootTreeElement {
   return treeElement.contextValue === "architectureRoot";
 }
 
 /** This class represents a single architecture of a repository */
-class RepositoryArchElement extends vscode.TreeItem {
+class RepositoryArchTreeElement extends vscode.TreeItem {
   public readonly contextValue = "architecture";
 
   constructor(
@@ -134,16 +136,16 @@ class RepositoryArchElement extends vscode.TreeItem {
 
 function isRepositoryArchElement(
   treeElement: RepositoryElement
-): treeElement is RepositoryArchElement {
+): treeElement is RepositoryArchTreeElement {
   return treeElement.contextValue === "architecture";
 }
 
 type RepositoryElement =
-  | RepositoryRootElement
-  | RepositoryPathRootElement
-  | RepositoryPathElement
-  | RepositoryArchRootElement
-  | RepositoryArchElement;
+  | RepositoryRootTreeElement
+  | RepositoryPathRootTreeElement
+  | RepositoryPathTreeElement
+  | RepositoryArchRootTreeElement
+  | RepositoryArchTreeElement;
 
 export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
   implements vscode.TreeDataProvider<RepositoryElement> {
@@ -264,7 +266,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
   @logAndReportExceptions()
   public async removeRepository(element?: RepositoryElement): Promise<void> {
     if (
-      !this.checkRepositoriesPresent() ||
+      !this.activeProjectHasRepositories() ||
       element === undefined ||
       !isRepositoryRootElement(element)
     ) {
@@ -390,7 +392,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
   public getChildren(
     element?: RepositoryElement
   ): Thenable<RepositoryElement[]> {
-    if (!this.checkRepositoriesPresent()) {
+    if (!this.activeProjectHasRepositories()) {
       return Promise.resolve([]);
     }
 
@@ -399,14 +401,14 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
     if (element === undefined) {
       return Promise.resolve(
-        repos.map(repo => new RepositoryRootElement(repo))
+        repos.map((repo) => new RepositoryRootTreeElement(repo))
       );
     }
 
     if (isRepositoryRootElement(element)) {
       return Promise.resolve([
-        new RepositoryPathRootElement(element.repository),
-        new RepositoryArchRootElement(element.repository)
+        new RepositoryPathRootTreeElement(element.repository),
+        new RepositoryArchRootTreeElement(element.repository)
       ]);
     }
 
@@ -459,7 +461,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     if (
       element === undefined ||
       !typeGuard(element) ||
-      !this.checkRepositoriesPresent()
+      !this.activeProjectHasRepositories()
     ) {
       this.logger.debug(
         "Not ading an architecture because element is invalid (%s) or the active project has no _meta associated with it (%s)",
@@ -514,8 +516,8 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
         matchingRepo.path = matchingRepo.path?.filter(
           (path) =>
             path.repository !==
-              (element as RepositoryPathElement).path.repository ||
-            path.project !== (element as RepositoryPathElement).path.project
+              (element as RepositoryPathTreeElement).path.repository ||
+            path.project !== (element as RepositoryPathTreeElement).path.project
         );
       }
     } else {
@@ -600,7 +602,12 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     this.refresh();
   }
 
-  private checkRepositoriesPresent(): boolean {
+  /**
+   * Returns `true` if the active project has one or more repositories defined.
+   * If no repositories are defined or no project is active, then `false` is
+   * returned instead.
+   */
+  private activeProjectHasRepositories(): boolean {
     return (
       this.activeProject !== undefined &&
       this.activeProject.meta !== undefined &&
