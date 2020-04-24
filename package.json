@@ -61,23 +61,28 @@
     "menus": {
       "view/item/context": [
         {
-          "group": "inline",
-          "when": "view == projectTree && viewItem == ObsServer",
-          "command": "obsProject.addProjectToBookmarks"
+          "when": "view == bookmarkedProjectsTree && viewItem == project",
+          "command": "vscodeObs.obsProject.removeBookmark"
         },
         {
           "group": "inline",
-          "when": "view == projectTree && viewItem == BookmarkedProjectsRoot",
-          "command": "obsProject.addProjectToBookmarks"
-        },
-        {
-          "when": "view == projectTree && viewItem == project",
-          "command": "obsProject.removeBookmark"
+          "when": "view == bookmarkedProjectsTree && viewItem == project",
+          "command": "vscodeObs.obsProject.updateProject"
         },
         {
           "group": "inline",
-          "when": "view == projectTree && viewItem == project",
-          "command": "obsProject.refreshProject"
+          "when": "view == currentProjectTree && viewItem == project",
+          "command": "vscodeObs.obsProject.updateProject"
+        },
+        {
+          "group": "inline",
+          "when": "view == currentProjectTree && viewItem == localProject",
+          "command": "vscodeObs.obsProject.updateCheckedOutProject"
+        },
+        {
+          "group": "inline",
+          "when": "view == bookmarkedProjectsTree && viewItem == package",
+          "command": "vscodeObs.obsProject.updatePackage"
         },
         {
           "group": "inline",
@@ -115,32 +120,35 @@
     },
     "commands": [
       {
-        "icon": "media/Remove_font_awesome.svg",
+        "icon": {
+          "dark": "media/dark/remove.svg",
+          "light": "media/light/remove.svg"
+        },
         "title": "Remove this Bookmark",
-        "command": "obsProject.removeBookmark"
+        "command": "vscodeObs.obsProject.removeBookmark"
       },
       {
         "icon": "media/ic_export_import.svg",
         "title": "Import accounts from osc's configuration file",
-        "command": "obsAccount.importAccountsFromOsrc"
+        "command": "vscodeObs.obsAccount.importAccountsFromOsrc"
       },
       {
         "title": "Set the password of a Build Service Account",
-        "command": "obsAccount.setAccountPassword"
+        "command": "vscodeObs.obsAccount.setAccountPassword"
       },
       {
         "icon": "media/Remove_font_awesome.svg",
         "title": "Remove an account from the settings",
-        "command": "obsAccount.removeAccount"
+        "command": "vscodeObs.obsAccount.removeAccount"
       },
       {
-        "title": "Create a new account for the Open Build Service ",
-        "command": "obsAccount.newAccountWizzard"
+        "title": "Add an existing account from the Open Build Service to the extension",
+        "command": "vscodeObs.obsAccount.newAccountWizard"
       },
       {
         "icon": "media/add.svg",
-        "title": "Add a project to the bookmarked projects",
-        "command": "obsProject.addProjectToBookmarks"
+        "title": "Bookmark a project from the Open Build Service",
+        "command": "vscodeObs.obsProject.bookmarkProject"
       },
       {
         "icon": {
@@ -191,29 +199,39 @@
         "command": "obsRepository.addRepositoryFromDistro"
       },
       {
-        "icon": "media/update.svg",
+        "icon": {
+          "dark": "media/dark/refresh.svg",
+          "light": "media/light/refresh.svg"
+        },
+        "title": "Update this Project",
+        "command": "vscodeObs.obsProject.updateProject"
+      },
+      {
+        "icon": {
+          "dark": "media/dark/refresh.svg",
+          "light": "media/light/refresh.svg"
+        },
         "title": "Refresh this Project",
-        "command": "obsProject.refreshProject"
+        "command": "vscodeObs.obsProject.updateCheckedOutProject"
       },
       {
-        "title": "Show this files' contents",
-        "command": "obsProject.showPackageFileContents"
-      },
-      {
-        "icon": "media/update.svg",
-        "title": "Update this packages contents and data",
-        "command": "obsProject.updatePackage"
-      },
-      {
-        "title": "Get the Project belonging the provided Uri from the project bookmarks",
-        "command": "obsProject.getProjectFromUri"
+        "icon": {
+          "dark": "media/dark/refresh.svg",
+          "light": "media/light/refresh.svg"
+        },
+        "title": "Update this Package and its content",
+        "command": "vscodeObs.obsProject.updatePackage"
       }
     ],
     "views": {
       "obs-tree-view": [
         {
-          "name": "Projects",
-          "id": "projectTree"
+          "name": "Bookmarked Projects",
+          "id": "bookmarkedProjectsTree"
+        },
+        {
+          "name": "Current Project",
+          "id": "currentProjectTree"
         },
         {
           "name": "Repositories",
