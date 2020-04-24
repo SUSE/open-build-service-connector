@@ -91,8 +91,7 @@ class AccountManagerFixture extends LoggingFixture {
   private readonly accountSettingsBackup: AccountStorage[];
 
   constructor(context: Mocha.Context) {
-    super();
-    super.beforeEach(context);
+    super(context);
 
     this.accountSettingsBackup = vscode.workspace
       .getConfiguration(configurationExtensionName)
