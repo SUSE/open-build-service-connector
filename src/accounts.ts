@@ -727,7 +727,7 @@ export class AccountManagerImpl extends LoggingBase {
    */
   public async promptForNotPresentAccountPasswords(): Promise<void> {
     this.logger.trace(
-      "Prompting for not passwords of accounts that don't have one, got %d accounts to query",
+      "Prompting for passwords of accounts that don't have one, got %d accounts to query",
       this.accountsWithOutPw.length
     );
 
