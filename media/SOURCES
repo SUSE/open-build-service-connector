@@ -1,6 +1,9 @@
-Toicon-icon-lines-and-angles-edit.svg:  https://upload.wikimedia.org/wikipedia/commons/3/30/Toicon-icon-lines-and-angles-edit.svg
-User_font_awesome.svg:                  https://upload.wikimedia.org/wikipedia/commons/7/7c/User_font_awesome.svg
-Remove_font_awesome.svg:                https://upload.wikimedia.org/wikipedia/commons/d/de/Remove_font_awesome.svg
-obs-logo.svg:                           https://openbuildservice.org/images/obs-logo.svg
-ic_export_import.svg:                   https://publicdomainvectors.org/en/free-clipart/Vector-image-of-round-grey-import-icon/17674.html
+obs-logo.svg:                                https://openbuildservice.org/images/obs-logo.svg
+ic_export_import.svg:                        https://publicdomainvectors.org/en/free-clipart/Vector-image-of-round-grey-import-icon/17674.html
+
 add.svg:                                     https://gitlab.com/SUSE-UIUX/eos-icons/-/raw/master/svg/extended/add.svg
+add_circle.svg                               https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/add_circle.svg
+add_circle_outline.svg                       https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/add_circle_outline.svg
+remove_circle.svg                            https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/remove_circle.svg
+remove_circle_outline.svg                    https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/remove_circle_outline.svg
+bookmark_border.svg:                         https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/bookmark_border.svg

@@ -120,10 +120,7 @@
     },
     "commands": [
       {
-        "icon": {
-          "dark": "media/dark/remove.svg",
-          "light": "media/light/remove.svg"
-        },
+        "icon": "$(remove)",
         "title": "Remove this Bookmark",
         "command": "vscodeObs.obsProject.removeBookmark"
       },
@@ -137,7 +134,7 @@
         "command": "vscodeObs.obsAccount.setAccountPassword"
       },
       {
-        "icon": "media/Remove_font_awesome.svg",
+        "icon": "$(remove)",
         "title": "Remove an account from the settings",
         "command": "vscodeObs.obsAccount.removeAccount"
       },
@@ -199,26 +196,17 @@
         "command": "obsRepository.addRepositoryFromDistro"
       },
       {
-        "icon": {
-          "dark": "media/dark/refresh.svg",
-          "light": "media/light/refresh.svg"
-        },
+        "icon": "$(refresh)",
         "title": "Update this Project",
         "command": "vscodeObs.obsProject.updateProject"
       },
       {
-        "icon": {
-          "dark": "media/dark/refresh.svg",
-          "light": "media/light/refresh.svg"
-        },
+        "icon": "$(refresh)",
         "title": "Refresh this Project",
         "command": "vscodeObs.obsProject.updateCheckedOutProject"
       },
       {
-        "icon": {
-          "dark": "media/dark/refresh.svg",
-          "light": "media/light/refresh.svg"
-        },
+        "icon": "$(refresh)",
         "title": "Update this Package and its content",
         "command": "vscodeObs.obsProject.updatePackage"
       }
