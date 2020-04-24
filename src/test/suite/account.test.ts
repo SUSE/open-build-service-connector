@@ -1278,7 +1278,7 @@ Gwc=
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
-          await mngr.newAccountWizzard().should.be.fulfilled;
+          await mngr.newAccountWizard().should.be.fulfilled;
 
           this.fixture.sandbox.assert.calledOnce(
             this.fixture.vscodeWindow.showQuickPick
@@ -1315,7 +1315,7 @@ Gwc=
 
           const mngr = await this.fixture.createAccountManager();
 
-          await mngr.newAccountWizzard().should.be.fulfilled;
+          await mngr.newAccountWizard().should.be.fulfilled;
 
           this.fixture.sandbox.assert.calledOnce(this.fixture.accountChangeSpy);
           checkAccountAndCon(
@@ -1372,7 +1372,7 @@ Gwc=
             Buffer.from(caCertRootCertificate, "ascii")
           );
 
-          await mngr.newAccountWizzard().should.be.fulfilled;
+          await mngr.newAccountWizard().should.be.fulfilled;
 
           this.fixture.sandbox.assert.calledTwice(
             this.fixture.vscodeWindow.showQuickPick
@@ -1412,7 +1412,7 @@ Gwc=
           const errMsg = `ENOENT: no such file or directory, open ${certPath}`;
           this.readFileMock.throws(Error(errMsg));
 
-          await mngr.newAccountWizzard().should.be.fulfilled;
+          await mngr.newAccountWizard().should.be.fulfilled;
 
           this.fixture.sandbox.assert.calledTwice(
             this.fixture.vscodeWindow.showQuickPick

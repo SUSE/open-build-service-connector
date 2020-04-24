@@ -799,7 +799,7 @@ export class AccountManager extends LoggingBase {
   }
 
   /** */
-  public async newAccountWizzard(): Promise<void> {
+  public async newAccountWizard(): Promise<void> {
     const OBS = "build.opensuse.org (OBS)";
     const CUSTOM = "other (custom)";
     const serverChoice = await this.vscodeWindow.showQuickPick([OBS, CUSTOM], {
