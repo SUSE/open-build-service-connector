@@ -260,7 +260,7 @@
             "error",
             "fatal"
           ],
-          "description": "Default logging level used",
+          "description": "Logging level used",
           "type": "string"
         },
         "vscode-obs.checkUnimportedAccounts": {
