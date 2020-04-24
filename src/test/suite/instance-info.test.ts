@@ -31,6 +31,7 @@ import {
   ObsServerInformation,
   UPDATE_INSTANCE_INFO_COMMAND
 } from "../../instance-info";
+import { AccountMapInitializer, FakeAccountManager } from "./fakes";
 import {
   fakeAccount1,
   fakeAccount2,
@@ -38,10 +39,8 @@ import {
   fakeApi2ValidAcc
 } from "./test-data";
 import {
-  AccountMapInitializer,
   castToAsyncFunc,
   createStubbedVscodeWindow,
-  FakeActiveAccounts,
   LoggingFixture,
   sleep,
   testLogger
@@ -61,13 +60,12 @@ class ObsServerInformationFixture extends LoggingFixture {
     "fetchHostedDistributions"
   );
 
-  public fakeActiveAccounts: FakeActiveAccounts | undefined;
+  public fakeAccountManager?: FakeAccountManager;
 
   public disposables: vscode.Disposable[] = [];
 
   constructor(ctx: Context) {
-    super();
-    super.beforeEach(ctx);
+    super(ctx);
   }
 
   public afterEach(ctx: Context) {
@@ -76,7 +74,7 @@ class ObsServerInformationFixture extends LoggingFixture {
 
     this.sandbox.restore();
 
-    this.disposables.forEach(disposable => disposable.dispose());
+    this.disposables.forEach((disposable) => disposable.dispose());
     this.disposables = [];
 
     super.afterEach(ctx);
@@ -85,13 +83,14 @@ class ObsServerInformationFixture extends LoggingFixture {
   public async createObsServerInformation(
     initialAccountMap?: AccountMapInitializer
   ): Promise<ObsServerInformation> {
-    this.fakeActiveAccounts = new FakeActiveAccounts(initialAccountMap);
+    this.fakeAccountManager = new FakeAccountManager(initialAccountMap);
 
-    const serverInfo = await ObsServerInformation.createObsServerInformation(
-      this.fakeActiveAccounts,
-      this.fakeActiveAccounts.onAccountChange,
+    const serverInfo = new ObsServerInformation(
+      this.fakeAccountManager,
       testLogger
     );
+
+    await serverInfo.initialInstanceInfoRetrieved;
 
     this.disposables.push(serverInfo);
 
@@ -249,7 +248,9 @@ describe("ObsServerInformation", () => {
           [fakeAccount1.apiUrl, fakeApi1ValidAcc]
         ]).should.be.fulfilled;
 
-        await this.fixture.fakeActiveAccounts!.addAccount(fakeApi2ValidAcc);
+        await this.fixture.fakeAccountManager!.activeAccounts.addAccount(
+          fakeApi2ValidAcc
+        );
 
         // HACK: the fetching of the infos is asynchronous and events are not,
         // so we need to manually delay here
@@ -272,7 +273,7 @@ describe("ObsServerInformation", () => {
         const thirdCon = new obs_ts.Connection(
           thirdAccount.username,
           "secure",
-          thirdAccount.apiUrl
+          { url: thirdAccount.apiUrl }
         );
 
         const serverInfo: ObsServerInformation = await this.fixture.createObsServerInformation(

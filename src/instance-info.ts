@@ -27,8 +27,9 @@ import {
 } from "obs-ts";
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { ActiveAccounts, ApiUrl } from "./accounts";
+import { AccountManager, ApiUrl } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
+import { cmdPrefix } from "./constants";
 import { logAndReportExceptionsWrapper } from "./util";
 
 /** Information about an instance of the Open Build Service. */
@@ -59,14 +60,13 @@ export interface ObsInstance {
  * The command takes a single parameter: the API Url of the instance and returns
  * a [[ObsInstance]] object if it is known or `undefined` otherwise.
  */
-export const GET_INSTANCE_INFO_COMMAND = "vscodeObs.ObsServerInfo.getInfo";
+export const GET_INSTANCE_INFO_COMMAND = `${cmdPrefix}.ObsServerInfo.getInfo`;
 
 /**
  * Name of the command to force an update of all stored information about the
  * known instances.
  */
-export const UPDATE_INSTANCE_INFO_COMMAND =
-  "vscodeObs.ObsServerInfo.updateInfo";
+export const UPDATE_INSTANCE_INFO_COMMAND = `${cmdPrefix}.ObsServerInfo.updateInfo`;
 
 /**
  * Class that stores and retrieves additional information about the known OBS
@@ -82,33 +82,14 @@ export const UPDATE_INSTANCE_INFO_COMMAND =
  */
 export class ObsServerInformation extends ConnectionListenerLoggerBase {
   /**
-   * Asynchronous constructor, creates a new ObsServerInformation and fetches
-   * all information about the currently know instances.
+   * Promise that resolves once the initial ObsInstance data fetch is completed.
    */
-  public static async createObsServerInformation(
-    activeAccounts: ActiveAccounts,
-    onAccountChange: vscode.Event<ApiUrl[]>,
-    logger: Logger
-  ): Promise<ObsServerInformation> {
-    const obsServerInfo = new ObsServerInformation(
-      activeAccounts,
-      onAccountChange,
-      logger
-    );
-
-    await obsServerInfo.updateAllInstanceInfos(activeAccounts.getAllApis());
-
-    return obsServerInfo;
-  }
+  public readonly initialInstanceInfoRetrieved: Promise<void>;
 
   private instances: ObsInstance[] = [];
 
-  private constructor(
-    activeAccounts: ActiveAccounts,
-    onAccountChange: vscode.Event<ApiUrl[]>,
-    logger: Logger
-  ) {
-    super(activeAccounts, onAccountChange, logger);
+  constructor(accountManager: AccountManager, logger: Logger) {
+    super(accountManager, logger);
 
     this.disposables.push(
       this.onAccountChange(
@@ -125,6 +106,14 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
         this.updateAllInstanceInfos,
         this
       )
+    );
+
+    // We shall be nasty here and don't await the Promise, because it can take
+    // ages to resolve.
+    // That is pretty hacky, but the called function *should* not throw any
+    // exceptions and just log them.
+    this.initialInstanceInfoRetrieved = this.updateAllInstanceInfos(
+      accountManager.activeAccounts.getAllApis()
     );
   }
 
