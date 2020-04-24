@@ -32,9 +32,9 @@ import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
 import { LoggingBase } from "./base-components";
+import { cmdPrefix } from "./constants";
 import { logAndReportExceptions, setDifference } from "./util";
 import { VscodeWindow } from "./vscode-dep";
-import { inspect } from "util";
 
 /**
  * # Accounts management
@@ -94,6 +94,16 @@ export const configurationCheckUnimportedAccounts = "checkUnimportedAccounts";
 
 /** Service name under which the passwords are stored in the OS' keyring */
 const keytarServiceName = configurationAccountsFullName;
+
+const cmdId = "obsAccount";
+
+export const IMPORT_ACCOUNTS_FROM_OSCRC_COMMAND = `${cmdPrefix}.${cmdId}.importAccountsFromOsrc`;
+
+export const SET_ACCOUNT_PASSWORD_COMMAND = `${cmdPrefix}.${cmdId}.setAccountPassword`;
+
+export const REMOVE_ACCOUNT_COMMAND = `${cmdPrefix}.${cmdId}.removeAccount`;
+
+export const NEW_ACCOUNT_WIZARD_COMMAND = `${cmdPrefix}.${cmdId}.newAccountWizard`;
 
 /** Type as which the URL to the API is stored */
 export type ApiUrl = string;
@@ -628,28 +638,28 @@ export class AccountManager extends LoggingBase {
       mngr.configurationChangeListener,
       mngr
     );
-    [
+    mngr.disposables.push(
       vscodeCommands.registerCommand(
-        "obsAccount.importAccountsFromOsrc",
+        IMPORT_ACCOUNTS_FROM_OSCRC_COMMAND,
         mngr.importAccountsFromOsrc,
         mngr
       ),
       vscode.commands.registerCommand(
-        "obsAccount.setAccountPassword",
+        SET_ACCOUNT_PASSWORD_COMMAND,
         mngr.setAccountPasswordInteractive,
         mngr
       ),
       vscode.commands.registerCommand(
-        "obsAccount.removeAccount",
+        REMOVE_ACCOUNT_COMMAND,
         mngr.removeAccountInteractive,
         mngr
       ),
       vscode.commands.registerCommand(
-        "obsAccount.newAccountWizzard",
-        mngr.newAccountWizzard,
+        NEW_ACCOUNT_WIZARD_COMMAND,
+        mngr.newAccountWizard,
         mngr
       )
-    ].forEach(disposable => mngr.disposables.push(disposable));
+    );
 
     await mngr.displayConfigurationLoadingFailedError(errMsgs);
 
