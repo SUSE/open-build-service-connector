@@ -6,3 +6,7 @@ coverage/
 .nyc_output/
 documentation/
 mocklibsecret/build/
+logfile.json
+test-resources/
+open-build-service/
+mocklibsecret/.mypy_cache/*
