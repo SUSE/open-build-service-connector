@@ -594,6 +594,13 @@ class RuntimeAccountConfiguration extends LoggingBase {
   }
 }
 
+export interface AccountManager extends vscode.Disposable {
+  readonly onAccountChange: vscode.Event<ApiUrl[]>;
+
+  /** Currently active accounts with a valid password */
+  readonly activeAccounts: ActiveAccounts;
+}
+
 /**
  * We want all input boxes to ignore loosing focus (imho terrible to have this
  * default to false).
@@ -614,7 +621,7 @@ const ignoreFocusOut = true;
  * should subscribe to the [[onAccountChange]] Event. It is fired every time
  * the account configuration changes.
  */
-export class AccountManager extends LoggingBase {
+export class AccountManagerImpl extends LoggingBase {
   /**
    * Construct a fully initialized [[AccountManager]] that has all commands
    * already registered.
@@ -624,8 +631,8 @@ export class AccountManager extends LoggingBase {
     vscodeWindow: VscodeWindow = vscode.window,
     vscodeCommands: typeof vscode.commands = vscode.commands,
     vscodeWorkspace: typeof vscode.workspace = vscode.workspace
-  ): Promise<AccountManager> {
-    const mngr = new AccountManager(logger, vscodeWindow);
+  ): Promise<AccountManagerImpl> {
+    const mngr = new AccountManagerImpl(logger, vscodeWindow);
     mngr.logger.trace("initializing the AccountManager");
 
     let errMsgs: string[];

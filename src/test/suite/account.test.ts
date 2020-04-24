@@ -29,6 +29,7 @@ import { ImportMock } from "ts-mock-imports";
 import * as vscode from "vscode";
 import {
   AccountManager,
+  AccountManagerImpl,
   AccountStorage,
   configurationAccounts,
   configurationCheckUnimportedAccounts,
@@ -100,15 +101,15 @@ class AccountManagerFixture extends LoggingFixture {
 
   public async createAccountManager(
     fakeAccounts: AccountStorage[] = [],
-    returnedPasswords: Array<string | null> = []
-  ): Promise<AccountManager> {
+    returnedPasswords: (string | null)[] = []
+  ): Promise<AccountManagerImpl> {
     await addFakeAcountsToConfig(fakeAccounts);
 
     returnedPasswords.forEach((pw, index) =>
       this.keytarGetPasswordMock.onCall(index).resolves(pw)
     );
 
-    const mngr = await AccountManager.createAccountManager(
+    const mngr = await AccountManagerImpl.createAccountManager(
       testLogger,
       this.vscodeWindow
     );

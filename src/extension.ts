@@ -23,10 +23,10 @@ import { promises as fsPromises } from "fs";
 import { join } from "path";
 import * as pino from "pino";
 import * as vscode from "vscode";
-import { AccountManager } from "./accounts";
 import { ProjectTreeProvider, UriScheme } from "./project-view";
 import { RepositoryTreeProvider } from "./repository";
 import { WorkspaceToProjectMatcher } from "./workspace";
+import { AccountManagerImpl } from "./accounts";
 import { ObsServerInformation } from "./instance-info";
 
 // this method is called when your extension is activated
@@ -52,7 +52,7 @@ export async function activate(
     dest
   );
 
-  const accountManager = await AccountManager.createAccountManager(logger);
+  const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
   const [
     ws2Proj,
