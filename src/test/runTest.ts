@@ -25,6 +25,7 @@ import { userInfo } from "os";
 import { runTests } from "vscode-test";
 
 async function main() {
+  let retval: number = 0;
   try {
     // The folder containing the Extension Manifest package.json
     // Passed to `--extensionDevelopmentPath`
@@ -45,16 +46,18 @@ async function main() {
     ) {
       launchArgs.push("--no-sandbox");
     }
-    // Download VS Code, unzip it and run the integration test
-    await runTests({
+    // Download VS Code, unzip it and run the unit tests
+    retval = await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs,
       version: process.env.VSCODE_VERSION
     });
   } catch (err) {
-    process.exit(1);
+    console.error(err);
+    retval = 1;
   }
+  process.exit(retval);
 }
 
 main();
