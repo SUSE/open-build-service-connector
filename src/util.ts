@@ -21,6 +21,7 @@
 
 import * as assert from "assert";
 import * as vscode from "vscode";
+import { Logger } from "pino";
 
 /**
  * Returns the difference `setA - setB` (all elements from A that are not in B).
@@ -202,4 +203,17 @@ export function logAndReportExceptionsWrapper<RT>(
       return undefined;
     }
   };
+}
+
+export async function logException<RT>(
+  logger: Logger,
+  func: () => Promise<RT>,
+  description: string = "Function"
+): Promise<RT | undefined> {
+  try {
+    return await func();
+  } catch (err) {
+    logger.error("%s failed with %s", description, err.toString());
+    return undefined;
+  }
 }
