@@ -20,24 +20,18 @@
  */
 
 import { afterEach, beforeEach, describe } from "mocha";
-import * as obs_ts from "obs-ts";
 import { createSandbox } from "sinon";
-import { ApiUrl, ActiveAccounts } from "../../accounts";
 import { RepositoryTreeProvider } from "../../repository";
 import { VscodeWindow } from "../../vscode-dep";
+import { ActiveProject } from "../../workspace";
 import {
-  createStubbedVscodeWindow,
-  testLogger,
-  makeFakeEvent,
-  FakeActiveAccounts
-} from "./test-utils";
+  AccountMapInitializer,
+  FakeAccountManager,
+  FakeActiveProjectWatcher
+} from "./fakes";
+import { createStubbedVscodeWindow, testLogger } from "./test-utils";
 
 class RepositoryTreeProviderFixture {
-  public readonly fakeAccountChange = makeFakeEvent<ApiUrl[]>();
-  public readonly fakeActiveProject = makeFakeEvent<
-    obs_ts.Project | undefined
-  >();
-
   public readonly sandbox = createSandbox();
 
   public readonly mockMemento = {
@@ -45,17 +39,25 @@ class RepositoryTreeProviderFixture {
     update: this.sandbox.stub()
   };
 
+  public fakeActiveProjectWatcher?: FakeActiveProjectWatcher;
+
+  public fakeAccountManager?: FakeAccountManager;
+
   public readonly vscodeWindow: VscodeWindow = createStubbedVscodeWindow(
     this.sandbox
   );
 
   public createRepositoryTreeProvider(
-    activeAccounts: ActiveAccounts = new FakeActiveAccounts()
+    initialActiveProject?: ActiveProject,
+    initialAccountMap?: AccountMapInitializer
   ): RepositoryTreeProvider {
+    this.fakeActiveProjectWatcher = new FakeActiveProjectWatcher(
+      initialActiveProject
+    );
+    this.fakeAccountManager = new FakeAccountManager(initialAccountMap);
     return new RepositoryTreeProvider(
-      this.fakeActiveProject.event,
-      activeAccounts,
-      this.fakeAccountChange.event,
+      this.fakeActiveProjectWatcher,
+      this.fakeAccountManager,
       testLogger,
       this.vscodeWindow
     );

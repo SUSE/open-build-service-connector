@@ -32,11 +32,12 @@ import {
 } from "obs-ts";
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { ActiveAccounts, ApiUrl, ValidAccount } from "./accounts";
+import { AccountManager, ValidAccount } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
 import { deepCopyProperties, logAndReportExceptions } from "./util";
 import { VscodeWindow } from "./vscode-dep";
+import { ActiveProjectWatcher } from "./workspace";
 
 // all architectures known by OBS in general
 const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
@@ -158,24 +159,23 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
   > = new vscode.EventEmitter<RepositoryElement | undefined>();
 
   constructor(
-    onDidChangeActiveProject: vscode.Event<Project | undefined>,
-    activeAccounts: ActiveAccounts,
-    onAccountChange: vscode.Event<ApiUrl[]>,
+    activeProjectWatcher: ActiveProjectWatcher,
+    accountManager: AccountManager,
     logger: Logger,
     private readonly vscodeWindow: VscodeWindow = vscode.window
   ) {
-    super(activeAccounts, onAccountChange, logger);
+    super(accountManager, logger);
 
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
-    this.activeProject = undefined;
+    this.activeProject = activeProjectWatcher.getActiveProject().activeProject;
 
-    [
+    this.disposables.push(
       this.onDidChangeTreeDataEmitter,
-      onDidChangeActiveProject(activeProj => {
-        this.activeProject = activeProj;
+      activeProjectWatcher.onDidChangeActiveProject((activeProj) => {
+        this.activeProject = activeProj.activeProject;
         this.logger.debug(
-          activeProj
-            ? `RepositoryTreeProvider was notified of the active project ${activeProj.name}`
+          this.activeProject
+            ? `RepositoryTreeProvider was notified of the active project ${this.activeProject.name}`
             : "RepositoryTreeProvider was notified that no project is active"
         );
         this.refresh();
@@ -183,7 +183,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       this.onAccountChange((_apiUrls) => {
         this.refresh();
       }, this)
-    ].forEach(disposable => this.disposables.push(disposable));
+    );
   }
 
   public refresh(): void {
