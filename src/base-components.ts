@@ -32,7 +32,7 @@ export class DisposableBase {
   protected disposables: vscode.Disposable[] = [];
 
   public dispose() {
-    this.disposables.forEach(disp => disp.dispose());
+    this.disposables.forEach((disp) => disp.dispose());
   }
 }
 

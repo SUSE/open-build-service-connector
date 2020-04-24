@@ -112,7 +112,7 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
 
     this.disposables.push(
       this.onAccountChange(
-        async apiUrls => this.updateAllInstanceInfos(apiUrls),
+        async (apiUrls) => this.updateAllInstanceInfos(apiUrls),
         this
       ),
       vscode.commands.registerCommand(
@@ -155,7 +155,7 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
       return undefined;
     }
     const existingInfo = this.instances.find(
-      obsInstance => obsInstance.apiUrl === apiUrl
+      (obsInstance) => obsInstance.apiUrl === apiUrl
     );
     return existingInfo;
   }
@@ -177,11 +177,11 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
     );
 
     const instanceInfos = await Promise.all(
-      apiUrls.map(apiUrl => this.fetchInstanceInfoForApi(apiUrl))
+      apiUrls.map((apiUrl) => this.fetchInstanceInfoForApi(apiUrl))
     );
 
     this.instances = [];
-    instanceInfos.forEach(instanceInfo => {
+    instanceInfos.forEach((instanceInfo) => {
       if (instanceInfo !== undefined) {
         this.instances.push(instanceInfo);
       }

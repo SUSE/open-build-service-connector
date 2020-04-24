@@ -62,7 +62,7 @@ export async function run(): Promise<void> {
 
   try {
     await new Promise((resolve, reject) => {
-      mocha.run(failures => {
+      mocha.run((failures) => {
         failures > 0
           ? reject(new Error(`${failures} tests failed.`))
           : resolve();

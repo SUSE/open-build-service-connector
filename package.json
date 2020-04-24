@@ -27,6 +27,7 @@
     "@types/chai-things": "^0.0.34",
     "@types/chai-as-promised": "^7",
     "@types/chai": "^4"
+    "prettier": "^2",
   },
   "dependencies": {
     "xml2js": "^0.4.22",
@@ -304,6 +305,9 @@
   ],
   "engines": {
     "vscode": "^1.37.0"
+  },
+  "prettier": {
+    "trailingComma": "none"
   },
   "repository": "https://gitlab.suse.de/dancermak/vscode-obs",
   "license": "MIT",

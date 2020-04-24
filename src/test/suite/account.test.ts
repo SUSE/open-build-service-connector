@@ -120,7 +120,7 @@ class AccountManagerFixture extends LoggingFixture {
   }
 
   public async afterEach(context: FixtureContext) {
-    this.disposables.forEach(disp => disp.dispose());
+    this.disposables.forEach((disp) => disp.dispose());
     this.disposables = [];
 
     this.keytarGetPasswordMock.restore();
@@ -141,21 +141,21 @@ class AccountManagerFixture extends LoggingFixture {
   }
 }
 
-describe("AccountManager", function() {
+describe("AccountManager", function () {
   this.timeout(5000);
 
-  beforeEach(async function() {
+  beforeEach(async function () {
     this.fixture = new AccountManagerFixture(this);
   });
 
-  afterEach(async function() {
+  afterEach(async function () {
     await this.fixture.afterEach(this);
   });
 
   describe("#createAccountManager", () => {
     it(
       "AccountManager has no accounts by default",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager([]);
         expect(mngr.activeAccounts.getAllApis())
           .to.be.an("array")
@@ -165,7 +165,7 @@ describe("AccountManager", function() {
 
     it(
       "populates the activeAccounts property",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1],
           ["fooPw"]
@@ -197,7 +197,7 @@ describe("AccountManager", function() {
 
     it(
       "reports configuration issues to the user",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         this.fixture.vscodeWindow.showErrorMessage.resolves();
 
         const mngr = await this.fixture.createAccountManager([
@@ -230,7 +230,7 @@ describe("AccountManager", function() {
   });
 
   describe("#configurationChangeListener", () => {
-    beforeEach(async function() {
+    beforeEach(async function () {
       this.fixture.vscodeWindow.showErrorMessage.resolves();
     });
 
@@ -255,7 +255,7 @@ describe("AccountManager", function() {
 
     it(
       "rejects invalid urls",
-      castToAsyncFunc<FixtureContext>(async function(this: FixtureContext) {
+      castToAsyncFunc<FixtureContext>(async function (this: FixtureContext) {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["a", "b"]
@@ -274,7 +274,7 @@ describe("AccountManager", function() {
 
     it(
       "rejects empty usernames",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["a", "b"]
@@ -296,7 +296,7 @@ describe("AccountManager", function() {
 
     it(
       "removes accounts that are dropped from the config",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["a", "b"]
@@ -318,7 +318,7 @@ describe("AccountManager", function() {
 
     it(
       "reflects changes in the username in stored accounts",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["a", "b"]
@@ -349,7 +349,7 @@ describe("AccountManager", function() {
 
     it(
       "prompts the user to provide a password for a newly added account",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager([]);
 
         const pw = "aFakePassword";
@@ -376,7 +376,7 @@ describe("AccountManager", function() {
 
     it(
       "does not add an account if the user does not provide a password",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1],
           ["foo"]
@@ -410,13 +410,13 @@ describe("AccountManager", function() {
           vscode.ConfigurationTarget.Global
         );
 
-    beforeEach(async function() {
+    beforeEach(async function () {
       this.unimportedAccountsSetting = vscode.workspace
         .getConfiguration(configurationExtensionName)
         .get(configurationCheckUnimportedAccounts);
     });
 
-    afterEach(async function() {
+    afterEach(async function () {
       await vscode.workspace
         .getConfiguration(configurationExtensionName)
         .update(
@@ -429,7 +429,7 @@ describe("AccountManager", function() {
     describe("#importAccountsFromOscrc", () => {
       it(
         "imports an account with a set password",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager([
             fakeAccount1,
             fakeAccount2
@@ -482,7 +482,7 @@ describe("AccountManager", function() {
           // the map should contain a mapping for our apiUrl and the Connection
           // should have a set value
           let activeAccount = mngr.activeAccounts.getConfig(apiUrl);
-          expect(activeAccount).to.not.be.undefined;
+          expect(activeAccount).to.not.equal(undefined);
           activeAccount = activeAccount!;
 
           expect(activeAccount.account).to.deep.equal({
@@ -492,7 +492,7 @@ describe("AccountManager", function() {
           });
 
           let con = activeAccount.connection;
-          expect(con).to.not.be.undefined;
+          expect(con).to.not.equal(undefined);
 
           con = con!;
           expect(con).to.deep.include({
@@ -504,7 +504,7 @@ describe("AccountManager", function() {
 
       it(
         "imports an account without a set password and asks the user to provide it",
-        castToAsyncFunc<FixtureContext>(async function(this: FixtureContext) {
+        castToAsyncFunc<FixtureContext>(async function (this: FixtureContext) {
           const mngr = await this.fixture.createAccountManager([
             fakeAccount1,
             fakeAccount2
@@ -552,7 +552,7 @@ describe("AccountManager", function() {
 
       it(
         "doesn't import an account if the user does not provide a password",
-        castToAsyncFunc<FixtureContext>(async function(this: FixtureContext) {
+        castToAsyncFunc<FixtureContext>(async function (this: FixtureContext) {
           const mngr = await this.fixture.createAccountManager();
           const fakeOscrcAccount: obs.Account = {
             aliases: [],
@@ -577,7 +577,7 @@ describe("AccountManager", function() {
 
       it(
         "doesn't import a present account",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager([fakeAccount1]);
 
           this.fixture.readAccountsFromOscrcMock.resolves([
@@ -601,7 +601,7 @@ describe("AccountManager", function() {
         username: "barUser"
       };
 
-      beforeEach(async function() {
+      beforeEach(async function () {
         await setCheckForUnimportedAccounts(true);
 
         this.fixture.sandbox.assert.notCalled(
@@ -611,7 +611,7 @@ describe("AccountManager", function() {
 
       it(
         "does nothing when the user does not wish to be prompted for uninmported accounts",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
           await setCheckForUnimportedAccounts(false);
@@ -626,7 +626,7 @@ describe("AccountManager", function() {
 
       it(
         "checks for uninmported accounts, but does not prompt the user if none are to be imported",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager([fakeAccount1]);
           this.fixture.readAccountsFromOscrcMock.resolves([fakeAccount1]);
 
@@ -643,7 +643,7 @@ describe("AccountManager", function() {
 
       it(
         "does nothing if the user let's the prompt time out",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
           this.fixture.readAccountsFromOscrcMock.resolves([
@@ -674,7 +674,7 @@ describe("AccountManager", function() {
 
       it(
         "writes the config if the user never wants to get bothered again",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
           this.fixture.readAccountsFromOscrcMock.resolves([
@@ -701,13 +701,13 @@ describe("AccountManager", function() {
             vscode.workspace
               .getConfiguration(configurationExtensionName)
               .get(configurationCheckUnimportedAccounts)
-          ).to.be.false;
+          ).to.equal(false);
         })
       );
 
       it(
         "does nothing when the user selects 'Not now'",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
           this.fixture.readAccountsFromOscrcMock.resolves([
@@ -733,13 +733,13 @@ describe("AccountManager", function() {
             vscode.workspace
               .getConfiguration(configurationExtensionName)
               .get(configurationCheckUnimportedAccounts)
-          ).to.be.true;
+          ).to.equal(true);
         })
       );
 
       it(
         "actually imports the account if the user wants to",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
           this.fixture.readAccountsFromOscrcMock.resolves([
             fakeNewOscrcAccount
@@ -771,7 +771,7 @@ describe("AccountManager", function() {
             vscode.workspace
               .getConfiguration(configurationExtensionName)
               .get(configurationCheckUnimportedAccounts)
-          ).to.be.true;
+          ).to.equal(true);
         })
       );
     });
@@ -780,7 +780,7 @@ describe("AccountManager", function() {
   describe("#removeAccountInteractive", () => {
     it(
       "removes a present password",
-      castToAsyncFunc<FixtureContext>(async function(this: FixtureContext) {
+      castToAsyncFunc<FixtureContext>(async function (this: FixtureContext) {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["secure", "lessSecure"]
@@ -807,7 +807,7 @@ describe("AccountManager", function() {
 
     it(
       "removes an account even if the password removal fails",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["secure", "lessSecure"]
@@ -825,7 +825,7 @@ describe("AccountManager", function() {
 
     it(
       "does nothing when the user cancels the request for the account to be removed",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["secure", "lessSecure"]
@@ -842,7 +842,7 @@ describe("AccountManager", function() {
 
     it(
       "does nothing when the user cancels the confirmation for the account removal",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["secure", "lessSecure"]
@@ -863,7 +863,7 @@ describe("AccountManager", function() {
 
     it(
       "does nothing when the user declines the account removal",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["secure", "lessSecure"]
@@ -886,7 +886,7 @@ describe("AccountManager", function() {
   describe("#dispose", () => {
     it(
       "stops the onConnectionChangeEmitter",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["barPw"]
@@ -910,7 +910,7 @@ describe("AccountManager", function() {
   describe("#promptForNotPresentAccountPasswords", () => {
     it(
       "doesn't prompt the user when all accounts have a password",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["pw", "fooPw"]
@@ -930,7 +930,7 @@ describe("AccountManager", function() {
 
     it(
       "does nothing when the prompt times out",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           [null, "fooPw"]
@@ -958,7 +958,7 @@ describe("AccountManager", function() {
 
     it(
       "does nothing when the user selects no",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           [null, "fooPw"]
@@ -980,7 +980,7 @@ describe("AccountManager", function() {
 
     it(
       "prompts the user for a single password and writes it to the keytar",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           [null, "fooPw"]
@@ -1024,7 +1024,7 @@ describe("AccountManager", function() {
 
     it(
       "prompts the user for a single password and doesn't put it into the keytar if the user cancels",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           [null, "fooPw"]
@@ -1045,7 +1045,7 @@ describe("AccountManager", function() {
   describe("#setAccountPasswordInteractive", () => {
     it(
       "does not set a password if the apiUrl is invalid",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1],
           ["secure"]
@@ -1064,7 +1064,7 @@ describe("AccountManager", function() {
 
     it(
       "presents a QuickPick if no apiUrl is passed as an argument and sets the account password",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["secure", "sooooSecure"]
@@ -1104,7 +1104,7 @@ describe("AccountManager", function() {
 
         const activeAccount = mngr.activeAccounts.getConfig(toChangeApi);
 
-        expect(activeAccount).to.not.be.undefined;
+        expect(activeAccount).to.not.equal(undefined);
         expect(activeAccount!.account).to.deep.equal(fakeAccount1);
         expect(activeAccount!.connection).to.deep.include({
           password: newPw,
@@ -1115,7 +1115,7 @@ describe("AccountManager", function() {
 
     it(
       "presents no QuickPick if no apiUrl is passed and only one account exists",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1],
           ["secure"]
@@ -1146,7 +1146,7 @@ describe("AccountManager", function() {
 
     it(
       "doesn't set the password if the user cancels the QuickPick",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1, fakeAccount2],
           ["secure", "sooooSecure"]
@@ -1173,7 +1173,7 @@ describe("AccountManager", function() {
 
     it(
       "doesn't set the password if the user cancels the password prompt",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const mngr = await this.fixture.createAccountManager(
           [fakeAccount1],
           ["secure"]
@@ -1233,11 +1233,11 @@ aQF+iMWscGOkgLFlWsAS3HwyiYLNJo26aqyWPaIdc8E4ck7Sk08WrFrHIK3EHr4n
 Gwc=
 -----END CERTIFICATE-----
 `;
-    beforeEach(function() {
+    beforeEach(function () {
       this.readFileMock = ImportMock.mockFunction(fsPromises, "readFile");
     });
 
-    afterEach(function() {
+    afterEach(function () {
       (this.readFileMock as SinonStub).restore();
     });
 
@@ -1262,7 +1262,7 @@ Gwc=
       const apiUrl = "https://api.opensuse.org/";
       const password = "foo";
 
-      beforeEach(function() {
+      beforeEach(function () {
         this.fixture.vscodeWindow.showQuickPick
           .onCall(0)
           .resolves("build.opensuse.org (OBS)");
@@ -1275,7 +1275,7 @@ Gwc=
 
       it(
         "creates a new OBS account",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
           await mngr.newAccountWizzard().should.be.fulfilled;
@@ -1309,7 +1309,7 @@ Gwc=
 
       it(
         "creates a OBS account without a real name and email",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           this.fixture.vscodeWindow.showInputBox.onCall(2).resolves(undefined);
           this.fixture.vscodeWindow.showInputBox.onCall(3).resolves("");
 
@@ -1344,7 +1344,7 @@ Gwc=
       const password = "foo";
       const certPath = "/etc/custom_cert.pem";
 
-      beforeEach(function() {
+      beforeEach(function () {
         this.fixture.vscodeWindow.showQuickPick
           .onCall(0)
           .resolves("other (custom)");
@@ -1365,7 +1365,7 @@ Gwc=
 
       it(
         "creates a new custom account",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
           this.readFileMock.resolves(
@@ -1406,7 +1406,7 @@ Gwc=
 
       it(
         "reports an error reading the certificate if the path is invalid",
-        castToAsyncFunc<FixtureContext>(async function() {
+        castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
           const errMsg = `ENOENT: no such file or directory, open ${certPath}`;

@@ -29,7 +29,7 @@ import * as vscode from "vscode";
  */
 export function setDifference<T>(setA: Set<T>, setB: Set<T>): Set<T> {
   const difference: Set<T> = new Set();
-  setA.forEach(val => {
+  setA.forEach((val) => {
     if (!setB.has(val)) {
       difference.add(val);
     }
@@ -155,7 +155,7 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
     );
     const originalMethod = descriptor!.value;
 
-    descriptor!.value = async function() {
+    descriptor!.value = async function () {
       const args = [];
 
       for (let i = 0; i < arguments.length; i++) {

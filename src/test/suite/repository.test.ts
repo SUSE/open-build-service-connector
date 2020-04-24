@@ -67,11 +67,11 @@ class RepositoryTreeProviderFixture {
 }
 
 describe("RepositoryTreeProvider", () => {
-  beforeEach(function() {
+  beforeEach(function () {
     this.fixture = new RepositoryTreeProviderFixture();
   });
 
-  afterEach(function() {
+  afterEach(function () {
     this.fixture.tearDown();
   });
 

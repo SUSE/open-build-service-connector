@@ -102,18 +102,18 @@ class ObsServerInformationFixture extends LoggingFixture {
 type FixtureContext = Context & { fixture: ObsServerInformationFixture };
 
 describe("ObsServerInformation", () => {
-  beforeEach(function() {
+  beforeEach(function () {
     this.fixture = new ObsServerInformationFixture(this);
   });
 
-  afterEach(function() {
+  afterEach(function () {
     this.fixture.afterEach(this);
   });
 
   describe("#createObsServerInformation", () => {
     it(
       "does not fetch anything if no accounts are present",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         await this.fixture.createObsServerInformation().should.be.fulfilled;
 
         this.fixture.sandbox.assert.notCalled(
@@ -127,7 +127,7 @@ describe("ObsServerInformation", () => {
 
     it(
       "registers the update & get instance info commands",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         await this.fixture.createObsServerInformation();
 
         await vscode.commands
@@ -142,7 +142,7 @@ describe("ObsServerInformation", () => {
 
     it(
       "de-registers the update & get instance info commands after being disposed",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const serverInfo = await this.fixture.createObsServerInformation();
 
         serverInfo.dispose();
@@ -190,7 +190,7 @@ describe("ObsServerInformation", () => {
       supportedArchitectures: ObsConfig.schedulers
     };
 
-    beforeEach(function() {
+    beforeEach(function () {
       this.fixture.mockFetchConfiguration
         .withArgs(match.has("url", fakeAccount2.apiUrl))
         .resolves(ObsConfig);
@@ -206,7 +206,7 @@ describe("ObsServerInformation", () => {
 
     it(
       "returns the server infos about known instances",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const serverInfo: ObsServerInformation = await this.fixture.createObsServerInformation(
           [
             [fakeAccount1.apiUrl, fakeApi1ValidAcc],
@@ -232,7 +232,7 @@ describe("ObsServerInformation", () => {
           fakeAccount1.apiUrl,
           fakeAccount2.apiUrl,
           "https://api.opensuse.org/"
-        ].forEach(async apiUrl => {
+        ].forEach(async (apiUrl) => {
           await vscode.commands
             .executeCommand(GET_INSTANCE_INFO_COMMAND, apiUrl)
             .should.be.fulfilled.and.eventually.deep.equal(
@@ -244,7 +244,7 @@ describe("ObsServerInformation", () => {
 
     it(
       "updates the server info on account changes",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         await this.fixture.createObsServerInformation([
           [fakeAccount1.apiUrl, fakeApi1ValidAcc]
         ]).should.be.fulfilled;
@@ -263,7 +263,7 @@ describe("ObsServerInformation", () => {
 
     it(
       "handles exceptions being thrown by the fetch functions",
-      castToAsyncFunc<FixtureContext>(async function() {
+      castToAsyncFunc<FixtureContext>(async function () {
         const thirdAccount = {
           accountName: "OBS",
           apiUrl: "https://api.opensuse.org/",

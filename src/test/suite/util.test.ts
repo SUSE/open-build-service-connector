@@ -75,21 +75,21 @@ describe("utilities", () => {
   });
 
   describe("load and save Map to Memento", () => {
-    beforeEach(function() {
+    beforeEach(function () {
       this.mockMemento = {
         get: stub(),
         update: stub()
       };
     });
 
-    afterEach(function() {
+    afterEach(function () {
       this.mockMemento.get.resetHistory();
       this.mockMemento.update.resetHistory();
     });
 
     it(
       "calls get on loadMapFromMemento",
-      castToFunc<MementoCtx>(function() {
+      castToFunc<MementoCtx>(function () {
         this.mockMemento.get.returns([]);
 
         expect(loadMapFromMemento(this.mockMemento, "foo"))
@@ -103,7 +103,7 @@ describe("utilities", () => {
 
     it(
       "saveMapToMemento is the inverse to loadMapFromMemento",
-      castToAsyncFunc<MementoCtx>(async function() {
+      castToAsyncFunc<MementoCtx>(async function () {
         this.mockMemento.update.resolves();
 
         const testMap = new Map<string, number | string>();
@@ -235,17 +235,17 @@ describe("utilities", () => {
 
     type TestClassCtx = Context & { testClass: ClassMakingApiCalls };
 
-    beforeEach(function() {
+    beforeEach(function () {
       this.testClass = new ClassMakingApiCalls();
     });
 
-    afterEach(function() {
+    afterEach(function () {
       this.testClass.sandbox.restore();
     });
 
     it(
       "reports the thrown exception",
-      castToAsyncFunc<TestClassCtx>(async function() {
+      castToAsyncFunc<TestClassCtx>(async function () {
         await this.testClass.doesNothingOrThrowsAsync(true).should.be.fulfilled;
 
         assert.calledOnce(this.testClass.loggingStub.error);
@@ -267,7 +267,7 @@ describe("utilities", () => {
 
     it(
       "reports the thrown ApiError in a more readable fashion",
-      castToAsyncFunc<TestClassCtx>(async function() {
+      castToAsyncFunc<TestClassCtx>(async function () {
         const summary = "package not found";
         const err = {
           status: { summary }
@@ -288,7 +288,7 @@ describe("utilities", () => {
 
     it(
       "does nothing when no exception is thrown",
-      castToAsyncFunc<TestClassCtx>(async function() {
+      castToAsyncFunc<TestClassCtx>(async function () {
         await this.testClass.doesNothingOrThrowsAsync(
           false
         ).should.be.fulfilled;
@@ -300,7 +300,7 @@ describe("utilities", () => {
 
     it(
       "does not report the exception to the user but logs it",
-      castToAsyncFunc<TestClassCtx>(async function() {
+      castToAsyncFunc<TestClassCtx>(async function () {
         await this.testClass.decoratedButNoUserReport(true).should.be.fulfilled;
 
         assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
@@ -314,7 +314,7 @@ describe("utilities", () => {
 
     it(
       "reports exception for non-async functions",
-      castToFunc<TestClassCtx>(function() {
+      castToFunc<TestClassCtx>(function () {
         this.testClass.doesNothingOrThrows(true);
 
         assert.calledOnce(this.testClass.vscodeWindow.showErrorMessage);
@@ -328,7 +328,7 @@ describe("utilities", () => {
 
     it(
       "correctly returns the return value if the method does not throw",
-      castToFunc<TestClassCtx>(async function() {
+      castToFunc<TestClassCtx>(async function () {
         await this.testClass
           .doesNothingOrThrows(false)
           .should.be.fulfilled.and.eventually.equal(false);
@@ -340,7 +340,7 @@ describe("utilities", () => {
 
     it(
       "correctly returns the returned Promise value if the method does not throw",
-      castToAsyncFunc<TestClassCtx>(async function() {
+      castToAsyncFunc<TestClassCtx>(async function () {
         await this.testClass
           .doesNothingOrThrowsAsync(false)
           .should.be.fulfilled.and.eventually.equal(42);
@@ -352,7 +352,7 @@ describe("utilities", () => {
 
     it(
       "returns undefined if the method throws",
-      castToAsyncFunc<TestClassCtx>(async function() {
+      castToAsyncFunc<TestClassCtx>(async function () {
         await this.testClass
           .doesNothingOrThrows(true)
           .should.be.fulfilled.and.eventually.equal(undefined);

@@ -58,11 +58,11 @@ class WorkspaceToProjectMatcherFixture extends LoggingFixture {
 }
 
 describe("WorkspaceToProjectMatcher", () => {
-  beforeEach(function() {
     this.fixture = new WorkspaceToProjectMatcherFixture(this);
+  beforeEach(function () {
   });
 
-  afterEach(function() {
+  afterEach(function () {
     this.fixture.afterEach();
   });
 

@@ -178,7 +178,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
         );
         this.refresh();
       }, this),
-      this.onAccountChange(_apiUrls => {
+      this.onAccountChange((_apiUrls) => {
         this.refresh();
       }, this)
     ].forEach(disposable => this.disposables.push(disposable));
@@ -230,20 +230,20 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const distrosToAddNames = await this.vscodeWindow.showQuickPick(
       hostedDistros
         .filter(
-          distro =>
-            presentRepos.find(repo => repo.name === distro.repositoryName) ===
+          (distro) =>
+            presentRepos.find((repo) => repo.name === distro.repositoryName) ===
             undefined
         )
-        .map(distro => distro.name),
+        .map((distro) => distro.name),
       { canPickMany: true }
     );
     if (distrosToAddNames === undefined || distrosToAddNames.length === 0) {
       return;
     }
 
-    distrosToAddNames.forEach(nameOfDistroToAdd => {
+    distrosToAddNames.forEach((nameOfDistroToAdd) => {
       const distroInfo = hostedDistros.find(
-        hostedDistro => hostedDistro.name === nameOfDistroToAdd
+        (hostedDistro) => hostedDistro.name === nameOfDistroToAdd
       )!;
       presentRepos.push({
         arch: distroInfo.architectures,
@@ -276,7 +276,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const { repository, ...rest } = this.activeProject!.meta!;
 
     // FIXME: need a better comparison here
-    const newRepos = repository!.filter(repo => repo !== element.repository);
+    const newRepos = repository!.filter((repo) => repo !== element.repository);
 
     const newMeta = { ...rest, repository: newRepos };
     await modifyProjectMeta(instanceInfo.connection!, newMeta);
@@ -413,7 +413,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     if (isRepositoryPathRootElement(element)) {
       return Promise.resolve(
         element.repository.path?.map(
-          path => new RepositoryPathElement(path, element.repository)
+          (path) => new RepositoryPathTreeElement(path, element.repository)
         ) ?? []
       );
     }
@@ -421,7 +421,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     if (isRepositoryArchRootElement(element)) {
       return Promise.resolve(
         element.repository.arch?.map(
-          arch => new RepositoryArchElement(arch, element.repository)
+          (arch) => new RepositoryArchTreeElement(arch, element.repository)
         ) ?? []
       );
     }
@@ -486,14 +486,14 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const expectedRepoName = element.repository.name;
 
     const matchingRepoArr: BaseRepository[] | undefined = repos.filter(
-      repo => repo.name === expectedRepoName
+      (repo) => repo.name === expectedRepoName
     );
     assert(
       matchingRepoArr.length === 1,
       `Expected to get exactly one repository with the name ${expectedRepoName}, but got ${matchingRepoArr.length}`
     );
     const matchingRepoIndex = repos.findIndex(
-      repo => repo.name === expectedRepoName
+      (repo) => repo.name === expectedRepoName
     );
     const matchingRepo = deepCopyProperties(repos[matchingRepoIndex]);
 
@@ -504,7 +504,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
           `Element ${element} must be a RepositoryArchElement, but its contextValue is: '${element.contextValue}'`
         );
         matchingRepo.arch = matchingRepo.arch?.filter(
-          arch => arch !== (element as RepositoryArchElement).architecture
+          (arch) => arch !== (element as RepositoryArchTreeElement).architecture
         );
       } else {
         assert(
@@ -512,7 +512,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
           `Element ${element} must be a RepositoryPathElement, but its contextValue is: '${element.contextValue}'`
         );
         matchingRepo.path = matchingRepo.path?.filter(
-          path =>
+          (path) =>
             path.repository !==
               (element as RepositoryPathElement).path.repository ||
             path.project !== (element as RepositoryPathElement).path.project
@@ -522,11 +522,11 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       if (property === "arch") {
         const possibleArches = new Set(Object.keys(Arch));
         if (matchingRepo.arch !== undefined && matchingRepo.arch.length > 0) {
-          matchingRepo.arch.forEach(arch => possibleArches.delete(arch));
+          matchingRepo.arch.forEach((arch) => possibleArches.delete(arch));
         }
 
         const archesToAdd = await this.vscodeWindow.showQuickPick(
-          [...possibleArches.keys()].map(arch => arch.toLowerCase()),
+          [...possibleArches.keys()].map((arch) => arch.toLowerCase()),
           {
             canPickMany: true
           }
@@ -544,7 +544,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
         const projToAdd = await vscode.window.showInputBox({
           ignoreFocusOut: true,
           prompt: "Specify a project which repository should be added",
-          validateInput: path =>
+          validateInput: (path) =>
             path === "" ? "Path must not be empty" : undefined
         });
         if (projToAdd === undefined) {
@@ -566,7 +566,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
         }
 
         const repoToAdd = await this.vscodeWindow.showQuickPick(
-          projToAddMeta.repository.map(repo => repo.name)
+          projToAddMeta.repository.map((repo) => repo.name)
         );
         if (repoToAdd === undefined) {
           return;
@@ -574,7 +574,8 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
         if (
           matchingRepo.path!.find(
-            path => path.project === projToAdd && path.repository === repoToAdd
+            (path) =>
+              path.project === projToAdd && path.repository === repoToAdd
           ) !== undefined
         ) {
           throw new Error(

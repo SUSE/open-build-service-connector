@@ -81,8 +81,8 @@ export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => ({
 export async function waitForEvent<T>(
   event: vscode.Event<T>
 ): Promise<vscode.Disposable> {
-  return new Promise(resolve => {
-    const disposable = event(_ => {
+  return new Promise((resolve) => {
+    const disposable = event((_) => {
       resolve(disposable);
     });
   });
@@ -133,7 +133,7 @@ export class FakeActiveAccounts implements ActiveAccounts {
 
 /** Sleep for at least the given time in ms */
 export const sleep = (ms: number) =>
-  new Promise(resolve => setTimeout(resolve, ms));
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 export const castToFuncT = <FC, FT>(func: (this: FC) => void): FT =>
   (func as any) as FT;

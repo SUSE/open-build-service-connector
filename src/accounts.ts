@@ -215,7 +215,7 @@ export async function promptUserForAccount(
     return apiUrls[0];
   } else {
     const apiUrlAccountNames: Array<[ApiUrl, string]> = [];
-    apiUrls.forEach(apiUrl => {
+    apiUrls.forEach((apiUrl) => {
       const accName = activeAccounts.getConfig(apiUrl)?.account.accountName;
       if (accName !== undefined) {
         apiUrlAccountNames.push([apiUrl, accName]);
@@ -302,14 +302,14 @@ class RuntimeAccountConfiguration extends LoggingBase {
       []
     );
     const oldAccounts = [...this.apiAccountMap.values()].map(
-      inst => inst.account
+      (inst) => inst.account
     );
 
     this.logger.debug(
       "new account settings from configuration: %s",
       newAccounts
         .map(
-          newAcc =>
+          (newAcc) =>
             `accountName: ${newAcc.accountName}, apiUrl: ${newAcc.apiUrl}`
         )
         .join("; ")
@@ -321,7 +321,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
     // drop all accounts that got removed in the configuration change
     for (const oldAcc of oldAccounts) {
       if (
-        newAccounts.find(newAcc => newAcc.apiUrl === oldAcc.apiUrl) ===
+        newAccounts.find((newAcc) => newAcc.apiUrl === oldAcc.apiUrl) ===
         undefined
       ) {
         configModified = true;
@@ -357,7 +357,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
       }
 
       if (
-        oldAccounts.find(oldAcc => oldAcc.apiUrl === newAcc.apiUrl) ===
+        oldAccounts.find((oldAcc) => oldAcc.apiUrl === newAcc.apiUrl) ===
         undefined
       ) {
         // this is a completely fresh account
@@ -454,7 +454,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
     await conf.update(
       configurationAccounts,
       [...this.apiAccountMap.values()].map(
-        validAccount => validAccount.account
+        (validAccount) => validAccount.account
       ),
       vscode.ConfigurationTarget.Global
     );
@@ -480,7 +480,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
     this.logger.trace(
       "Loading the following accounts from the storage: %s",
       accounts
-        .map(acc => `name: ${acc.accountName}, apiUrl: ${acc.apiUrl}`)
+        .map((acc) => `name: ${acc.accountName}, apiUrl: ${acc.apiUrl}`)
         .join("; ")
     );
 
@@ -681,7 +681,7 @@ export class AccountManager extends LoggingBase {
     if (this.onDidChangeConfigurationDisposable !== undefined) {
       this.onDidChangeConfigurationDisposable.dispose();
     }
-    this.disposables.forEach(disp => disp.dispose());
+    this.disposables.forEach((disp) => disp.dispose());
   }
 
   /**
@@ -701,7 +701,7 @@ export class AccountManager extends LoggingBase {
       this.accountsWithOutPw.length === 1
         ? `The following account has no password set: ${this.accountsWithOutPw[0].accountName}. Would you like to set it now?`
         : `The following accounts have no password set: ${this.accountsWithOutPw
-            .map(acc => acc.accountName)
+            .map((acc) => acc.accountName)
             .join(", ")}. Would you like to set them now?`;
     const selected = await this.vscodeWindow.showInformationMessage(
       msg,
@@ -891,7 +891,7 @@ export class AccountManager extends LoggingBase {
       serverCaCertificate,
       username
     };
-    Object.keys(accountStorage).forEach(key => {
+    Object.keys(accountStorage).forEach((key) => {
       if (accountStorage[key as keyof AccountStorage] === undefined) {
         delete accountStorage[key as keyof AccountStorage];
       }
@@ -1106,7 +1106,7 @@ export class AccountManager extends LoggingBase {
     this.logger.trace("Checking for unimported accounts");
 
     const accounts = await readAccountsFromOscrc();
-    const oscrcAccountsApiUrls = accounts.map(acc => acc.apiUrl);
+    const oscrcAccountsApiUrls = accounts.map((acc) => acc.apiUrl);
     this.logger.trace("found the accounts in oscrc: %s", oscrcAccountsApiUrls);
 
     const storedAccountsApiUrls = this.activeAccounts.getAllApis();
@@ -1125,7 +1125,7 @@ export class AccountManager extends LoggingBase {
     if (setDiff.size > 0) {
       const apiUrls = [...setDiff.values()];
       const res = accounts.filter(
-        acc => apiUrls.find(url => url === acc.apiUrl) !== undefined
+        (acc) => apiUrls.find((url) => url === acc.apiUrl) !== undefined
       );
       assert(setDiff.size === res.length);
       return res;
@@ -1145,7 +1145,7 @@ export class AccountManager extends LoggingBase {
       ignoreFocusOut,
       password: true,
       prompt: `set the password for the account ${apiUrl}`,
-      validateInput: val =>
+      validateInput: (val) =>
         val === "" ? "Password must not be empty" : undefined
     });
   }
