@@ -80,6 +80,9 @@ export const configurationExtensionName = "vscode-obs";
 /** Key under which the AccountStorage array is stored. */
 export const configurationAccounts = "accounts";
 
+/** Key under which the setting whether https is enforced is stored */
+export const configurationforceHttps = "forceHttps";
+
 /** Full key under which the AccountStorage array is stored */
 export const configurationAccountsFullName = `${configurationExtensionName}.${configurationAccounts}`;
 
@@ -182,6 +185,14 @@ const isValidUrl = (potentialUrl: string) => {
   }
 };
 
+const getForceHttpsSetting = (
+  wsConfig?: vscode.WorkspaceConfiguration
+): boolean | undefined =>
+  (wsConfig === undefined
+    ? vscode.workspace.getConfiguration(configurationExtensionName)
+    : wsConfig
+  ).get<boolean>(configurationforceHttps);
+
 /**
  * Ask the user to specify which account to use for an action with the given
  * description.
@@ -214,7 +225,7 @@ export async function promptUserForAccount(
   } else if (apiUrls.length === 1) {
     return apiUrls[0];
   } else {
-    const apiUrlAccountNames: Array<[ApiUrl, string]> = [];
+    const apiUrlAccountNames: [ApiUrl, string][] = [];
     apiUrls.forEach((apiUrl) => {
       const accName = activeAccounts.getConfig(apiUrl)?.account.accountName;
       if (accName !== undefined) {
@@ -301,6 +312,8 @@ class RuntimeAccountConfiguration extends LoggingBase {
       configurationAccounts,
       []
     );
+    const forceHttps = getForceHttpsSetting(wsConfig);
+
     const oldAccounts = [...this.apiAccountMap.values()].map(
       (inst) => inst.account
     );
@@ -345,7 +358,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
     //   relevant settings of the Connection changed
     for (const newAcc of newAccounts) {
       // skip faulty accounts
-      const errMsg = this.checkAccount(newAcc);
+      const errMsg = this.checkAccount(newAcc, forceHttps);
       if (errMsg !== undefined) {
         this.logger.error(
           "new account named '%s' has the following issue: %s",
@@ -378,6 +391,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
             this.apiAccountMap.set(newAcc.apiUrl, {
               account: newAcc,
               connection: connection.clone({
+                forceHttps,
                 serverCaCertificate: newAcc.serverCaCertificate,
                 username: newAcc.username
               })
@@ -418,16 +432,16 @@ class RuntimeAccountConfiguration extends LoggingBase {
     account: AccountStorage,
     password: string
   ): Promise<void> {
+    const connection = new Connection(account.username, password, {
+      forceHttps: getForceHttpsSetting(),
+      serverCaCertificate: account.serverCaCertificate,
+      url: account.apiUrl
+    });
+
     // try to set the password first, if that fails, we'll get an exception and
     // won't leave the system in a dirty state
     await keytar.setPassword(keytarServiceName, account.apiUrl, password);
 
-    const connection = new Connection(
-      account.username,
-      password,
-      account.apiUrl,
-      account.serverCaCertificate
-    );
     this.apiAccountMap.set(account.apiUrl, { account, connection });
   }
 
@@ -473,9 +487,11 @@ class RuntimeAccountConfiguration extends LoggingBase {
    *       in the configuration. Accounts that generate errors are not added.
    */
   public async loadFromStorage(): Promise<[AccountStorage[], string[]]> {
-    const accounts = vscode.workspace
-      .getConfiguration(configurationExtensionName)
-      .get<AccountStorage[]>(configurationAccounts, []);
+    const wsConfig = vscode.workspace.getConfiguration(
+      configurationExtensionName
+    );
+    const accounts = wsConfig.get<AccountStorage[]>(configurationAccounts, []);
+    const forceHttps = getForceHttpsSetting(wsConfig);
 
     this.logger.trace(
       "Loading the following accounts from the storage: %s",
@@ -489,7 +505,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
     const errorMessages: string[] = [];
 
     for (const account of accounts) {
-      const errMsg = this.checkAccount(account);
+      const errMsg = this.checkAccount(account, forceHttps);
       if (errMsg !== undefined) {
         this.logger.trace(
           "Account %s is misconfigured: %s",
@@ -515,12 +531,11 @@ class RuntimeAccountConfiguration extends LoggingBase {
         addedAccounts++;
         this.apiAccountMap.set(account.apiUrl, {
           account,
-          connection: new Connection(
-            account.username,
-            password,
-            account.apiUrl,
-            account.serverCaCertificate
-          )
+          connection: new Connection(account.username, password, {
+            forceHttps,
+            serverCaCertificate: account.serverCaCertificate,
+            url: account.apiUrl
+          })
         });
         this.logger.trace("Account %s was added", account.accountName);
       }
@@ -537,8 +552,15 @@ class RuntimeAccountConfiguration extends LoggingBase {
   /**
    * Return an error message describing an issue with the provided `account` or
    * undefined if the account is ok.
+   *
+   * @param forceHttps  Boolean flag whether https connections are enforced
+   *     (true). This value should be taken from the user's global config.
+   *     This value is forwarded to the constructor of a [[Connection]].
    */
-  private checkAccount(account: AccountStorage): string | undefined {
+  private checkAccount(
+    account: AccountStorage,
+    forceHttps: boolean | undefined
+  ): string | undefined {
     if (account.username === "") {
       return `Got an empty username for the account ${account.accountName}`;
     }
@@ -546,12 +568,11 @@ class RuntimeAccountConfiguration extends LoggingBase {
       // just create a connection for the side effect of a potential error being
       // thrown
       // tslint:disable-next-line: no-unused-expression
-      new Connection(
-        account.username,
-        "irrelevant",
-        account.apiUrl,
-        account.serverCaCertificate
-      );
+      new Connection(account.username, "irrelevant", {
+        forceHttps,
+        serverCaCertificate: account.serverCaCertificate,
+        url: account.apiUrl
+      });
     } catch (err) {
       // the url error message looks like an internal error => remove the nasty
       // looking bits so that the user doesn't think they hit an application bug
@@ -793,6 +814,31 @@ export class AccountManager extends LoggingBase {
         return;
       }
       apiUrl = apiUrlCandidate;
+      const proto = new URL(apiUrl).protocol;
+      if (proto === "http:" && getForceHttpsSetting()) {
+        const changeForceHttpsSetting = await this.vscodeWindow.showQuickPick(
+          ["Yes", "No"],
+          {
+            canPickMany: false,
+            placeHolder:
+              "The specified URL uses the http, which is currently forbidden. Do you want to allow non-https urls?"
+          }
+        );
+        if (
+          changeForceHttpsSetting === undefined ||
+          changeForceHttpsSetting === "No"
+        ) {
+          return;
+        }
+        assert(changeForceHttpsSetting === "Yes");
+        await this.vscodeWorkspace
+          .getConfiguration(configurationExtensionName)
+          .update(
+            configurationforceHttps,
+            false,
+            vscode.ConfigurationTarget.Global
+          );
+      }
     } else {
       assert(
         serverChoice === OBS,
@@ -840,7 +886,7 @@ export class AccountManager extends LoggingBase {
 
     let serverCaCertificate: string | undefined;
 
-    if (serverChoice === CUSTOM) {
+    if (serverChoice === CUSTOM && new URL(apiUrl).protocol === "https:") {
       const provideServerCert = await this.vscodeWindow.showQuickPick(
         ["Yes", "No"],
         {

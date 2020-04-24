@@ -249,6 +249,12 @@
           "description": "Specify whether the extension will check for accounts in your .oscrc that have not been imported into VSCode",
           "type": "boolean"
         },
+        "vscode-obs.forceHttps": {
+          "scope": "application",
+          "default": true,
+          "description": "Define whether URLs to the Buildservice must use https, or whether http is permitted as well",
+          "type": "boolean"
+        },
         "vscode-obs.accounts": {
           "description": "Accounts for instances of the Open Build Service",
           "default": [],
