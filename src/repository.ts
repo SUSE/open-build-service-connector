@@ -48,6 +48,8 @@ const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
 class RepositoryRootTreeElement extends vscode.TreeItem {
   public readonly contextValue = "repositoryRoot";
 
+  public readonly iconPath = new vscode.ThemeIcon("repo");
+
   constructor(public readonly repository: BaseRepository) {
     super(repository.name, vscode.TreeItemCollapsibleState.Collapsed);
   }
