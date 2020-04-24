@@ -822,7 +822,7 @@ export class AccountManagerImpl extends LoggingBase {
     if (serverChoice === CUSTOM) {
       const apiUrlCandidate = await this.vscodeWindow.showInputBox({
         ignoreFocusOut,
-        placeHolder: "https://api.opensuse.org",
+        placeHolder: "https://api.my-instance.org",
         prompt: "Enter the URL to the API of your OBS instance.",
         validateInput: (value: string) =>
           !isValidUrl(value) ? `Invalid URL '${value}' entered` : undefined
