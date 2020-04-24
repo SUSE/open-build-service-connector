@@ -323,7 +323,8 @@
   },
   "main": "./out/extension.js",
   "activationEvents": [
-    "onView:projectTree",
+    "onView:bookmarkedProjectsTree",
+    "onView:currentProjectTree",
     "onView:repositoryTree"
   ],
   "categories": [
