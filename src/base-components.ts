@@ -19,9 +19,75 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { Package, PackageFile, Project } from "obs-ts";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ActiveAccounts, ApiUrl } from "./accounts";
+
+export class BasePackage implements Package {
+  public readonly apiUrl: string;
+  public readonly name: string;
+  public readonly projectName: string;
+
+  constructor(pkg: Package);
+  constructor(apiUrl: string, name: string, projectName: string);
+  constructor(
+    pkgOrApiUrl: string | Package,
+    name?: string,
+    projectName?: string
+  ) {
+    if (typeof pkgOrApiUrl === "string") {
+      this.apiUrl = pkgOrApiUrl;
+      this.name = name!;
+      this.projectName = projectName!;
+    } else {
+      this.apiUrl = pkgOrApiUrl.apiUrl;
+      this.projectName = pkgOrApiUrl.projectName;
+      this.name = pkgOrApiUrl.name;
+    }
+  }
+}
+
+export class BaseProject implements Project {
+  public readonly apiUrl: string;
+  public readonly name: string;
+
+  constructor(project: Project);
+  constructor(apiUrl: string, name: string);
+  constructor(projectOrApiUrl: string | Project, name?: string) {
+    if (typeof projectOrApiUrl === "string") {
+      this.apiUrl = projectOrApiUrl;
+      this.name = name!;
+    } else {
+      this.apiUrl = projectOrApiUrl.apiUrl;
+      this.name = projectOrApiUrl.name;
+    }
+  }
+}
+
+export class BasePackageFile implements PackageFile {
+  public readonly name: string;
+  public readonly packageName: string;
+  public readonly projectName: string;
+
+  constructor(pkgFile: PackageFile);
+  constructor(name: string, packageName: string, projectName: string);
+  constructor(
+    pkgFileOrName: string | PackageFile,
+    packageName?: string,
+    projectName?: string
+  ) {
+    if (typeof pkgFileOrName === "string") {
+      this.name = pkgFileOrName;
+      this.packageName = packageName!;
+      this.projectName = projectName!;
+    } else {
+      this.name = pkgFileOrName.name;
+      this.projectName = pkgFileOrName.projectName;
+      this.packageName = pkgFileOrName.packageName;
+    }
+  }
+}
 
 /** Base class for components that should have access to the logger */
 export class LoggingBase {
