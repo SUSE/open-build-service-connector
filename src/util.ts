@@ -20,8 +20,6 @@
  */
 
 import * as assert from "assert";
-import { promises as fsPromises } from "fs";
-import { join } from "path";
 import * as vscode from "vscode";
 
 /**
@@ -69,22 +67,6 @@ export async function saveMapToMemento<K, T>(
   map: Map<K, T>
 ): Promise<void> {
   await memento.update(storageKey, [...map.entries()]);
-}
-
-/** Remove the directory `dir` recursively */
-export async function rmRf(dir: string): Promise<void> {
-  const dentries = await fsPromises.readdir(dir, { withFileTypes: true });
-
-  await Promise.all(
-    dentries.map(async dentry => {
-      if (dentry.isFile()) {
-        await fsPromises.unlink(join(dir, dentry.name));
-      } else if (dentry.isDirectory()) {
-        await rmRf(join(dir, dentry.name));
-        await fsPromises.rmdir(join(dir, dentry.name));
-      }
-    })
-  );
 }
 
 /** Create a deep copy of `obj` omitting **all** functions. */

@@ -19,11 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import mockFs = require("mock-fs");
-
 import { expect, should } from "chai";
-import { existsSync } from "fs";
-import { afterEach, beforeEach, Context, describe, it, xit } from "mocha";
+import { afterEach, beforeEach, Context, describe, it } from "mocha";
 import { Logger } from "pino";
 import { assert, createSandbox, SinonSandbox, SinonStub, stub } from "sinon";
 import { LoggingBase } from "../../base-components";
@@ -31,7 +28,6 @@ import {
   deepCopyProperties,
   loadMapFromMemento,
   logAndReportExceptions,
-  rmRf,
   saveMapToMemento,
   setDifference
 } from "../../util";
@@ -132,31 +128,6 @@ describe("utilities", () => {
         assert.calledWith(this.mockMemento.get, "bar");
       })
     );
-  });
-
-  describe("#rmRf", () => {
-    beforeEach(() => {
-      mockFs({
-        "fooDir/dturinae/asdf": "something",
-        "fooDir/foo/bar/baz": "nested",
-        "fooDir/testFile": "It's something",
-        thisShouldStay: "I'm still there"
-      });
-    });
-
-    afterEach(() => {
-      mockFs.restore();
-    });
-
-    // FIXME: this does not work as mock-fs doesn't support fs.Dirent:
-    // https://github.com/tschaub/mock-fs/issues/272#issuecomment-513847569
-    xit("removes the directory fooDir and all its contents", async () => {
-      expect(existsSync("fooDir")).to.equal(true);
-
-      await rmRf("fooDir").should.be.fulfilled;
-
-      expect(existsSync("fooDir")).to.equal(false);
-    });
   });
 
   describe("#deepCopyPropierts", () => {
