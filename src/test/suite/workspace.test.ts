@@ -19,36 +19,30 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { afterEach, beforeEach, describe, it, Context } from "mocha";
-import { ApiUrl } from "../../accounts";
-import { WorkspaceToProjectMatcher } from "../../workspace";
+import { afterEach, beforeEach, Context, describe, it } from "mocha";
 import {
-  FakeActiveAccounts,
-  makeFakeEvent,
-  testLogger,
-  LoggingFixture
-} from "./test-utils";
+  ActiveProjectWatcher,
+  ActiveProjectWatcherImpl
+} from "../../workspace";
+import { AccountMapInitializer, FakeAccountManager } from "./fakes";
+import { LoggingFixture, testLogger } from "./test-utils";
 
-class WorkspaceToProjectMatcherFixture extends LoggingFixture {
-  public readonly fakeActiveAccounts = makeFakeEvent<ApiUrl[]>();
+class ActiveProjectWatcherFixture extends LoggingFixture {
+  public fakeAccountManager?: FakeAccountManager;
 
   constructor(ctx: Context) {
-    super();
-    super.beforeEach(ctx);
+    super(ctx);
   }
 
-  public async createWorkspaceToProjectMatcher(): Promise<
-    WorkspaceToProjectMatcher
-  > {
-    const [
-      ws2Proj,
-      delayedInit
-    ] = WorkspaceToProjectMatcher.createWorkspaceToProjectMatcher(
-      new FakeActiveAccounts(),
-      this.fakeActiveAccounts.event,
+  public async createActiveProjectWatcher(
+    initialAccountMap?: AccountMapInitializer
+  ): Promise<ActiveProjectWatcher> {
+    this.fakeAccountManager = new FakeAccountManager(initialAccountMap);
+    const ws2Proj = await ActiveProjectWatcherImpl.createActiveProjectWatcher(
+      this.fakeAccountManager,
       testLogger
     );
-    await delayedInit(ws2Proj);
+
     return ws2Proj;
   }
 
@@ -58,8 +52,8 @@ class WorkspaceToProjectMatcherFixture extends LoggingFixture {
 }
 
 describe("WorkspaceToProjectMatcher", () => {
-    this.fixture = new WorkspaceToProjectMatcherFixture(this);
   beforeEach(function () {
+    this.fixture = new ActiveProjectWatcherFixture(this);
   });
 
   afterEach(function () {

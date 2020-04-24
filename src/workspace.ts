@@ -19,210 +19,405 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { existsSync } from "fs";
+import * as assert from "assert";
 import {
-  getProjectMeta,
+  fetchProject,
+  fetchProjectMeta,
   Project,
   readInCheckedOutProject,
   updateCheckedOutProject
 } from "obs-ts";
-import { join } from "path";
+import { dirname, normalize, resolve } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { ActiveAccounts, ApiUrl } from "./accounts";
+import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
-import { UriScheme } from "./project-view";
+import { cmdPrefix } from "./constants";
+import {
+  isLocalProjectTreeElement,
+  LocalProjectTreeElement,
+  LOCAL_PROJECT_TREE_ELEMENT_CTX_VAL
+} from "./current-project-view";
+import {
+  ObsPackageFileUriScheme,
+  RemotePackageFileContentProvider
+} from "./package-file-contents";
+import { GET_BOOKMARKED_PROJECT_COMMAND } from "./project-bookmarks";
+import { ProjectTreeItem } from "./project-view";
+import { logAndReportExceptions } from "./util";
 
-/** Currently active projects of this workspace. */
-export interface WorkspaceProjects {
-  /**
-   * List of projects present in the currently opened workspace.
-   * This array can be empty.
-   */
-  projectsInWorkspace: Project[];
+export const UPDATE_CHECKEDOUT_PROJECT_CMD = `${cmdPrefix}.obsProject.updateCheckedOutProject`;
 
+/** Currently active project of the current text editor window. */
+export interface ActiveProject {
   /**
    * The Project belonging to the currently opened file.
    * `undefined` if the file does not belong to a Project.
    */
-  activeProject: Project | undefined;
+  readonly activeProject: Project | undefined;
+
+  /**
+   * additional properties of the [[activeProject]].
+   *
+   * This field must be present when [[activeProject]] is not undefined.
+   */
+  properties?: {
+    /** True if [[activeProject]] is bookmarked. */
+    readonly isBookmark: boolean;
+
+    /** True if [[activeProject]] is checked out. */
+    readonly isCheckedOut: boolean;
+
+    /**
+     * If this project is checked out, then the path to its root folder is saved
+     * in this variable.
+     */
+    readonly checkedOutPath: string | undefined;
+  };
 }
 
-export class WorkspaceToProjectMatcher extends ConnectionListenerLoggerBase {
-  public static createWorkspaceToProjectMatcher(
-    activeAccounts: ActiveAccounts,
-    onAccountChange: vscode.Event<ApiUrl[]>,
+function workspacesEqual(
+  ws1: vscode.WorkspaceFolder,
+  ws2: vscode.WorkspaceFolder
+): boolean {
+  return (
+    ws1.name === ws2.name && ws1.uri === ws2.uri && ws1.index === ws2.index
+  );
+}
+
+export interface ActiveProjectWatcher extends vscode.Disposable {
+  readonly onDidChangeActiveProject: vscode.Event<ActiveProject>;
+
+  getActiveProject(): ActiveProject;
+}
+
+export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
+  implements ActiveProjectWatcher {
+  public static async createActiveProjectWatcher(
+    accountManager: AccountManager,
     logger: Logger
-  ): [
-    WorkspaceToProjectMatcher,
-    (wsMatcher: WorkspaceToProjectMatcher) => Promise<void>
-  ] {
-    const wsToProj = new WorkspaceToProjectMatcher(
-      activeAccounts,
-      onAccountChange,
-      logger
-    );
+  ): Promise<ActiveProjectWatcher> {
+    const actProjWatcher = new ActiveProjectWatcherImpl(accountManager, logger);
 
-    return [wsToProj, WorkspaceToProjectMatcher.delayedInit];
-  }
-
-  private static async delayedInit(
-    wsMatcher: WorkspaceToProjectMatcher
-  ): Promise<void> {
-    await wsMatcher.adjustWorkspaceFolders(
+    await actProjWatcher.adjustWorkspaceFolders(
       vscode.workspace.workspaceFolders ?? [],
       []
     );
 
     // we need to call this **after** the initial mapping has been setup,
     // otherwise this won't do a thing
-    await wsMatcher.sendOnDidChangeActiveProjectEvent(
+    await actProjWatcher.sendOnDidChangeActiveProjectEvent(
       vscode.window.activeTextEditor
     );
-  }
 
-  private static workspacesEqual(
-    ws1: vscode.WorkspaceFolder,
-    ws2: vscode.WorkspaceFolder
-  ): boolean {
-    return (
-      ws1.name === ws2.name && ws1.uri === ws2.uri && ws1.index === ws2.index
-    );
+    return actProjWatcher;
   }
 
   /**
    * Event that fires when the "active" [[Project]] changes.
    */
-  public readonly onDidChangeActiveProject: vscode.Event<Project | undefined>;
+  public readonly onDidChangeActiveProject: vscode.Event<ActiveProject>;
 
+  /**
+   * List of currently open [workspace
+   * folders](https://code.visualstudio.com/api/references/vscode-api#WorkspaceFolder).
+   */
   private currentWorkspaceFolders: vscode.WorkspaceFolder[] = [];
 
-  private onDidChangeActiveProjectEmitter: vscode.EventEmitter<
-    Project | undefined
-  > = new vscode.EventEmitter<Project | undefined>();
+  private activeProject: ActiveProject = { activeProject: undefined };
 
+  private onDidChangeActiveProjectEmitter: vscode.EventEmitter<
+    ActiveProject
+  > = new vscode.EventEmitter<ActiveProject>();
+
+  private readonly dotOscFsWatcher = vscode.workspace.createFileSystemWatcher(
+    "**/.{osc,.osc_obs_ts}/*"
+  );
+
+  /**
+   * Internal mapping between the currently open workspaces and the associated
+   * projects.
+   */
   private workspaceProjectMapping: Map<
     vscode.WorkspaceFolder,
     Project
   > = new Map();
 
-  private constructor(
-    activeAccounts: ActiveAccounts,
-    onAccountChange: vscode.Event<ApiUrl[]>,
-    logger: Logger
-  ) {
-    super(activeAccounts, onAccountChange, logger);
+  private constructor(accountManager: AccountManager, logger: Logger) {
+    super(accountManager, logger);
+
     this.onDidChangeActiveProject = this.onDidChangeActiveProjectEmitter.event;
 
-    vscode.workspace.onDidChangeWorkspaceFolders(
-      async folderChangeEvent =>
-        this.adjustWorkspaceFolders(
-          folderChangeEvent.added,
-          folderChangeEvent.removed
-        ),
-      this
-    );
-
-    vscode.window.onDidChangeActiveTextEditor(textEditor => {
-      this.sendOnDidChangeActiveProjectEvent(textEditor);
-    }, this);
+    this.disposables = this.disposables.concat([
+      this.dotOscFsWatcher,
+      this.dotOscFsWatcher.onDidChange(this.onDotOscModification, this),
+      this.dotOscFsWatcher.onDidCreate(this.onDotOscModification, this),
+      this.dotOscFsWatcher.onDidDelete(this.onDotOscModification, this),
+      this.onDidChangeActiveProjectEmitter,
+      vscode.workspace.onDidChangeWorkspaceFolders(
+        async (folderChangeEvent) =>
+          this.adjustWorkspaceFolders(
+            folderChangeEvent.added,
+            folderChangeEvent.removed
+          ),
+        this
+      ),
+      vscode.window.onDidChangeActiveTextEditor(
+        async (textEditor) =>
+          this.sendOnDidChangeActiveProjectEvent(textEditor),
+        this
+      ),
+      vscode.commands.registerCommand(
+        UPDATE_CHECKEDOUT_PROJECT_CMD,
+        this.updateCheckedOutProjectCommand,
+        this
+      )
+    ]);
   }
 
-  public async getProjectForTextdocument(
-    textDocument: vscode.TextDocument | undefined
-  ): Promise<Project | undefined> {
-    if (textDocument === undefined) {
-      return undefined;
-    }
+  public getActiveProject(): ActiveProject {
+    return this.activeProject;
+  }
 
-    if (textDocument.uri.scheme === UriScheme) {
-      // HACK: we fetch the current project via a command, which is not great...
-      // => need to modularize the code more
-      const proj = await vscode.commands.executeCommand<Project | undefined>(
-        "obsProject.getProjectFromUri",
-        textDocument.uri
+  @logAndReportExceptions(true)
+  private async updateCheckedOutProjectCommand(
+    element?: ProjectTreeItem | LocalProjectTreeElement
+  ): Promise<void> {
+    if (element === undefined || !isLocalProjectTreeElement(element)) {
+      this.logger.error(
+        "command %s called with a wrong element, expected a %s but got a %s",
+        UPDATE_CHECKEDOUT_PROJECT_CMD,
+        LOCAL_PROJECT_TREE_ELEMENT_CTX_VAL,
+        element?.contextValue
       );
-      return proj;
-    }
-    const wsFolder = vscode.workspace.getWorkspaceFolder(textDocument.uri);
-    if (wsFolder !== undefined) {
-      return this.workspaceProjectMapping.get(wsFolder);
+      return;
     }
 
-    return undefined;
+    const proj = element.project;
+    const acc = this.activeAccounts.getConfig(proj.apiUrl);
+    if (acc === undefined) {
+      throw new Error(`No account configured for the API ${proj.apiUrl}`);
+    }
+
+    const newProj = await fetchProject(acc.connection, proj.name, true);
+    await updateCheckedOutProject(newProj, element.checkedOutPath);
+
+    const projUri = vscode.Uri.file(element.checkedOutPath);
+    const projWsFolder = vscode.workspace.getWorkspaceFolder(projUri);
+    if (projWsFolder === undefined) {
+      return;
+    }
+
+    if (
+      this.activeProject.activeProject !== undefined &&
+      this.activeProject.properties !== undefined &&
+      this.activeProject.properties.isCheckedOut &&
+      normalize(this.activeProject.properties.checkedOutPath ?? "") ===
+        normalize(element.checkedOutPath)
+    ) {
+      this.activeProject = {
+        activeProject: newProj,
+        ...this.activeProject.properties
+      };
+    }
+  }
+
+  private async getActiveProjectForTextdocument(
+    textDocument: vscode.TextDocument | undefined
+  ): Promise<ActiveProject> {
+    if (textDocument === undefined) {
+      return { activeProject: undefined };
+    }
+
+    let activeProject: Project | undefined;
+    let isBookmark: boolean = false;
+    let isCheckedOut: boolean = false;
+    let checkedOutPath: string | undefined;
+
+    // this is a "virtual" textdocument, that was opened via the
+    // RemotePackageFileContentProvider
+    // => either it is a bookmark or it is just a random file that the user
+    // wanted to view.
+    if (textDocument.uri.scheme === ObsPackageFileUriScheme) {
+      try {
+        const {
+          apiUrl,
+          pkgFile
+        } = RemotePackageFileContentProvider.uriToPackageFile(textDocument.uri);
+        activeProject = await vscode.commands.executeCommand<
+          Project | undefined
+        >(GET_BOOKMARKED_PROJECT_COMMAND, apiUrl, pkgFile.projectName);
+
+        if (activeProject !== undefined) {
+          // this is just a bookmark => we're done
+          isBookmark = true;
+        } else {
+          // apparently this is not a bookmark, try to fetch the project instead
+          const con = this.activeAccounts.getConfig(apiUrl)?.connection;
+          if (con === undefined) {
+            // we have managed to open a file belonging to a Package for which we
+            // don't have a connection??
+            this.logger.error(
+              "No connection exists for the API %s, which is required to retrieve the project for the file %s",
+              apiUrl,
+              textDocument.uri
+            );
+          } else {
+            activeProject = await fetchProject(con, pkgFile.projectName, false);
+          }
+        }
+      } catch (err) {
+        this.logger.error(
+          "Got the following error while trying to obtain the Project for the file %s: %s",
+          textDocument.uri,
+          err.toString()
+        );
+        // something went wrong, we'll therefore reset activeProject to
+        // undefined to not send invalid data
+        activeProject = undefined;
+      }
+    } else {
+      // simple case: this is an actual file inside a workspace folder
+      let wsFolder = vscode.workspace.getWorkspaceFolder(textDocument.uri);
+      if (wsFolder !== undefined) {
+        activeProject = this.workspaceProjectMapping.get(wsFolder);
+      }
+      // if we now still don't have an activeProject then either we haven't
+      // opened this workspace yet or the active text editor belongs to a
+      // workspace that hasn't been properly registered yet (can happen if you
+      // just open a text document and don't open it permanently)
+      if (activeProject === undefined) {
+        wsFolder = {
+          index: 0,
+          name: "tmp",
+          uri: vscode.Uri.file(resolve(dirname(textDocument.uri.fsPath), ".."))
+        };
+        activeProject = await this.getProjectFromWorkspace(wsFolder);
+      }
+      if (activeProject !== undefined) {
+        assert(
+          wsFolder !== undefined,
+          "wsFolder must be defined in this branch"
+        );
+        isCheckedOut = true;
+        checkedOutPath = wsFolder!.uri.fsPath;
+        // XXX: is this really necessary?
+        isBookmark =
+          (await vscode.commands.executeCommand<Project | undefined>(
+            GET_BOOKMARKED_PROJECT_COMMAND,
+            activeProject.apiUrl,
+            activeProject.name
+          )) !== undefined;
+      }
+    }
+
+    return activeProject === undefined
+      ? { activeProject }
+      : {
+          activeProject,
+          properties: { isBookmark, isCheckedOut, checkedOutPath }
+        };
+  }
+
+  private async onDotOscModification(changedUri: vscode.Uri): Promise<void> {
+    const wsFolder = vscode.workspace.getWorkspaceFolder(changedUri);
+    if (wsFolder === undefined) {
+      return;
+    }
+
+    // is this workspaceFolder already tracked?
+    // if no => don't proceed as the adjustWorkspaceFolders function should take
+    // care of that
+    if (
+      this.currentWorkspaceFolders.find((presentFolder) =>
+        workspacesEqual(presentFolder, wsFolder)
+      ) === undefined
+    ) {
+      return;
+    }
+
+    // can we get a project from the folder?
+    // yes => try to add it
+    // no => remove the workspace from the mapped folders
+    const proj = await this.getProjectFromWorkspace(wsFolder);
+    if (proj !== undefined) {
+      await this.addWorkspace(wsFolder, proj);
+    } else {
+      this.workspaceProjectMapping.delete(wsFolder);
+    }
+  }
+
+  private async addWorkspace(
+    wsFolder: vscode.WorkspaceFolder,
+    proj?: Project
+  ): Promise<void> {
+    this.currentWorkspaceFolders.push(wsFolder);
+    if (proj !== undefined) {
+      proj = await this.getProjectFromWorkspace(wsFolder);
+    }
+    if (proj !== undefined) {
+      this.workspaceProjectMapping.set(wsFolder, proj);
+    }
   }
 
   private async adjustWorkspaceFolders(
     addedWorkspaces: ReadonlyArray<vscode.WorkspaceFolder>,
     removedWorkspaces: ReadonlyArray<vscode.WorkspaceFolder>
   ): Promise<void> {
-    await Promise.all(
-      addedWorkspaces.map(async ws => {
-        this.currentWorkspaceFolders.push(ws);
+    await Promise.all(addedWorkspaces.map((ws) => this.addWorkspace(ws)));
 
-        const proj = await this.getProjectFromWorkspace(ws);
-        if (proj !== undefined) {
-          this.workspaceProjectMapping.set(ws, proj);
-        }
-      })
-    );
-
-    removedWorkspaces.forEach(ws => {
+    removedWorkspaces.forEach((ws) => {
       this.workspaceProjectMapping.delete(ws);
     });
 
-    const newWorkspaces: vscode.WorkspaceFolder[] = [];
-
-    this.currentWorkspaceFolders.forEach(ws => {
-      if (
-        removedWorkspaces.find(removedWs =>
-          WorkspaceToProjectMatcher.workspacesEqual(removedWs, ws)
+    this.currentWorkspaceFolders = this.currentWorkspaceFolders.filter(
+      (curWs) =>
+        removedWorkspaces.find((removedWs) =>
+          workspacesEqual(removedWs, curWs)
         ) === undefined
-      ) {
-        newWorkspaces.push(ws);
-      }
-    });
+    );
   }
 
   private async getProjectFromWorkspace(
     workspace: vscode.WorkspaceFolder
   ): Promise<Project | undefined> {
-    if (existsSync(join(workspace.uri.fsPath, ".osc"))) {
-      try {
-        const proj = await readInCheckedOutProject(workspace.uri.fsPath);
+    try {
+      const proj = await readInCheckedOutProject(workspace.uri.fsPath);
 
-        // refresh the project _meta in case our local copy is stale
-        // but only if we actually have an active connection available
-        const instanceInfo = this.activeAccounts.getConfig(proj.apiUrl);
-        if (instanceInfo !== undefined) {
-          this.logger.trace(
-            "Fetching the _meta for Project %s via API %s",
-            proj.name,
-            proj.apiUrl
-          );
-          proj.meta = await getProjectMeta(instanceInfo.connection, proj.name);
-          await updateCheckedOutProject(proj, workspace.uri.fsPath);
-        }
-
-        return proj;
-      } catch (err) {
+      // refresh the project _meta in case our local copy is stale
+      // but only if we actually have an active connection available
+      const activeAccount = this.activeAccounts.getConfig(proj.apiUrl);
+      if (activeAccount !== undefined) {
         this.logger.trace(
-          `Error reading in directory ${workspace.uri.fsPath} as an osc project, but got: ${err}`
+          "Fetching the _meta for Project %s via API %s",
+          proj.name,
+          proj.apiUrl
         );
+        proj.meta = await fetchProjectMeta(activeAccount.connection, proj.name);
+        await updateCheckedOutProject(proj, workspace.uri.fsPath);
       }
+
+      return proj;
+    } catch (err) {
+      this.logger.trace(
+        "Error reading in directory %s as an osc project, but got: %s",
+        workspace.uri.fsPath,
+        err.toString()
+      );
+      return undefined;
     }
-    return undefined;
   }
 
   private async sendOnDidChangeActiveProjectEvent(
     textEditor?: vscode.TextEditor
   ) {
-    const proj = await this.getProjectForTextdocument(textEditor?.document);
+    this.activeProject = await this.getActiveProjectForTextdocument(
+      textEditor?.document
+    );
     this.logger.trace(
-      `sending onDidChangeActiveProjectEvent with project: ${proj?.name}`
+      "sending onDidChangeActiveProjectEvent with project: %s",
+      this.activeProject.activeProject?.name
     );
-    this.onDidChangeActiveProjectEmitter.fire(
-      await this.getProjectForTextdocument(textEditor?.document)
-    );
+    this.onDidChangeActiveProjectEmitter.fire(this.activeProject);
   }
 }
