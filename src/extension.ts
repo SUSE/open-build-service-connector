@@ -23,11 +23,14 @@ import { promises as fsPromises } from "fs";
 import { join } from "path";
 import * as pino from "pino";
 import * as vscode from "vscode";
-import { ProjectTreeProvider, UriScheme } from "./project-view";
-import { RepositoryTreeProvider } from "./repository";
-import { WorkspaceToProjectMatcher } from "./workspace";
 import { AccountManagerImpl } from "./accounts";
+import { BookmarkedProjectsTreeProvider } from "./bookmark-tree-view";
+import { CurrentProjectTreeProvider } from "./current-project-view";
 import { ObsServerInformation } from "./instance-info";
+import { RemotePackageFileContentProvider } from "./package-file-contents";
+import { ProjectBookmarkManager } from "./project-bookmarks";
+import { RepositoryTreeProvider } from "./repository";
+import { ActiveProjectWatcherImpl } from "./workspace";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -54,50 +57,63 @@ export async function activate(
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
-  const [
-    ws2Proj,
-    delayedInit
-  ] = WorkspaceToProjectMatcher.createWorkspaceToProjectMatcher(
-    accountManager.activeAccounts,
-    accountManager.onAccountChange,
-    logger
-  );
-
-  const projectTreeProvider = new ProjectTreeProvider(
-    ws2Proj.onDidChangeActiveProject,
-    accountManager.onAccountChange,
-    accountManager.activeAccounts,
-    context.globalState,
-    logger
-  );
-
-  const projectTree = vscode.window.createTreeView("projectTree", {
-    showCollapseAll,
-    treeDataProvider: projectTreeProvider
-  });
-
-  const repoTreeProvider = new RepositoryTreeProvider(
-    ws2Proj.onDidChangeActiveProject,
-    accountManager.activeAccounts,
-    accountManager.onAccountChange,
-    logger
-  );
-  context.subscriptions.push(
-    vscode.window.createTreeView("repositoryTree", {
-      showCollapseAll,
-      treeDataProvider: repoTreeProvider
-    })
-  );
-
-  await delayedInit(ws2Proj);
-
-  [
-    accountManager,
-    await ObsServerInformation.createObsServerInformation(
-      accountManager.activeAccounts,
-      accountManager.onAccountChange,
+  const [projectBookmarks, actProjWatcher] = await Promise.all([
+    ProjectBookmarkManager.createProjectBookmarkManager(
+      context,
+      accountManager,
       logger
     ),
+    await ActiveProjectWatcherImpl.createActiveProjectWatcher(
+      accountManager,
+      logger
+    )
+  ]);
+
+  const bookmarkedProjectsTreeProvider = new BookmarkedProjectsTreeProvider(
+    accountManager,
+    projectBookmarks,
+    logger
+  );
+  const bookmarkedProjectsTree = vscode.window.createTreeView(
+    "bookmarkedProjectsTree",
+    {
+      showCollapseAll,
+      treeDataProvider: bookmarkedProjectsTreeProvider
+    }
+  );
+
+  const currentProjectTreeProvider = new CurrentProjectTreeProvider(
+    actProjWatcher,
+    accountManager,
+    logger
+  );
+  const currentProjectTree = vscode.window.createTreeView(
+    "currentProjectTree",
+    { showCollapseAll, treeDataProvider: currentProjectTreeProvider }
+  );
+
+  const repoTreeProvider = new RepositoryTreeProvider(
+    actProjWatcher,
+    accountManager,
+    logger
+  );
+  const repositoryTree = vscode.window.createTreeView("repositoryTree", {
+    showCollapseAll,
+    treeDataProvider: repoTreeProvider
+  });
+
+  const pkgFileProv = new RemotePackageFileContentProvider(
+    accountManager,
+    logger
+  );
+
+  context.subscriptions.push(
+    currentProjectTree,
+    repositoryTree,
+    accountManager,
+    bookmarkedProjectsTree,
+    pkgFileProv,
+    new ObsServerInformation(accountManager, logger),
     vscode.commands.registerCommand(
       "obsRepository.addArchitecturesToRepo",
       repoTreeProvider.addArchitecturesToRepo,
@@ -118,37 +134,6 @@ export async function activate(
       repoTreeProvider.addPathToRepo,
       repoTreeProvider
     ),
-
-    vscode.commands.registerCommand(
-      "obsProject.refreshProject",
-      projectTreeProvider.refreshProject,
-      projectTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsProject.addProjectToBookmarks",
-      projectTreeProvider.addProjectToBookmarksTreeButton,
-      projectTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsProject.updatePackage",
-      projectTreeProvider.updatePackage,
-      projectTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsProject.removeBookmark",
-      projectTreeProvider.removeBookmark,
-      projectTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsProject.getProjectFromUri",
-      projectTreeProvider.getProjectFromUri,
-      projectTreeProvider
-    ),
-    vscode.workspace.registerTextDocumentContentProvider(
-      UriScheme,
-      projectTreeProvider
-    ),
-
     vscode.commands.registerCommand(
       "obsRepository.addRepositoryFromDistro",
       repoTreeProvider.addRepositoryFromDistro,
@@ -158,17 +143,14 @@ export async function activate(
       "obsRepository.removeRepository",
       repoTreeProvider.removeRepository,
       repoTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsProject.showPackageFileContents",
-      projectTreeProvider.showPackageFileContents,
-      projectTreeProvider
     )
-  ].forEach(disposable => context.subscriptions.push(disposable));
+  );
 
   await accountManager.promptForUninmportedAccountsInOscrc();
   await accountManager.promptForNotPresentAccountPasswords();
 }
 
 // this method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+  // nothing yet
+}
