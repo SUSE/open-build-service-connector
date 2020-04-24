@@ -36,18 +36,14 @@ export const fakeAccount2: AccountStorage = {
 
 export const fakeApi1ValidAcc: ValidAccount = {
   account: fakeAccount1,
-  connection: new Connection(
-    fakeAccount1.username,
-    fakeAccount1.username,
-    fakeAccount1.apiUrl
-  )
+  connection: new Connection(fakeAccount1.username, fakeAccount1.username, {
+    url: fakeAccount1.apiUrl
+  })
 };
 
 export const fakeApi2ValidAcc: ValidAccount = {
   account: fakeAccount2,
-  connection: new Connection(
-    fakeAccount2.username,
-    fakeAccount2.username,
-    fakeAccount2.apiUrl
-  )
+  connection: new Connection(fakeAccount2.username, fakeAccount2.username, {
+    url: fakeAccount2.apiUrl
+  })
 };
