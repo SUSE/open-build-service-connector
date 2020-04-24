@@ -25,11 +25,13 @@ import * as chaiThings from "chai-things";
 import { AsyncFunc, Context, Func } from "mocha";
 import * as pino from "pino";
 import { SinonSandbox } from "sinon";
+import * as sinonChai from "sinon-chai";
 import * as vscode from "vscode";
 import { ActiveAccounts, ApiUrl, ValidAccount } from "../../accounts";
 
 use(chaiThings);
 use(chaiAsPromised);
+use(sinonChai);
 should();
 
 export const testLogger = pino(

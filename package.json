@@ -27,7 +27,9 @@
     "@types/chai-things": "^0.0.34",
     "@types/chai-as-promised": "^7",
     "@types/chai": "^4"
+    "@types/sinon-chai": "^3.2.4",
     "prettier": "^2",
+    "sinon-chai": "^3.5.0",
   },
   "dependencies": {
     "xml2js": "^0.4.22",
