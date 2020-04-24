@@ -55,7 +55,7 @@ export function loadMapFromMemento<K, T>(
   memento: vscode.Memento,
   storageKey: string
 ): Map<K, T> {
-  return new Map(memento.get<Array<[K, T]>>(storageKey, []));
+  return new Map(memento.get<[K, T][]>(storageKey, []));
 }
 
 /**
@@ -190,13 +190,13 @@ export function logAndReportExceptionsWrapper<RT>(
 
     reportObj.logger.error(err);
     if (reportToUser) {
-      await (reportObj as any).vscodeWindow!.showErrorMessage(errMsg);
+      await reportObj.vscodeWindow.showErrorMessage(errMsg);
     }
   };
 
   return async (): Promise<RT | undefined> => {
     try {
-      return await func.apply(undefined, args);
+      return await func.apply(reportObj, args);
     } catch (err) {
       await reportFunc(err);
       return undefined;
