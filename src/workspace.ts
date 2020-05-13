@@ -118,12 +118,6 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
    */
   public readonly onDidChangeActiveProject: vscode.Event<ActiveProject>;
 
-  /**
-   * List of currently open [workspace
-   * folders](https://code.visualstudio.com/api/references/vscode-api#WorkspaceFolder).
-   */
-  private currentWorkspaceFolders: vscode.WorkspaceFolder[] = [];
-
   private activeProject: ActiveProject = { activeProject: undefined };
 
   private onDidChangeActiveProjectEmitter: vscode.EventEmitter<
@@ -329,7 +323,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
     // if no => don't proceed as the adjustWorkspaceFolders function should take
     // care of that
     if (
-      this.currentWorkspaceFolders.find((presentFolder) =>
+      vscode.workspace.workspaceFolders?.find((presentFolder) =>
         workspacesEqual(presentFolder, wsFolder)
       ) === undefined
     ) {
@@ -351,12 +345,10 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
     wsFolder: vscode.WorkspaceFolder,
     proj?: Project
   ): Promise<void> {
-    this.currentWorkspaceFolders.push(wsFolder);
-    if (proj !== undefined) {
-      proj = await this.getProjectFromWorkspace(wsFolder);
-    }
-    if (proj !== undefined) {
-      this.workspaceProjectMapping.set(wsFolder, proj);
+    const projOfWs = proj ?? (await this.getProjectFromWorkspace(wsFolder));
+
+    if (projOfWs !== undefined) {
+      this.workspaceProjectMapping.set(wsFolder, projOfWs);
     }
   }
 
@@ -369,13 +361,6 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
     removedWorkspaces.forEach((ws) => {
       this.workspaceProjectMapping.delete(ws);
     });
-
-    this.currentWorkspaceFolders = this.currentWorkspaceFolders.filter(
-      (curWs) =>
-        removedWorkspaces.find((removedWs) =>
-          workspacesEqual(removedWs, curWs)
-        ) === undefined
-    );
   }
 
   private async getProjectFromWorkspace(
