@@ -176,7 +176,7 @@ class ActiveAccountsImpl implements ActiveAccounts {
   constructor(public readonly apiAccountMapping: ApiAccountMapping) {}
 
   public getConfig(apiUrl: ApiUrl): ValidAccount | undefined {
-    return this.apiAccountMapping.get(apiUrl);
+    return this.apiAccountMapping.get(normalizeUrl(apiUrl));
   }
 
   public getAllApis(): ApiUrl[] {

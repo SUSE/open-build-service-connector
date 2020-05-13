@@ -196,6 +196,23 @@ describe("AccountManager", function () {
     );
 
     it(
+      "finds the correct account by an unnormalized URL as well",
+      castToAsyncFunc<FixtureContext>(async function () {
+        const mngr = await this.fixture.createAccountManager(
+          [fakeAccount1],
+          ["fooPw"]
+        );
+
+        expect(
+          mngr.activeAccounts.getConfig("https://api.baz.org")
+        ).to.not.equal(undefined);
+        expect(
+          mngr.activeAccounts.getConfig("https://api.baz.org")
+        ).to.deep.equal(mngr.activeAccounts.getConfig(fakeAccount1.apiUrl));
+      })
+    );
+
+    it(
       "reports configuration issues to the user",
       castToAsyncFunc<FixtureContext>(async function () {
         this.fixture.vscodeWindow.showErrorMessage.resolves();
