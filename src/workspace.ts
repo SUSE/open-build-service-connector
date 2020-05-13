@@ -118,7 +118,9 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
    */
   public readonly onDidChangeActiveProject: vscode.Event<ActiveProject>;
 
-  private activeProject: ActiveProject = { activeProject: undefined };
+  private activeProject: ActiveProject = {
+    activeProject: undefined
+  };
 
   private onDidChangeActiveProjectEmitter: vscode.EventEmitter<
     ActiveProject
@@ -306,7 +308,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
     }
 
     return activeProject === undefined
-      ? { activeProject }
+      ? { activeProject: undefined }
       : {
           activeProject,
           properties: { isBookmark, isCheckedOut, checkedOutPath }
