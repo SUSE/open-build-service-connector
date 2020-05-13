@@ -39,7 +39,7 @@ import {
   LOCAL_PROJECT_TREE_ELEMENT_CTX_VAL
 } from "./current-project-view";
 import {
-  ObsPackageFileUriScheme,
+  OBS_PACKAGE_FILE_URI_SCHEME,
   RemotePackageFileContentProvider
 } from "./package-file-contents";
 import { GET_BOOKMARKED_PROJECT_COMMAND } from "./project-bookmarks";
@@ -238,7 +238,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
     // RemotePackageFileContentProvider
     // => either it is a bookmark or it is just a random file that the user
     // wanted to view.
-    if (textDocument.uri.scheme === ObsPackageFileUriScheme) {
+    if (textDocument.uri.scheme === OBS_PACKAGE_FILE_URI_SCHEME) {
       try {
         const {
           apiUrl,

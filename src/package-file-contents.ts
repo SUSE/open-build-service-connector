@@ -30,7 +30,7 @@ import { GET_FILE_FROM_CACHE_COMMAND } from "./project-bookmarks";
 import { isFileTreeElement, ProjectTreeItem } from "./project-view";
 
 /** URI scheme of the read-only files */
-export const ObsPackageFileUriScheme = "vscodeObsPackageFile";
+export const OBS_PACKAGE_FILE_URI_SCHEME = "vscodeObsPackageFile";
 
 /** custom authority since vscode lowercases it, so we cannot put information into it */
 const authority = "remote_file";
@@ -52,7 +52,7 @@ export class RemotePackageFileContentProvider
   implements vscode.TextDocumentContentProvider {
   public static uriToPackageFile(uri: vscode.Uri): PackageFileUriData {
     assert(
-      uri.scheme === ObsPackageFileUriScheme && uri.authority === authority
+      uri.scheme === OBS_PACKAGE_FILE_URI_SCHEME && uri.authority === authority
     );
 
     // FIXME: the authority is lowercased by vscode
@@ -86,7 +86,7 @@ export class RemotePackageFileContentProvider
     packageFile: PackageFile,
     revision?: string
   ): vscode.Uri {
-    const baseUri = `${ObsPackageFileUriScheme}://${authority}/${packageFile.projectName}/${packageFile.packageName}/${packageFile.name}?${apiUrl}`;
+    const baseUri = `${OBS_PACKAGE_FILE_URI_SCHEME}://${authority}/${packageFile.projectName}/${packageFile.packageName}/${packageFile.name}?${apiUrl}`;
     return vscode.Uri.parse(
       revision === undefined ? baseUri : baseUri.concat(`#${revision}`),
       true
@@ -98,7 +98,7 @@ export class RemotePackageFileContentProvider
 
     this.disposables.push(
       vscode.workspace.registerTextDocumentContentProvider(
-        ObsPackageFileUriScheme,
+        OBS_PACKAGE_FILE_URI_SCHEME,
         this
       ),
       vscode.commands.registerCommand(
