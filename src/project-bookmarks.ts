@@ -689,10 +689,10 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
   }
 
   /**
-   * Finds a specific project in the bookmarks and returns it.
+   * Finds a specified package in the bookmarks and returns it.
    *
    * This function is also available via the command with the identifier
-   * [[GET_BOOKMARKED_PROJECT_COMMAND]].
+   * [[GET_BOOKMARKED_PACKAGE_COMMAND]].
    */
   public async getBookmarkedPackage(
     apiUrl?: ApiUrl,
