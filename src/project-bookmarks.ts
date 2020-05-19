@@ -45,7 +45,6 @@ import {
 } from "./base-components";
 import { cmdPrefix } from "./constants";
 import { loadMapFromMemento, saveMapToMemento } from "./util";
-import { error } from "vscode-extension-tester";
 
 const projectBookmarkStorageKey: string = "vscodeObs.ProjectTree.Projects";
 
