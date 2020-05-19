@@ -915,7 +915,7 @@ export class AccountManagerImpl extends LoggingBase {
         ["Yes", "No"],
         {
           canPickMany: false,
-          ignoreFocusOut: true,
+          ignoreFocusOut,
           placeHolder:
             "Optional: Provide a custom server certificate (in the PEM format)?"
         }
