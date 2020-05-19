@@ -307,11 +307,11 @@
   "prettier": {
     "trailingComma": "none"
   },
-  "repository": "https://gitlab.suse.de/dancermak/vscode-obs",
+  "repository": "https://github.com/SUSE/open-build-service-connector",
   "license": "MIT",
   "publisher": "SUSE",
   "version": "0.0.1",
-  "description": "Wrapper for the Open Build Service",
-  "displayName": "vscode-obs",
-  "name": "vscode-obs"
+  "description": "Connector to the Open Build Service",
+  "displayName": "Open Build Service Connector",
+  "name": "open-build-service-connector"
 }
