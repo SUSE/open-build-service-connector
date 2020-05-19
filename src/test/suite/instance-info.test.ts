@@ -21,9 +21,8 @@
 
 import { expect } from "chai";
 import { afterEach, beforeEach, Context, describe, it } from "mocha";
-import * as obs_ts from "obs-ts";
+import * as openBuildServiceApi from "open-build-service-api";
 import { createSandbox, match } from "sinon";
-import { ImportMock } from "ts-mock-imports";
 import { URL } from "url";
 import * as vscode from "vscode";
 import {
@@ -51,14 +50,8 @@ class ObsServerInformationFixture extends LoggingFixture {
 
   public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
 
-  public mockFetchConfiguration = ImportMock.mockFunction(
-    obs_ts,
-    "fetchConfiguration"
-  );
-  public mockFetchHostedDistributions = ImportMock.mockFunction(
-    obs_ts,
-    "fetchHostedDistributions"
-  );
+  public fetchConfigurationMock = this.sandbox.stub();
+  public fetchHostedDistributionsMock = this.sandbox.stub();
 
   public fakeAccountManager?: FakeAccountManager;
 
@@ -69,9 +62,6 @@ class ObsServerInformationFixture extends LoggingFixture {
   }
 
   public afterEach(ctx: Context) {
-    this.mockFetchConfiguration.restore();
-    this.mockFetchHostedDistributions.restore();
-
     this.sandbox.restore();
 
     this.disposables.forEach((disposable) => disposable.dispose());
@@ -87,7 +77,11 @@ class ObsServerInformationFixture extends LoggingFixture {
 
     const serverInfo = new ObsServerInformation(
       this.fakeAccountManager,
-      testLogger
+      testLogger,
+      {
+        fetchConfiguration: this.fetchConfigurationMock,
+        fetchHostedDistributions: this.fetchHostedDistributionsMock
+      }
     );
 
     await serverInfo.initialInstanceInfoRetrieved;
@@ -116,10 +110,10 @@ describe("ObsServerInformation", () => {
         await this.fixture.createObsServerInformation().should.be.fulfilled;
 
         this.fixture.sandbox.assert.notCalled(
-          this.fixture.mockFetchConfiguration
+          this.fixture.fetchConfigurationMock
         );
         this.fixture.sandbox.assert.notCalled(
-          this.fixture.mockFetchHostedDistributions
+          this.fixture.fetchHostedDistributionsMock
         );
       })
     );
@@ -158,22 +152,25 @@ describe("ObsServerInformation", () => {
   });
 
   describe("#getInfo", () => {
-    const ObsConfig: obs_ts.Configuration = {
+    const ObsConfig: openBuildServiceApi.Configuration = {
       description:
         "The openSUSE Build Service is the public instance of the Open Build Service (OBS)",
       disableBranchPublishing: true,
-      schedulers: [obs_ts.Arch.X86_64, obs_ts.Arch.Aarch64],
+      schedulers: [
+        openBuildServiceApi.Arch.X86_64,
+        openBuildServiceApi.Arch.Aarch64
+      ],
       title: "openSUSE Build Service"
     };
 
-    const FooInstanceConfig: obs_ts.Configuration = {
+    const FooInstanceConfig: openBuildServiceApi.Configuration = {
       description: "This is just a test instance",
       disableBranchPublishing: true,
       schedulers: [],
       title: "Test"
     };
 
-    const Tumbleweed: obs_ts.Distribution = {
+    const Tumbleweed: openBuildServiceApi.Distribution = {
       link: new URL("http://www.opensuse.org/"),
       name: "openSUSE Tumbleweed",
       project: "openSUSE:Factory",
@@ -190,17 +187,17 @@ describe("ObsServerInformation", () => {
     };
 
     beforeEach(function () {
-      this.fixture.mockFetchConfiguration
+      this.fixture.fetchConfigurationMock
         .withArgs(match.has("url", fakeAccount2.apiUrl))
         .resolves(ObsConfig);
-      this.fixture.mockFetchConfiguration
+      this.fixture.fetchConfigurationMock
         .withArgs(match.has("url", fakeAccount1.apiUrl))
         .resolves(FooInstanceConfig);
-      this.fixture.mockFetchConfiguration.rejects(
+      this.fixture.fetchConfigurationMock.rejects(
         Error("Cannot fetch the configuration for this API")
       );
 
-      this.fixture.mockFetchHostedDistributions.resolves([Tumbleweed]);
+      this.fixture.fetchHostedDistributionsMock.resolves([Tumbleweed]);
     });
 
     it(
@@ -270,7 +267,7 @@ describe("ObsServerInformation", () => {
           apiUrl: "https://api.opensuse.org/",
           username: "meee"
         };
-        const thirdCon = new obs_ts.Connection(
+        const thirdCon = new openBuildServiceApi.Connection(
           thirdAccount.username,
           "secure",
           { url: thirdAccount.apiUrl }
@@ -287,10 +284,10 @@ describe("ObsServerInformation", () => {
         ).should.be.fulfilled;
 
         this.fixture.sandbox.assert.calledTwice(
-          this.fixture.mockFetchConfiguration
+          this.fixture.fetchConfigurationMock
         );
         this.fixture.sandbox.assert.calledTwice(
-          this.fixture.mockFetchHostedDistributions
+          this.fixture.fetchHostedDistributionsMock
         );
 
         expect(serverInfo.getInfo(thirdAccount.apiUrl)).to.deep.equal({

@@ -20,9 +20,7 @@
  */
 
 import { Context } from "mocha";
-import * as obs_ts from "obs-ts";
 import { createSandbox } from "sinon";
-import { ImportMock } from "ts-mock-imports";
 import { AccountMapInitializer, FakeAccountManager } from "./fakes";
 import { createStubbedVscodeWindow, LoggingFixture } from "./test-utils";
 
@@ -32,19 +30,9 @@ export class ProjectViewFixture extends LoggingFixture {
   public readonly sandbox = createSandbox();
   public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
 
-  public readonly fetchProjectMock = ImportMock.mockFunction(
-    obs_ts,
-    "fetchProject"
-  );
-
-  public readonly fetchPackageMock = ImportMock.mockFunction(
-    obs_ts,
-    "fetchPackage"
-  );
-
-  // constructor(ctx: Context) {
-  //   super(ctx);
-  // }
+  public readonly fetchProjectMock = this.sandbox.stub();
+  public readonly fetchPackageMock = this.sandbox.stub();
+  public readonly fetchFileContentsMock = this.sandbox.stub();
 
   public createFakeAccountManager(
     initialAccountMap?: AccountMapInitializer
@@ -54,8 +42,6 @@ export class ProjectViewFixture extends LoggingFixture {
 
   public afterEach(ctx: Context) {
     this.sandbox.restore();
-    this.fetchProjectMock.restore();
-    this.fetchPackageMock.restore();
 
     super.afterEach(ctx);
     this.dispose();

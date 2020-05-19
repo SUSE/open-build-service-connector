@@ -20,7 +20,7 @@
  */
 
 import * as assert from "assert";
-import { PackageFile } from "obs-ts";
+import { PackageFile } from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";

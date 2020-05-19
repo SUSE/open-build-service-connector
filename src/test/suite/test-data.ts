@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { Connection } from "obs-ts";
+import { Connection } from "open-build-service-api";
 import { AccountStorage, ValidAccount } from "../../accounts";
 
 export const fakeAccount1: AccountStorage = {

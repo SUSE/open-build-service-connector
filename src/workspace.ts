@@ -26,7 +26,7 @@ import {
   Project,
   readInCheckedOutProject,
   updateCheckedOutProject
-} from "obs-ts";
+} from "open-build-service-api";
 import { dirname, normalize, resolve } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";

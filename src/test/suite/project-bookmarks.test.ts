@@ -22,7 +22,7 @@
 const mockFs = require("mock-fs");
 
 import { Context, describe } from "mocha";
-import { Project } from "obs-ts";
+import { Project } from "open-build-service-api";
 import * as vscode from "vscode";
 import { ApiUrl } from "../../accounts";
 import { ProjectBookmarkManager } from "../../project-bookmarks";

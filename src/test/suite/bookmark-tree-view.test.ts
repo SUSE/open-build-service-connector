@@ -21,17 +21,18 @@
 
 import { promises as fsPromises } from "fs";
 import { afterEach, beforeEach, Context, describe, it, xit } from "mocha";
-import * as obs_ts from "obs-ts";
+import * as obs_ts from "open-build-service-api";
 import { tmpdir } from "os";
 import { sep } from "path";
+import { match } from "sinon";
 import * as vscode from "vscode";
 import { ApiUrl } from "../../accounts";
+import { BaseProject } from "../../base-components";
 import {
   AddBookmarkElement,
   BookmarkedProjectsTreeProvider,
   MyBookmarksElement,
   ObsServerTreeElement,
-  UPDATE_PACKAGE_COMMAND,
   UPDATE_PROJECT_COMMAND
 } from "../../bookmark-tree-view";
 import { SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND } from "../../package-file-contents";
@@ -41,9 +42,9 @@ import {
 } from "../../project-bookmarks";
 import {
   FileTreeElement,
+  isPackageTreeElement,
   PackageTreeElement,
-  ProjectTreeElement,
-  isPackageTreeElement
+  ProjectTreeElement
 } from "../../project-view";
 import { AccountMapInitializer } from "./fakes";
 import { ProjectViewFixture } from "./project-view.test";
@@ -54,8 +55,6 @@ import {
   fakeApi2ValidAcc
 } from "./test-data";
 import { castToAsyncFunc, testLogger } from "./test-utils";
-import { BaseProject } from "../../base-components";
-import { match } from "sinon";
 
 const fooProj: obs_ts.Project = {
   apiUrl: fakeAccount1.apiUrl,
@@ -145,14 +144,20 @@ class BookmarkedProjectsTreeProviderFixture extends ProjectViewFixture {
         globalStoragePath: this.globalStoragePath
       } as vscode.ExtensionContext,
       this.fakeAccountManager!,
-      testLogger
+      testLogger,
+      {
+        fetchFileContents: this.fetchFileContentsMock,
+        fetchPackage: this.fetchPackageMock,
+        fetchProject: this.fetchProjectMock
+      }
     );
 
     const projTreeProv = new BookmarkedProjectsTreeProvider(
       this.fakeAccountManager!,
       this.projectBookmarkManager,
       testLogger,
-      this.vscodeWindow
+      this.vscodeWindow,
+      this.fetchProjectMock
     );
 
     this.disposables.push(projTreeProv, this.projectBookmarkManager);

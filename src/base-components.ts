@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { Package, PackageFile, Project } from "obs-ts";
+import { Package, PackageFile, Project } from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ActiveAccounts, ApiUrl } from "./accounts";

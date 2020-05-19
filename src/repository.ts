@@ -29,7 +29,7 @@ import {
   Path,
   Project,
   updateCheckedOutProject
-} from "obs-ts";
+} from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ValidAccount } from "./accounts";

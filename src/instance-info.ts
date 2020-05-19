@@ -24,13 +24,18 @@ import {
   Distribution,
   fetchConfiguration,
   fetchHostedDistributions
-} from "obs-ts";
+} from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix } from "./constants";
 import { logAndReportExceptionsWrapper } from "./util";
+
+interface ObsFetchers {
+  readonly fetchConfiguration: typeof fetchConfiguration;
+  readonly fetchHostedDistributions: typeof fetchHostedDistributions;
+}
 
 /** Information about an instance of the Open Build Service. */
 export interface ObsInstance {
@@ -88,7 +93,14 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
 
   private instances: ObsInstance[] = [];
 
-  constructor(accountManager: AccountManager, logger: Logger) {
+  constructor(
+    accountManager: AccountManager,
+    logger: Logger,
+    private readonly obsFetchers: ObsFetchers = {
+      fetchConfiguration,
+      fetchHostedDistributions
+    }
+  ) {
     super(accountManager, logger);
 
     this.disposables.push(
@@ -190,13 +202,13 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
       logAndReportExceptionsWrapper(
         this,
         false,
-        fetchConfiguration,
+        this.obsFetchers.fetchConfiguration,
         connection
       )(),
       logAndReportExceptionsWrapper(
         this,
         false,
-        fetchHostedDistributions,
+        this.obsFetchers.fetchHostedDistributions,
         connection
       )()
     ]);

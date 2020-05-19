@@ -20,7 +20,7 @@
  */
 
 import * as assert from "assert";
-import { Package, PackageFile, Project } from "obs-ts";
+import { Package, PackageFile, Project } from "open-build-service-api";
 import * as vscode from "vscode";
 import { BaseProject } from "./base-components";
 

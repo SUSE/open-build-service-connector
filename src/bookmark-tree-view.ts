@@ -20,7 +20,7 @@
  */
 
 import * as assert from "assert";
-import { fetchProject, Package, Project } from "obs-ts";
+import { fetchProject, Package, Project } from "open-build-service-api";
 import { join } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -157,7 +157,8 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     accountManager: AccountManager,
     private readonly bookmarkMngr: ProjectBookmarkManager,
     logger: Logger,
-    private vscodeWindow: VscodeWindow = vscode.window
+    private vscodeWindow: VscodeWindow = vscode.window,
+    private readonly obsFetchProject: typeof fetchProject = fetchProject
   ) {
     super(accountManager, logger);
 
@@ -551,7 +552,11 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
 
     let proj: Project | undefined;
     try {
-      proj = await fetchProject(accountConfig.connection, projectName, true);
+      proj = await this.obsFetchProject(
+        accountConfig.connection,
+        projectName,
+        true
+      );
     } catch (err) {
       const selected = await this.vscodeWindow.showErrorMessage(
         `Adding a bookmark for the project ${projectName} using the account ${accountConfig.account.accountName} failed with: ${err}.`,

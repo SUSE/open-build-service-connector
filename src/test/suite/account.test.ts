@@ -23,7 +23,7 @@ import { expect } from "chai";
 import { promises as fsPromises } from "fs";
 import * as keytar from "keytar";
 import { afterEach, beforeEach, describe, it } from "mocha";
-import * as obs from "obs-ts";
+import * as openBuildServiceApi from "open-build-service-api";
 import { createSandbox, match, SinonSandbox, SinonStub } from "sinon";
 import { ImportMock } from "ts-mock-imports";
 import * as vscode from "vscode";
@@ -77,10 +77,7 @@ class AccountManagerFixture extends LoggingFixture {
     keytar,
     "deletePassword"
   );
-  public readonly readAccountsFromOscrcMock = ImportMock.mockFunction(
-    obs,
-    "readAccountsFromOscrc"
-  );
+  public readonly readAccountsFromOscrcMock = this.sandbox.stub();
 
   public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
 
@@ -110,7 +107,10 @@ class AccountManagerFixture extends LoggingFixture {
 
     const mngr = await AccountManagerImpl.createAccountManager(
       testLogger,
-      this.vscodeWindow
+      this.vscodeWindow,
+      vscode.commands,
+      vscode.workspace,
+      this.readAccountsFromOscrcMock
     );
     mngr.onAccountChange(this.accountChangeSpy);
 
@@ -126,7 +126,6 @@ class AccountManagerFixture extends LoggingFixture {
     this.keytarGetPasswordMock.restore();
     this.keytarSetPasswordMock.restore();
     this.keytarDeletePasswordMock.restore();
-    this.readAccountsFromOscrcMock.restore();
 
     this.sandbox.restore();
 
@@ -461,7 +460,7 @@ describe("AccountManager", function () {
             username: "barUser"
           };
           // ensure that everything that follows uses the normalized url
-          apiUrl = obs.normalizeUrl(apiUrl);
+          apiUrl = openBuildServiceApi.normalizeUrl(apiUrl);
 
           this.fixture.readAccountsFromOscrcMock.resolves([
             fakeNewOscrcAccount
@@ -526,7 +525,7 @@ describe("AccountManager", function () {
             fakeAccount1,
             fakeAccount2
           ]);
-          const fakeOscrcAccount: obs.Account = {
+          const fakeOscrcAccount: openBuildServiceApi.Account = {
             aliases: [],
             apiUrl: "https://api.bar.org",
             password: undefined,
@@ -548,7 +547,9 @@ describe("AccountManager", function () {
 
           this.fixture.sandbox.assert.calledOnce(this.fixture.accountChangeSpy);
 
-          const apiUrl = obs.normalizeUrl(fakeOscrcAccount.apiUrl);
+          const apiUrl = openBuildServiceApi.normalizeUrl(
+            fakeOscrcAccount.apiUrl
+          );
 
           expect(mngr.activeAccounts.getAllApis())
             .to.have.length(3)
@@ -571,7 +572,7 @@ describe("AccountManager", function () {
         "doesn't import an account if the user does not provide a password",
         castToAsyncFunc<FixtureContext>(async function (this: FixtureContext) {
           const mngr = await this.fixture.createAccountManager();
-          const fakeOscrcAccount: obs.Account = {
+          const fakeOscrcAccount: openBuildServiceApi.Account = {
             aliases: [],
             apiUrl: "https://api.bar.org",
             password: undefined,
@@ -780,7 +781,7 @@ describe("AccountManager", function () {
           this.fixture.sandbox.assert.calledWith(
             this.fixture.keytarSetPasswordMock.firstCall,
             match.string,
-            obs.normalizeUrl(apiUrl),
+            openBuildServiceApi.normalizeUrl(apiUrl),
             newPassword
           );
 

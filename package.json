@@ -34,7 +34,7 @@
   "dependencies": {
     "config-ini-parser": "^1.2.2",
     "keytar": "^5",
-    "obs-ts": "https://gitlab.suse.de/dancermak/obs.ts.git",
+    "open-build-service-api": "https://github.com/SUSE/open-build-service-api.git",
     "pino": "^6",
     "xml2js": "^0.4.22"
   },

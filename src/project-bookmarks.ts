@@ -31,7 +31,7 @@ import {
   pathExists,
   PathType,
   Project
-} from "obs-ts";
+} from "open-build-service-api";
 import { join } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -50,6 +50,12 @@ import { error } from "vscode-extension-tester";
 const projectBookmarkStorageKey: string = "vscodeObs.ProjectTree.Projects";
 
 const cmdId = "ProjectBookmarks";
+
+interface ObsFetchers {
+  readonly fetchFileContents: typeof fetchFileContents;
+  readonly fetchPackage: typeof fetchPackage;
+  readonly fetchProject: typeof fetchProject;
+}
 
 /**
  * Identifier of the command that returns an array of all projects that have
@@ -169,9 +175,15 @@ class MetadataCache extends ConnectionListenerLoggerBase {
   public static async createMetadataCache(
     extensionContext: vscode.ExtensionContext,
     accountManager: AccountManager,
-    logger: Logger
+    logger: Logger,
+    obsFetchers: ObsFetchers
   ): Promise<MetadataCache> {
-    const cache = new MetadataCache(extensionContext, accountManager, logger);
+    const cache = new MetadataCache(
+      extensionContext,
+      accountManager,
+      logger,
+      obsFetchers
+    );
     await fsPromises.mkdir(cache.baseStoragePath, { recursive: true });
     return cache;
   }
@@ -183,7 +195,8 @@ class MetadataCache extends ConnectionListenerLoggerBase {
   private constructor(
     extensionContext: vscode.ExtensionContext,
     accountManager: AccountManager,
-    logger: Logger
+    logger: Logger,
+    private readonly obsFetchers: ObsFetchers
   ) {
     super(accountManager, logger);
     this.baseStoragePath = join(
@@ -267,7 +280,10 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         );
       }
       try {
-        file.contents = await fetchFileContents(account.connection, pkgFile);
+        file.contents = await this.obsFetchers.fetchFileContents(
+          account.connection,
+          pkgFile
+        );
         await fsPromises.mkdir(fileContentsDir, { recursive: true });
         await fsPromises.writeFile(fileContentsPath, file.contents);
       } catch (err) {
@@ -316,7 +332,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         );
       }
 
-      const newPkg = await fetchPackage(
+      const newPkg = await this.obsFetchers.fetchPackage(
         account.connection,
         pkg.projectName,
         pkg.name,
@@ -385,7 +401,11 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         );
       }
 
-      const freshProj = await fetchProject(account.connection, proj.name, true);
+      const freshProj = await this.obsFetchers.fetchProject(
+        account.connection,
+        proj.name,
+        true
+      );
       await this.saveProject(freshProj);
       return freshProj;
       // } catch (err) {
@@ -439,12 +459,14 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
   public static async createProjectBookmarkManager(
     ctx: vscode.ExtensionContext,
     accountManager: AccountManager,
-    logger: Logger
+    logger: Logger,
+    obsFetchers: ObsFetchers = { fetchProject, fetchFileContents, fetchPackage }
   ): Promise<ProjectBookmarkManager> {
     const cache = await MetadataCache.createMetadataCache(
       ctx,
       accountManager,
-      logger
+      logger,
+      obsFetchers
     );
     const mngr = new ProjectBookmarkManager(cache, ctx.globalState, logger);
     mngr.disposables.push(cache);

@@ -27,7 +27,7 @@ import {
   Connection,
   normalizeUrl,
   readAccountsFromOscrc
-} from "obs-ts";
+} from "open-build-service-api";
 import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
@@ -630,9 +630,15 @@ export class AccountManagerImpl extends LoggingBase {
     logger: Logger,
     vscodeWindow: VscodeWindow = vscode.window,
     vscodeCommands: typeof vscode.commands = vscode.commands,
-    vscodeWorkspace: typeof vscode.workspace = vscode.workspace
+    vscodeWorkspace: typeof vscode.workspace = vscode.workspace,
+    obsReadAccountsFromOscrc: typeof readAccountsFromOscrc = readAccountsFromOscrc
   ): Promise<AccountManagerImpl> {
-    const mngr = new AccountManagerImpl(logger, vscodeWindow);
+    const mngr = new AccountManagerImpl(
+      logger,
+      vscodeWindow,
+      vscodeWorkspace,
+      obsReadAccountsFromOscrc
+    );
     mngr.logger.trace("initializing the AccountManager");
 
     let errMsgs: string[];
@@ -704,7 +710,8 @@ export class AccountManagerImpl extends LoggingBase {
   private constructor(
     logger: Logger,
     private readonly vscodeWindow: VscodeWindow,
-    private readonly vscodeWorkspace: typeof vscode.workspace = vscode.workspace
+    private readonly vscodeWorkspace: typeof vscode.workspace = vscode.workspace,
+    private readonly obsReadAccountsFromOscrc: typeof readAccountsFromOscrc = readAccountsFromOscrc
   ) {
     super(logger);
 
@@ -1021,7 +1028,7 @@ export class AccountManagerImpl extends LoggingBase {
     oscrcAccounts?: Account[]
   ): Promise<void> {
     if (oscrcAccounts === undefined) {
-      oscrcAccounts = await readAccountsFromOscrc();
+      oscrcAccounts = await this.obsReadAccountsFromOscrc();
     }
 
     let added: boolean = false;
@@ -1168,7 +1175,7 @@ export class AccountManagerImpl extends LoggingBase {
   private async unimportedAccountsInOscrc(): Promise<Account[]> {
     this.logger.trace("Checking for unimported accounts");
 
-    const accounts = await readAccountsFromOscrc();
+    const accounts = await this.obsReadAccountsFromOscrc();
     const oscrcAccountsApiUrls = accounts.map((acc) => acc.apiUrl);
     this.logger.trace("found the accounts in oscrc: %s", oscrcAccountsApiUrls);
 
