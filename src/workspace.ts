@@ -374,7 +374,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
       // refresh the project _meta in case our local copy is stale
       // but only if we actually have an active connection available
       const activeAccount = this.activeAccounts.getConfig(proj.apiUrl);
-      if (activeAccount !== undefined) {
+      if (activeAccount !== undefined && proj.meta === undefined) {
         this.logger.trace(
           "Fetching the _meta for Project %s via API %s",
           proj.name,
