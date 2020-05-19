@@ -39,7 +39,7 @@ import { deepCopyProperties, logAndReportExceptions } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 import { ActiveProjectWatcher } from "./workspace";
 
-// all architectures known by OBS in general
+/** All architectures known by OBS in general */
 const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
 
 /**
