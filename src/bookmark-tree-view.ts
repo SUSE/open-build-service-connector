@@ -221,7 +221,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
   }
 
   public refresh(): void {
-    this.onDidChangeTreeDataEmitter.fire();
+    this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
   public getTreeItem(element: BookmarkTreeItem): vscode.TreeItem {
@@ -618,7 +618,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     // FIXME: this should fire with the ObsServerTreeElement or the MyBookmarksElement
     // NOTE: this must not fire with the ProjectTreeElement, as that one doesn't
     // exist yet and thus will result in nothing happening
-    this.onDidChangeTreeDataEmitter.fire();
+    this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
   public async removeBookmark(element?: BookmarkTreeItem): Promise<void> {

@@ -189,7 +189,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
   }
 
   public refresh(): void {
-    this.onDidChangeTreeDataEmitter.fire();
+    this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
   public getTreeItem(element: RepositoryElement): vscode.TreeItem {

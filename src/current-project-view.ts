@@ -121,7 +121,7 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
   }
 
   public refresh(): void {
-    this.onDidChangeTreeDataEmitter.fire();
+    this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
   public getTreeItem(element: ProjectTreeItem): vscode.TreeItem {
