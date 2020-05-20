@@ -46,7 +46,8 @@ install:
 script:
   # try hard to install the packages
   - yarn install || yarn install || yarn install
-  - yarn run coverage
+  - mkdir tmpdir
+  - TMPDIR=$(realpath ./tmpdir) yarn run coverage
 cache:
   yarn: true
   apt: true

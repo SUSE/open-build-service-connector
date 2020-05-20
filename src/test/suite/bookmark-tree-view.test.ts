@@ -130,7 +130,7 @@ class BookmarkedProjectsTreeProviderFixture extends ProjectViewFixture {
     initialBookmarks: [ApiUrl, obs_ts.Project[]][] = []
   ): Promise<BookmarkedProjectsTreeProvider> {
     this.globalStoragePath = await fsPromises.mkdtemp(
-      `${tmpdir()}${sep}obs-connector`
+      `${process.env.TMPDIR ?? tmpdir()}${sep}obs-connector`
     );
     // in case there is a projectBookmarkManager, dispose it, so that the
     // commands are unregistered
