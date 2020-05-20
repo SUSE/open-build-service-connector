@@ -1,14 +1,41 @@
 language: node_js
 os:
-  - osx
+  # - osx
   - linux
 node_js:
   - 10
   - 12
   - 13
-
+env:
+  - VSCODE_VERSION="1.37.0"
+  - VSCODE_VERSION="1.37.1"
+  - VSCODE_VERSION="1.38.0"
+  - VSCODE_VERSION="1.38.1"
+  - VSCODE_VERSION="1.39.0"
+  - VSCODE_VERSION="1.39.1"
+  - VSCODE_VERSION="1.39.2"
+  - VSCODE_VERSION="1.40.0"
+  - VSCODE_VERSION="1.40.1"
+  - VSCODE_VERSION="1.41.0"
+  - VSCODE_VERSION="1.41.1"
+  - VSCODE_VERSION="1.42.0"
+  - VSCODE_VERSION="1.42.1"
+  - VSCODE_VERSION="1.43.0"
+  - VSCODE_VERSION="1.43.1"
+  - VSCODE_VERSION="1.43.2"
+  - VSCODE_VERSION="1.44.0"
+  - VSCODE_VERSION="1.44.1"
+  - VSCODE_VERSION="1.44.2"
+  - VSCODE_VERSION="1.45.0"
+  - VSCODE_VERSION="1.45.1"
+  - VSCODE_VERSION="insiders"
 services:
   - docker
+addons:
+  apt:
+    packages:
+      - libsecret-1-dev
+      - jq
 
 install:
   - |
@@ -17,7 +44,26 @@ install:
       /usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
     fi
 script:
-  - |
-    yarn install
-    yarn run coverage
-cache: yarn
+  # try hard to install the packages
+  - yarn install || yarn install || yarn install
+  - yarn run coverage
+cache:
+  yarn: true
+  apt: true
+  directories:
+    - "./.vscode-test"
+
+jobs:
+  include:
+    - name: test mocklibsecret
+      os: linux
+      before_script:
+        - apt-get -y install meson gcc ninja libsecret-1-dev libglib2.0-dev python3
+      script:
+        - mkdir -p mocklibsecret/build
+        - pushd mocklibsecret/build
+        - meson ..
+        - ninja
+        - cd ..
+        - ./run_tests.py
+        - popd
