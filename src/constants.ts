@@ -21,3 +21,9 @@
 
 /** First part of the identifier of commands contributed by this extension */
 export const cmdPrefix = "vscodeObs";
+
+/**
+ * We want all input boxes to ignore loosing focus (imho terrible to have this
+ * default to false).
+ */
+export const ignoreFocusOut = true;

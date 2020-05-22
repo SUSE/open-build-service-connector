@@ -32,7 +32,7 @@ import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
 import { LoggingBase } from "./base-components";
-import { cmdPrefix } from "./constants";
+import { cmdPrefix, ignoreFocusOut } from "./constants";
 import { logAndReportExceptions, setDifference } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 
@@ -600,12 +600,6 @@ export interface AccountManager extends vscode.Disposable {
   /** Currently active accounts with a valid password */
   readonly activeAccounts: ActiveAccounts;
 }
-
-/**
- * We want all input boxes to ignore loosing focus (imho terrible to have this
- * default to false).
- */
-const ignoreFocusOut = true;
 
 /**
  * Class providing the user facing commands for OBS account management and the
