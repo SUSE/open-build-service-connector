@@ -24,15 +24,17 @@ import { join } from "path";
 import * as pino from "pino";
 import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
+import { ActivePackageWatcher } from "./active-package-watcher";
 import { BookmarkedProjectsTreeProvider } from "./bookmark-tree-view";
 import { CurrentProjectTreeProvider } from "./current-project-view";
+import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 import { ObsServerInformation } from "./instance-info";
 import { RemotePackageFileContentProvider } from "./package-file-contents";
 import { ProjectBookmarkManager } from "./project-bookmarks";
 import { RepositoryTreeProvider } from "./repository";
-import { PackageScm, PackageScmHistoryTree } from "./vcs";
+import { PackageScmHistoryTree } from "./scm-history";
+import { PackageScm } from "./vcs";
 import { ActiveProjectWatcherImpl } from "./workspace";
-import { EmptyDocumentProvider } from "./empty-file-provider";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -59,14 +61,18 @@ export async function activate(
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
-  const [projectBookmarks, actProjWatcher, packageScm] = await Promise.all([
+  const [
+    projectBookmarks,
+    actProjWatcher,
+    activePackageWatcher
+  ] = await Promise.all([
     ProjectBookmarkManager.createProjectBookmarkManager(
       context,
       accountManager,
       logger
     ),
     ActiveProjectWatcherImpl.createActiveProjectWatcher(accountManager, logger),
-    PackageScm.createPackageScm(accountManager, logger)
+    ActivePackageWatcher.createActivePackageWatcher(accountManager, logger)
   ]);
 
   const bookmarkedProjectsTreeProvider = new BookmarkedProjectsTreeProvider(
@@ -101,7 +107,8 @@ export async function activate(
     showCollapseAll,
     treeDataProvider: repoTreeProvider
   });
-  const packageScmHistoryTreeProvider = new PackageScmHistoryTree(
+  const packageScmHistoryTreeProvider = await PackageScmHistoryTree.createPackageScmHistoryTree(
+    activePackageWatcher,
     accountManager,
     logger
   );
@@ -121,10 +128,10 @@ export async function activate(
     accountManager,
     bookmarkedProjectsTree,
     pkgFileProv,
-    packageScm,
+    new PackageScm(activePackageWatcher, accountManager, logger),
     packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
-    new EmptyDocumentProvider(),
+    new EmptyDocumentForDiffProvider(),
     vscode.commands.registerCommand(
       "obsRepository.addArchitecturesToRepo",
       repoTreeProvider.addArchitecturesToRepo,

@@ -24,10 +24,18 @@ import { DisposableBase } from "./base-components";
 
 export const EMPTY_DOCUMENT_SCHEME = "vscodeObsEmptyFile";
 
-export class EmptyDocumentProvider extends DisposableBase
+export function fsPathFromEmptyDocumentUri(
+  uri: vscode.Uri
+): string | undefined {
+  return uri.scheme === EMPTY_DOCUMENT_SCHEME
+    ? uri.with({ scheme: "file" }).fsPath
+    : undefined;
+}
+
+export class EmptyDocumentForDiffProvider extends DisposableBase
   implements vscode.TextDocumentContentProvider {
-  public static buildUri(fileName: string): vscode.Uri {
-    return vscode.Uri.parse(`${EMPTY_DOCUMENT_SCHEME}://${fileName}`);
+  public static buildUri(path: string): vscode.Uri {
+    return vscode.Uri.file(path).with({ scheme: EMPTY_DOCUMENT_SCHEME });
   }
 
   constructor() {

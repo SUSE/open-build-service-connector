@@ -24,21 +24,17 @@ import { promises as fsPromises } from "fs";
 import {
   addAndDeleteFilesFromPackage,
   commit,
-  fetchHistory,
   FileState,
-  ModifiedPackage,
-  Package,
-  pathExists,
-  readInModifiedPackageFromDir,
-  Revision
+  ModifiedPackage
 } from "open-build-service-api";
-import { basename, dirname, join, relative, sep } from "path";
+import { basename, dirname, join, sep } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
+import { ActivePackageWatcher } from "./active-package-watcher";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix } from "./constants";
-import { EmptyDocumentProvider } from "./empty-file-provider";
+import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 
 interface LineChange {
   readonly originalStartLineNumber: number;
@@ -63,285 +59,49 @@ export const SHOW_DIFF_COMMAND = `${cmdPrefix}.${cmdId}.showDiff`;
 
 export const SHOW_DIFF_FROM_URI_COMMAND = `${cmdPrefix}.${cmdId}.showDiffFromUri`;
 
-export const SET_CURRENT_PKG_OF_HISTORY_TREE_COMMAND = `${cmdPrefix}.${cmdId}.setCurrentPackage`;
-
-export const SET_CURRENT_PKG_OF_HISTORY_TREE_FROM_EDITOR_COMMAND = `${cmdPrefix}.${cmdId}.setCurrentPackageFromEditor`;
-
 /**
  * URI scheme for to get the file contents at HEAD for files under version
  * control.
  */
 export const OBS_FILE_AT_HEAD_SCHEME = "vscodeObsFileAtHead";
 
-class PackageCache extends ConnectionListenerLoggerBase {
-  public static async createPackageCache(
-    accountManager: AccountManager,
-    logger: Logger
-  ): Promise<PackageCache> {
-    const pkgCache = new PackageCache(accountManager, logger);
-
-    await Promise.all(
-      vscode.window.visibleTextEditors.map((editor) => {
-        return pkgCache.registerTextEditor(editor);
-      })
-    );
-
-    pkgCache.activePackage = pkgCache.getPkg(vscode.window.activeTextEditor);
-
-    pkgCache.disposables.push(
-      vscode.window.onDidChangeVisibleTextEditors(async function (
-        this: PackageCache,
-        editors
-      ) {
-        const presentEditorPaths = [...this.modifiedPackageMap.keys()];
-
-        await Promise.all(
-          editors.map(async function (this: PackageCache, editor) {
-            const path = dirname(editor.document.uri.fsPath);
-            if (!this.modifiedPackageMap.has(path)) {
-              await this.registerTextEditor(editor);
-            }
-
-            const curPathIndex = presentEditorPaths.indexOf(path);
-            if (curPathIndex !== -1) {
-              presentEditorPaths.splice(curPathIndex, 1);
-            }
-          }, this)
-        );
-
-        // all paths left in this array are no longer used text editors and need
-        // to me removed
-        presentEditorPaths.forEach((presentPath) => {
-          this.removePkgFromMap(presentPath);
-        });
-      },
-      pkgCache),
-
-      vscode.window.onDidChangeActiveTextEditor(async function (
-        this: PackageCache,
-        editor
-      ) {
-        let modPkgAndFsWatcher:
-          | undefined
-          | [ModifiedPackage, vscode.FileSystemWatcher];
-
-        if (editor !== undefined) {
-          const path = dirname(editor.document.uri.fsPath);
-          if (this.modifiedPackageMap.has(path)) {
-            modPkgAndFsWatcher = this.modifiedPackageMap.get(path);
-          } else {
-            await this.registerTextEditor(editor);
-            modPkgAndFsWatcher = this.modifiedPackageMap.get(path);
-            // editor doesn't have to belong to a osc package, so
-            // modPkgAndFsWatcher can be undefined here
-          }
-        }
-        modPkgAndFsWatcher !== undefined
-          ? this.fireActivePackageEvent(modPkgAndFsWatcher[0])
-          : this.fireActivePackageEvent(undefined);
-      },
-      pkgCache)
-    );
-
-    return pkgCache;
-  }
-
-  public onDidChangeActivePackage: vscode.Event<ModifiedPackage | undefined>;
-
-  public activePackage: ModifiedPackage | undefined;
-
-  private modifiedPackageMap: Map<
-    string,
-    [ModifiedPackage, vscode.FileSystemWatcher]
-  > = new Map();
-
-  private onDidChangeActivePackageEmitter: vscode.EventEmitter<
-    ModifiedPackage | undefined
-  > = new vscode.EventEmitter();
-
-  private constructor(accountManager: AccountManager, logger: Logger) {
-    super(accountManager, logger);
-    this.onDidChangeActivePackage = this.onDidChangeActivePackageEmitter.event;
-    this.disposables.push(this.onDidChangeActivePackageEmitter);
-  }
-
-  public dispose(): void {
-    for (const pkgAndFsWatcher of this.modifiedPackageMap.values()) {
-      pkgAndFsWatcher[1].dispose();
-    }
-    super.dispose();
-  }
-
-  public getPkg(
-    editor: vscode.TextEditor | undefined
-  ): ModifiedPackage | undefined {
-    if (
-      editor === undefined ||
-      (editor.document.uri.scheme !== "file" &&
-        editor.document.uri.scheme !== OBS_FILE_AT_HEAD_SCHEME)
-    ) {
-      return undefined;
-    }
-    // we want to also return a package if the user views the diff
-    // const fsPath = editor.document.uri.scheme === "file" ? editor.document.uri.fsPath :
-    const modPkgAndWatcher = this.modifiedPackageMap.get(
-      dirname(editor.document.uri.fsPath)
-    );
-    return modPkgAndWatcher === undefined ? undefined : modPkgAndWatcher[0];
-  }
-
-  private fireActivePackageEvent(pkg: ModifiedPackage | undefined) {
-    this.activePackage = pkg;
-    this.onDidChangeActivePackageEmitter.fire(pkg);
-  }
-
-  private insertPkgIntoMap(pkg: ModifiedPackage): void {
-    if (this.modifiedPackageMap.has(pkg.path)) {
-      this.updatePkgInMap(pkg);
-      return;
-    }
-
-    const wsFolder = vscode.workspace.getWorkspaceFolder(
-      vscode.Uri.file(pkg.path)
-    );
-    if (wsFolder === undefined) {
-      this.logger.error(
-        "Cannot get workspace folder from package %s/%s in path: %s",
-        pkg.projectName,
-        pkg.name,
-        pkg.path
-      );
-      return;
-    }
-    const relPath = relative(wsFolder.uri.fsPath, pkg.path);
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(wsFolder, `${relPath}/**`)
-    );
-    const pkgUpdate = async function (this: PackageCache, uri: vscode.Uri) {
-      if (uri.scheme !== "file") {
-        // shouldn't happen
-        this.logger.error(
-          "file system watcher received a non file uri: %s",
-          uri.toString()
-        );
-        return;
-      }
-      const oldPkgAndWatcher = this.modifiedPackageMap.get(pkg.path);
-      if (oldPkgAndWatcher !== undefined) {
-        let newPkg: ModifiedPackage;
-        try {
-          newPkg = await readInModifiedPackageFromDir(pkg.path);
-        } catch (err) {
-          this.logger.error(
-            "Failed to read in the package at '%s', got: %s",
-            pkg.path,
-            err.toString()
-          );
-          this.removePkgFromMap(pkg.path);
-          return;
-        }
-        assert(newPkg !== undefined);
-        this.updatePkgInMap(newPkg);
-      }
-    };
-    watcher.onDidChange(pkgUpdate, this);
-    watcher.onDidCreate(pkgUpdate, this);
-    watcher.onDidDelete(pkgUpdate, this);
-
-    this.modifiedPackageMap.set(pkg.path, [pkg, watcher]);
-  }
-
-  private removePkgFromMap(pkgOrPath: ModifiedPackage | string): void {
-    const key = typeof pkgOrPath === "string" ? pkgOrPath : pkgOrPath.path;
-    const pkgAndWatcher = this.modifiedPackageMap.get(key);
-    const deleteRes = this.modifiedPackageMap.delete(key);
-    if (pkgAndWatcher !== undefined) {
-      pkgAndWatcher[1].dispose();
-    }
-    if (this.activePackage?.path === key) {
-      this.fireActivePackageEvent(undefined);
-    }
-    assert(
-      deleteRes === (pkgAndWatcher !== undefined),
-      "Deletion of the package must succeed when we were able to retrieve it"
-    );
-  }
-
-  private updatePkgInMap(pkg: ModifiedPackage): void {
-    const pkgAndWatcher = this.modifiedPackageMap.get(pkg.path);
-    if (pkgAndWatcher === undefined) {
-      throw new Error(
-        `cannot update package ${pkg.name} in the map, it is not present`
-      );
-    }
-    this.modifiedPackageMap.set(pkg.path, [pkg, pkgAndWatcher[1]]);
-    if (pkg.path === this.activePackage?.path) {
-      this.fireActivePackageEvent(pkg);
-    }
-  }
-
-  private async registerTextEditor(editor: vscode.TextEditor): Promise<void> {
-    if (editor.document.uri.scheme !== "file") {
-      return;
-    }
-    const dir = dirname(editor.document.uri.fsPath);
-    if (!(await pathExists(join(dir, ".osc")))) {
-      return;
-    }
-    try {
-      const modPkg = await readInModifiedPackageFromDir(dir);
-      this.insertPkgIntoMap(modPkg);
-    } catch (err) {
-      this.logger.trace(
-        "Tried to read in a package from %s but got the error: %s",
-        dir,
-        err.toString()
-      );
-      return;
-    }
-  }
+export function fsPathFromFileAtHeadUri(uri: vscode.Uri): string | undefined {
+  return uri.scheme === OBS_FILE_AT_HEAD_SCHEME
+    ? uri.with({ scheme: "file" }).fsPath
+    : undefined;
 }
+
+export const fileAtHeadUri = {
+  URI_SCHEME: OBS_FILE_AT_HEAD_SCHEME,
+  getFsPath: fsPathFromFileAtHeadUri
+};
 
 export class PackageScm extends ConnectionListenerLoggerBase
   implements vscode.QuickDiffProvider, vscode.TextDocumentContentProvider {
-  public static async createPackageScm(
-    accountManager: AccountManager,
-    logger: Logger
-  ): Promise<PackageScm> {
-    const pkgScm = new PackageScm(accountManager, logger);
-
-    pkgScm.pkgCache = await PackageCache.createPackageCache(
-      accountManager,
-      logger
-    );
-
-    pkgScm.disposables.push(
-      pkgScm.pkgCache.onDidChangeActivePackage(function (
-        this: PackageScm,
-        _modPkg
-      ) {
-        this.updateScm();
-      },
-      pkgScm),
-      pkgScm.pkgCache
-    );
-
-    pkgScm.updateScm();
-
-    return pkgScm;
-  }
-
-  private pkgCache?: PackageCache;
-
   private activePackage: ModifiedPackage | undefined;
 
   private curScm: vscode.SourceControl | undefined;
 
   private scmDisposable: vscode.Disposable | undefined;
 
-  private constructor(accountManager: AccountManager, logger: Logger) {
+  constructor(
+    private readonly activePackageWatcher: ActivePackageWatcher,
+    accountManager: AccountManager,
+    logger: Logger
+  ) {
     super(accountManager, logger);
+
+    this.updateScm();
+
     this.disposables.push(
+      this.activePackageWatcher.onDidChangeActivePackage(function (
+        this: PackageScm,
+        _modPkg
+      ) {
+        this.updateScm();
+      },
+      this),
+      this.activePackageWatcher,
       vscode.commands.registerCommand(
         REVERT_CHANGE_COMMAND,
         this.revertChange,
@@ -371,11 +131,6 @@ export class PackageScm extends ConnectionListenerLoggerBase
       ),
       vscode.workspace.registerTextDocumentContentProvider(
         OBS_FILE_AT_HEAD_SCHEME,
-        this
-      ),
-      vscode.commands.registerCommand(
-        SET_CURRENT_PKG_OF_HISTORY_TREE_FROM_EDITOR_COMMAND,
-        this.setCurrentPackageFromEditor,
         this
       )
     );
@@ -448,9 +203,9 @@ export class PackageScm extends ConnectionListenerLoggerBase
     if (fileState === FileState.ToBeAdded) {
       await vscode.commands.executeCommand(
         "vscode.diff",
-        EmptyDocumentProvider.buildUri(fname),
+        EmptyDocumentForDiffProvider.buildUri(uri.fsPath),
         uri,
-        `New File: ${fname}`
+        `${fname} (New File)`
       );
     } else {
       const orig = this.getUriOfOriginalResource(uri);
@@ -469,18 +224,16 @@ export class PackageScm extends ConnectionListenerLoggerBase
         await vscode.commands.executeCommand(
           "vscode.diff",
           orig,
-          EmptyDocumentProvider.buildUri(fname),
-          `File ${fname} ${
-            fileState === FileState.ToBeDeleted
-              ? "will be deleted"
-              : "is missing"
-          }`
+          EmptyDocumentForDiffProvider.buildUri(uri.fsPath),
+          `${fname} (${
+            fileState === FileState.ToBeDeleted ? "to be deleted" : "missing"
+          })`
         );
       } else {
         await vscode.commands.executeCommand(
           "vscode.diff",
           orig,
-          EmptyDocumentProvider.buildUri(fname),
+          uri,
           `${fname} (Working Tree)`
         );
       }
@@ -736,10 +489,12 @@ export class PackageScm extends ConnectionListenerLoggerBase
 
   private updateScm(): void {
     this.curScm?.dispose();
-    this.activePackage = this.pkgCache!.activePackage;
+    this.activePackage = this.activePackageWatcher.activePackage;
 
-    if (this.pkgCache!.activePackage !== undefined) {
-      this.curScm = this.scmFromModifiedPackage(this.pkgCache!.activePackage);
+    if (this.activePackageWatcher.activePackage !== undefined) {
+      this.curScm = this.scmFromModifiedPackage(
+        this.activePackageWatcher.activePackage
+      );
     }
   }
 
@@ -797,247 +552,5 @@ export class PackageScm extends ConnectionListenerLoggerBase
     };
 
     return obsScm;
-  }
-
-  @logAndReportExceptions(true)
-  private async setCurrentPackageFromEditor(): Promise<void> {
-    if (this.activePackage !== undefined) {
-      await vscode.commands.executeCommand(
-        SET_CURRENT_PKG_OF_HISTORY_TREE_COMMAND,
-        this.activePackage
-      );
-    }
-  }
-}
-
-export class HistoryRootTreeElement extends vscode.TreeItem {
-  public contextValue = "historyRoot";
-
-  constructor(pkg: Package) {
-    super(
-      `${pkg.projectName}/${pkg.name}`,
-      vscode.TreeItemCollapsibleState.Expanded
-    );
-  }
-}
-
-export class CommitTreeElement extends vscode.TreeItem {
-  public contextValue = "commit";
-
-  public iconPath = new vscode.ThemeIcon("git-commit");
-
-  constructor(public readonly rev: Revision, public readonly apiUrl: string) {
-    super(
-      `${rev.revision}: ${
-        rev.commitMessage === undefined
-          ? "no commit message available"
-          : rev.commitMessage.split("\n")[0]
-      }`,
-      vscode.TreeItemCollapsibleState.None
-    );
-    this.command = {
-      arguments: [this],
-      command: OPEN_COMMIT_DOCUMENT_COMMAND,
-      title: "Show commit info"
-    };
-  }
-}
-
-function isCommitTreeElement(elem: vscode.TreeItem): elem is CommitTreeElement {
-  return elem.contextValue === "commit";
-}
-
-function isHistoryRootTreeElement(
-  elem: vscode.TreeItem
-): elem is HistoryRootTreeElement {
-  return elem.contextValue === "historyRoot";
-}
-
-type HistoryTreeItem = CommitTreeElement | HistoryRootTreeElement;
-
-export const OBS_REVISION_FILE_SCHEME = "vscodeObsCommit";
-
-export const OPEN_COMMIT_DOCUMENT_COMMAND = `${cmdPrefix}.${cmdId}.openCommitDocument`;
-
-export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
-  implements
-    vscode.TreeDataProvider<HistoryTreeItem>,
-    vscode.TextDocumentContentProvider {
-  private static commitToUri(rev: Revision, apiUrl: string): vscode.Uri {
-    const baseUri = `${OBS_REVISION_FILE_SCHEME}://${rev.revisionHash}/${rev.projectName}/${rev.packageName}/?${apiUrl}`;
-    return vscode.Uri.parse(baseUri);
-  }
-
-  public onDidChangeTreeData: vscode.Event<HistoryTreeItem | undefined>;
-
-  private onDidChangeTreeDataEmitter: vscode.EventEmitter<
-    HistoryTreeItem | undefined
-  > = new vscode.EventEmitter();
-
-  private currentPackage: Package | undefined = undefined;
-  private currentHistory: readonly Revision[] | undefined = undefined;
-
-  constructor(accountManager: AccountManager, logger: Logger) {
-    super(accountManager, logger);
-    this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
-
-    this.disposables.push(
-      vscode.commands.registerCommand(
-        SET_CURRENT_PKG_OF_HISTORY_TREE_COMMAND,
-        this.setCurrentPackage,
-        this
-      ),
-      vscode.commands.registerCommand(
-        OPEN_COMMIT_DOCUMENT_COMMAND,
-        this.openCommitDocument,
-        this
-      ),
-      vscode.workspace.registerTextDocumentContentProvider(
-        OBS_REVISION_FILE_SCHEME,
-        this
-      )
-    );
-  }
-
-  public async provideTextDocumentContent(
-    uri: vscode.Uri,
-    token: vscode.CancellationToken
-  ): Promise<string | undefined> {
-    const rev = await this.commitFromUri(uri);
-
-    if (token.isCancellationRequested) {
-      return undefined;
-    }
-    let content = `r${rev.revision} | ${rev.userId} | ${rev.commitTime} | ${rev.revisionHash}`;
-    if (rev.version !== undefined) {
-      content = content.concat(" | ", rev.version);
-    }
-    if (rev.requestId !== undefined) {
-      content = content.concat(" | rq", rev.requestId.toString());
-    }
-    content = content.concat(
-      `
-`,
-      rev.commitMessage ?? "No commit message available"
-    );
-
-    return content;
-  }
-
-  public getTreeItem(element: HistoryTreeItem): vscode.TreeItem {
-    return element;
-  }
-
-  public getChildren(element?: HistoryTreeItem): HistoryTreeItem[] {
-    if (this.currentPackage === undefined) {
-      return [];
-    }
-    if (element === undefined) {
-      return [new HistoryRootTreeElement(this.currentPackage)];
-    }
-
-    assert(isHistoryRootTreeElement(element));
-    if (this.currentHistory === undefined) {
-      this.logger.error("currentPackage is set, but no history is present");
-      return [];
-    }
-    return this.currentHistory.map(
-      (rev) => new CommitTreeElement(rev, this.currentPackage!.apiUrl)
-    );
-  }
-
-  private async commitFromUri(uri: vscode.Uri): Promise<Revision> {
-    if (uri.scheme !== OBS_REVISION_FILE_SCHEME) {
-      throw new Error(
-        `cannot extract a Revision from the uri '${uri}', invalid scheme: ${uri.scheme}, expected ${OBS_REVISION_FILE_SCHEME}`
-      );
-    }
-
-    const revisionHash = uri.authority;
-    const apiUrl = uri.query;
-    const projAndPkg = uri.path;
-
-    const projAndPkgArr = projAndPkg.split("/");
-    if (projAndPkgArr.length < 2 || projAndPkgArr.length > 4) {
-      throw new Error(
-        `Invalid Uri '${uri}', expected project and package name as part of the path.`
-      );
-    }
-
-    const firstIndex = projAndPkgArr[0] === "" ? 1 : 0;
-    const projectName = projAndPkgArr[firstIndex];
-    const packageName = projAndPkgArr[firstIndex + 1];
-
-    let hist: readonly Revision[];
-    if (
-      this.currentPackage !== undefined &&
-      this.currentPackage.apiUrl === apiUrl &&
-      this.currentPackage.projectName === projectName &&
-      this.currentPackage.name === packageName &&
-      this.currentHistory !== undefined
-    ) {
-      hist = this.currentHistory;
-    } else {
-      const con = this.activeAccounts.getConfig(apiUrl)?.connection;
-      if (con === undefined) {
-        throw new Error(
-          `cannot retrieve the history of the package ${projectName}/${packageName} from ${apiUrl}: no account is configured`
-        );
-      }
-      hist = await fetchHistory(con, {
-        apiUrl,
-        name: packageName,
-        projectName
-      });
-    }
-    const foundRev = hist.find((rev) => rev.revisionHash === revisionHash);
-    if (foundRev === undefined) {
-      throw new Error(
-        `cannot retrieve revision ${revisionHash} of package ${projectName}/${packageName} from ${apiUrl}: revision does not exist`
-      );
-    }
-    return foundRev;
-  }
-
-  private async openCommitDocument(element?: vscode.TreeItem): Promise<void> {
-    if (element === undefined || !isCommitTreeElement(element)) {
-      return;
-    }
-    const uri = PackageScmHistoryTree.commitToUri(
-      element.rev,
-      this.currentPackage!.apiUrl
-    );
-    const document = await vscode.workspace.openTextDocument(uri);
-    await vscode.window.showTextDocument(document, { preview: false });
-  }
-
-  private async setCurrentPackage(pkg?: Package): Promise<void> {
-    if (pkg === undefined) {
-      this.logger.error("setCurrentPackage called without the pkg parameter");
-      return;
-    }
-    const con = this.activeAccounts.getConfig(pkg.apiUrl)?.connection;
-    if (con === undefined) {
-      throw new Error(
-        `cannot fetch history for ${pkg.projectName}/${pkg.name}: no account is configured for the API ${pkg.apiUrl}`
-      );
-    }
-
-    try {
-      this.currentHistory = await fetchHistory(con, pkg);
-      this.currentPackage = pkg;
-      this.onDidChangeTreeDataEmitter.fire(undefined);
-    } catch (err) {
-      this.logger.error(
-        "Failed to load history of %s/%s from %s, got error: %s",
-        pkg.projectName,
-        pkg.name,
-        pkg.apiUrl,
-        err.toString()
-      );
-      throw new Error(
-        `cannot fetch history for ${pkg.projectName}/${pkg.name}: communication error`
-      );
-    }
   }
 }
