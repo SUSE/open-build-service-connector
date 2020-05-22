@@ -32,6 +32,7 @@ import {
 } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix } from "./constants";
+import { logAndReportExceptions } from "./decorators";
 import { SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND } from "./package-file-contents";
 import {
   ChangedObject,
@@ -51,11 +52,7 @@ import {
   ProjectTreeElement,
   ProjectTreeItem
 } from "./project-view";
-import {
-  logAndReportExceptions,
-  logAndReportExceptionsWrapper,
-  logException
-} from "./util";
+import { logException } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 
 const cmdId = "obsProject";

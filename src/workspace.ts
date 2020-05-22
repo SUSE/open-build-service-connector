@@ -38,13 +38,13 @@ import {
   LocalProjectTreeElement,
   LOCAL_PROJECT_TREE_ELEMENT_CTX_VAL
 } from "./current-project-view";
+import { logAndReportExceptions } from "./decorators";
 import {
   OBS_PACKAGE_FILE_URI_SCHEME,
   RemotePackageFileContentProvider
 } from "./package-file-contents";
 import { GET_BOOKMARKED_PROJECT_COMMAND } from "./project-bookmarks";
 import { ProjectTreeItem } from "./project-view";
-import { logAndReportExceptions } from "./util";
 
 export const UPDATE_CHECKEDOUT_PROJECT_CMD = `${cmdPrefix}.obsProject.updateCheckedOutProject`;
 

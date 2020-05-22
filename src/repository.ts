@@ -34,8 +34,9 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ValidAccount } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
+import { logAndReportExceptions } from "./decorators";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
-import { deepCopyProperties, logAndReportExceptions } from "./util";
+import { deepCopyProperties } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 import { ActiveProjectWatcher } from "./workspace";
 

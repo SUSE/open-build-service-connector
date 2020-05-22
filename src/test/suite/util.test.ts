@@ -21,21 +21,14 @@
 
 import { expect, should } from "chai";
 import { afterEach, beforeEach, Context, describe, it } from "mocha";
-import { Logger } from "pino";
-import { assert, createSandbox, SinonSandbox, SinonStub, stub } from "sinon";
-import { LoggingBase } from "../../base-components";
+import { assert, SinonStub, stub } from "sinon";
 import {
   deepCopyProperties,
   loadMapFromMemento,
-  logAndReportExceptions,
   saveMapToMemento,
   setDifference
 } from "../../util";
-import {
-  castToAsyncFunc,
-  castToFunc,
-  createStubbedVscodeWindow
-} from "./test-utils";
+import { castToAsyncFunc, castToFunc } from "./test-utils";
 
 should();
 
@@ -158,179 +151,5 @@ describe("utilities", () => {
         .to.deep.equal({ foo: "bar" })
         .and.to.not.have.property("baz");
     });
-  });
-
-  describe("#logAndReportExceptions", () => {
-    class ClassMakingApiCalls extends LoggingBase {
-      public readonly sandbox: SinonSandbox;
-      public loggingStub: { error: SinonStub };
-      public readonly vscodeWindow: ReturnType<
-        typeof createStubbedVscodeWindow
-      >;
-
-      constructor() {
-        const sandbox = createSandbox();
-        const loggingStub = { error: sandbox.stub() };
-        super((loggingStub as any) as Logger);
-        this.loggingStub = loggingStub;
-        this.sandbox = sandbox;
-        this.vscodeWindow = createStubbedVscodeWindow(this.sandbox);
-      }
-
-      @logAndReportExceptions()
-      public async doesNothingOrThrowsAsync(
-        throwUp: boolean,
-        exception?: any
-      ): Promise<number> {
-        if (throwUp) {
-          throw exception ?? new Error("Barf");
-        }
-        return 42;
-      }
-
-      @logAndReportExceptions()
-      public doesNothingOrThrows(throwUp: boolean): boolean {
-        if (throwUp) {
-          throw new Error("Tripple Barf");
-        }
-        return false;
-      }
-
-      @logAndReportExceptions(false)
-      public async decoratedButNoUserReport(throwUp: boolean) {
-        if (throwUp) {
-          throw new Error("BarfBarf");
-        }
-      }
-    }
-
-    type TestClassCtx = Context & { testClass: ClassMakingApiCalls };
-
-    beforeEach(function () {
-      this.testClass = new ClassMakingApiCalls();
-    });
-
-    afterEach(function () {
-      this.testClass.sandbox.restore();
-    });
-
-    it(
-      "reports the thrown exception",
-      castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass.doesNothingOrThrowsAsync(true).should.be.fulfilled;
-
-        assert.calledOnce(this.testClass.loggingStub.error);
-        assert.calledOnce(this.testClass.vscodeWindow.showErrorMessage);
-
-        // need to compare the errors by their .toString() as the Error class
-        // includes the current call stack
-        expect(
-          this.testClass.loggingStub.error.getCall(0).args[0].toString()
-        ).to.deep.equal(Error("Barf").toString());
-
-        const errMsg = "Error: Barf";
-        assert.calledWith(
-          this.testClass.vscodeWindow.showErrorMessage.firstCall,
-          errMsg
-        );
-      })
-    );
-
-    it(
-      "reports the thrown ApiError in a more readable fashion",
-      castToAsyncFunc<TestClassCtx>(async function () {
-        const summary = "package not found";
-        const err = {
-          status: { summary }
-        };
-        await this.testClass.doesNothingOrThrowsAsync(
-          true,
-          err
-        ).should.be.fulfilled;
-
-        const errMsg = `Error performing API call: ${summary}`;
-        assert.calledWith(this.testClass.loggingStub.error.firstCall, err);
-        assert.calledWith(
-          this.testClass.vscodeWindow.showErrorMessage.firstCall,
-          errMsg
-        );
-      })
-    );
-
-    it(
-      "does nothing when no exception is thrown",
-      castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass.doesNothingOrThrowsAsync(
-          false
-        ).should.be.fulfilled;
-
-        assert.notCalled(this.testClass.loggingStub.error);
-        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
-      })
-    );
-
-    it(
-      "does not report the exception to the user but logs it",
-      castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass.decoratedButNoUserReport(true).should.be.fulfilled;
-
-        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
-
-        assert.calledOnce(this.testClass.loggingStub.error);
-        expect(
-          this.testClass.loggingStub.error.getCall(0).args[0].toString()
-        ).to.deep.equal(Error("BarfBarf").toString());
-      })
-    );
-
-    it(
-      "reports exception for non-async functions",
-      castToFunc<TestClassCtx>(function () {
-        this.testClass.doesNothingOrThrows(true);
-
-        assert.calledOnce(this.testClass.vscodeWindow.showErrorMessage);
-
-        assert.calledOnce(this.testClass.loggingStub.error);
-        expect(
-          this.testClass.loggingStub.error.getCall(0).args[0].toString()
-        ).to.deep.equal(Error("Tripple Barf").toString());
-      })
-    );
-
-    it(
-      "correctly returns the return value if the method does not throw",
-      castToFunc<TestClassCtx>(async function () {
-        await this.testClass
-          .doesNothingOrThrows(false)
-          .should.be.fulfilled.and.eventually.equal(false);
-
-        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
-        assert.notCalled(this.testClass.loggingStub.error);
-      })
-    );
-
-    it(
-      "correctly returns the returned Promise value if the method does not throw",
-      castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass
-          .doesNothingOrThrowsAsync(false)
-          .should.be.fulfilled.and.eventually.equal(42);
-
-        assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
-        assert.notCalled(this.testClass.loggingStub.error);
-      })
-    );
-
-    it(
-      "returns undefined if the method throws",
-      castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass
-          .doesNothingOrThrows(true)
-          .should.be.fulfilled.and.eventually.equal(undefined);
-        await this.testClass
-          .doesNothingOrThrowsAsync(true)
-          .should.be.fulfilled.and.eventually.equal(undefined);
-      })
-    );
   });
 });

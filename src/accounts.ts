@@ -33,7 +33,8 @@ import { URL } from "url";
 import * as vscode from "vscode";
 import { LoggingBase } from "./base-components";
 import { cmdPrefix, ignoreFocusOut } from "./constants";
-import { logAndReportExceptions, setDifference } from "./util";
+import { logAndReportExceptions } from "./decorators";
+import { setDifference } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 
 /**

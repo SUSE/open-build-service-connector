@@ -39,7 +39,6 @@ import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix } from "./constants";
 import { EmptyDocumentProvider } from "./empty-file-provider";
-import { logAndReportExceptions } from "./util";
 
 interface LineChange {
   readonly originalStartLineNumber: number;
