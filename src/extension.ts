@@ -30,7 +30,9 @@ import { ObsServerInformation } from "./instance-info";
 import { RemotePackageFileContentProvider } from "./package-file-contents";
 import { ProjectBookmarkManager } from "./project-bookmarks";
 import { RepositoryTreeProvider } from "./repository";
+import { PackageScm, PackageScmHistoryTree } from "./vcs";
 import { ActiveProjectWatcherImpl } from "./workspace";
+import { EmptyDocumentProvider } from "./empty-file-provider";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -57,16 +59,14 @@ export async function activate(
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
-  const [projectBookmarks, actProjWatcher] = await Promise.all([
+  const [projectBookmarks, actProjWatcher, packageScm] = await Promise.all([
     ProjectBookmarkManager.createProjectBookmarkManager(
       context,
       accountManager,
       logger
     ),
-    await ActiveProjectWatcherImpl.createActiveProjectWatcher(
-      accountManager,
-      logger
-    )
+    ActiveProjectWatcherImpl.createActiveProjectWatcher(accountManager, logger),
+    PackageScm.createPackageScm(accountManager, logger)
   ]);
 
   const bookmarkedProjectsTreeProvider = new BookmarkedProjectsTreeProvider(
@@ -101,6 +101,14 @@ export async function activate(
     showCollapseAll,
     treeDataProvider: repoTreeProvider
   });
+  const packageScmHistoryTreeProvider = new PackageScmHistoryTree(
+    accountManager,
+    logger
+  );
+  const packageScmHistoryTree = vscode.window.createTreeView(
+    "packageScmHistoryTree",
+    { showCollapseAll, treeDataProvider: packageScmHistoryTreeProvider }
+  );
 
   const pkgFileProv = new RemotePackageFileContentProvider(
     accountManager,
@@ -113,7 +121,10 @@ export async function activate(
     accountManager,
     bookmarkedProjectsTree,
     pkgFileProv,
+    packageScm,
+    packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
+    new EmptyDocumentProvider(),
     vscode.commands.registerCommand(
       "obsRepository.addArchitecturesToRepo",
       repoTreeProvider.addArchitecturesToRepo,
@@ -152,5 +163,5 @@ export async function activate(
 
 // this method is called when your extension is deactivated
 export function deactivate() {
-  // nothing yet
+  // NOP
 }

@@ -111,11 +111,50 @@
           "command": "obsRepository.removePathFromRepo"
         }
       ],
+      "editor/title": [
+        {
+          "command": "vscodeObs.obsScm.showDiffFromUri",
+          "group": "navigation"
+        },
+        {
+          "command": "vscodeObs.obsScm.setCurrentPackageFromEditor",
+          "group": "navigation"
+        }
+      ],
       "view/title": [
         {
           "group": "navigation",
           "when": "view == repositoryTree",
           "command": "obsRepository.addRepositoryFromDistro"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "vscodeObs.obsScm.commitChanges",
+          "when": "scmProvider == obs",
+          "group": "inline"
+        }
+      ],
+      "scm/change/title": [
+        {
+          "command": "vscodeObs.obsScm.revertChange"
+        }
+      ],
+      "scm/resourceState/context": [
+        {
+          "command": "vscodeObs.obsScm.showDiff",
+          "when": "scmProvider == obs && scmResourceGroup == changes",
+          "group": "inline"
+        },
+        {
+          "command": "vscodeObs.obsScm.discardChanges",
+          "when": "scmProvider == obs && scmResourceGroup == changes",
+          "group": "inline"
+        },
+        {
+          "command": "vscodeObs.obsScm.addFile",
+          "when": "scmProvider == obs && scmResourceGroup == untracked",
+          "group": "inline"
         }
       ]
     },
@@ -192,6 +231,54 @@
         "icon": "$(refresh)",
         "title": "Update this Package and its content",
         "command": "vscodeObs.obsProject.updatePackage"
+      },
+      {
+        "command": "vscodeObs.obsScm.revertChange",
+        "title": "Revert this change",
+        "icon": "$(discard)",
+        "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.obsScm.commitChanges",
+        "title": "Commit the current changes",
+        "icon": "$(check)",
+        "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.obsScm.showDiff",
+        "title": "Show the differences to the last commit",
+        "icon": "$(git-compare)",
+        "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.obsScm.showDiffFromUri",
+        "title": "Show the differences to the last commit",
+        "icon": "$(git-compare)",
+        "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.obsScm.addFile",
+        "title": "Add this file",
+        "icon": "$(add)",
+        "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.obsScm.removeFile",
+        "title": "Remove this file",
+        "icon": "$(remove)",
+        "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.obsScm.discardChanges",
+        "title": "Discard Changes",
+        "icon": "$(discard)",
+        "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.obsScm.setCurrentPackageFromEditor",
+        "title": "Show the history of this package",
+        "icon": "$(history)",
+        "when": "scmProvider == obs"
       }
     ],
     "views": {
@@ -207,6 +294,12 @@
         {
           "name": "Repositories",
           "id": "repositoryTree"
+        }
+      ],
+      "scm": [
+        {
+          "name": "Package History",
+          "id": "packageScmHistoryTree"
         }
       ]
     },
@@ -296,7 +389,9 @@
   "activationEvents": [
     "onView:bookmarkedProjectsTree",
     "onView:currentProjectTree",
-    "onView:repositoryTree"
+    "onView:repositoryTree",
+    "workspaceContains:**/.osc",
+    "workspaceContains:**/.osc_obs_ts"
   ],
   "categories": [
     "Other"
