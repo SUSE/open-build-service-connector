@@ -51,8 +51,21 @@ jobs:
   include:
     - name: test mocklibsecret
       os: linux
+      dist: bionic
+      cache:
+        yarn: false
+        apt: true
+      addons:
+        apt:
+          packages:
+            - gcc
+            - meson
+            - ninja-build
+            - libsecret-1-dev
+            - libglib2.0-dev
+            - python3
       before_script:
-        - apt-get -y install meson gcc ninja libsecret-1-dev libglib2.0-dev python3
+        - npm install keytar
       script:
         - mkdir -p mocklibsecret/build
         - pushd mocklibsecret/build
