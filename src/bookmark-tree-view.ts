@@ -342,7 +342,6 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     }
 
     assert(false, "This code must be unreachable");
-    return [] as never;
 
     // let project: Project = isProjectTreeElement(projTreeItem)
     //   ? projTreeItem.parentProject
@@ -410,7 +409,6 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     }
 
     assert(false, "This part of the code must be unreachable");
-    return undefined;
   }
 
   /**
