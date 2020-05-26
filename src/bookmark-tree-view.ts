@@ -137,7 +137,6 @@ function isMyBookmarksElement(
 }
 
 const BOOKMARK_ICON = {
-  // FIXME: this is not really dark
   dark: join(__filename, "..", "..", "media", "dark", "bookmark_border.svg"),
   light: join(__filename, "..", "..", "media", "light", "bookmark_border.svg")
 };
@@ -342,36 +341,6 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     }
 
     assert(false, "This code must be unreachable");
-
-    // let project: Project = isProjectTreeElement(projTreeItem)
-    //   ? projTreeItem.parentProject
-    //   : isPackageTreeElement(projTreeItem)
-    //   ? projTreeItem.parent.project
-    //   : projTreeItem.parent.parent.project;
-
-    // try {
-    //   if (isProjectTreeElement(projTreeItem)) {
-    //     project = await this.bookmarkMngr.updateAndGetBookmarkedProject(
-    //       projTreeItem.parentProject,
-    //       false
-    //     );
-    //   } else if (isPackageTreeElement(projTreeItem)) {
-    //     const updatedPkg = await this.bookmarkMngr.updateAndGetBookmarkedPackage(
-    //       projTreeItem.pkg,
-    //       false
-    //     );
-    //     insertPackageIntoProject(updatedPkg, project);
-    //   }
-    // } catch (err) {
-    //   this.logger.error(
-    //     "Updating the element %s from %s failed with: %s",
-    //     projTreeItem.contextValue,
-    //     project.apiUrl,
-    //     err.toString()
-    //   );
-    // }
-
-    // return getChildrenOfProjectTreeItem(project, projTreeItem);
   }
 
   public getParent(element: BookmarkTreeItem): BookmarkTreeItem | undefined {
@@ -459,28 +428,6 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     }
     this.onDidChangeTreeDataEmitter.fire(element);
   }
-
-  /**
-   * User facing command that updates a single project.
-   */
-  // @logAndReportExceptions()
-  // public async refreshProjectCommand(
-  //   element?: BookmarkTreeItem
-  // ): Promise<void> {
-  //   if (
-  //     element === undefined ||
-  //     !isProjectTreeItem(element) ||
-  //     !isProjectTreeElement(element)
-  //   ) {
-  //     this.logger.error(
-  //       "Called refreshProjectCommand on an invalid element: %s",
-  //       element?.contextValue
-  //     );
-  //     return;
-  //   }
-
-  //   await this.refreshProject(element);
-  // }
 
   @logAndReportExceptions()
   public async bookmarkProjectCommand(
@@ -640,113 +587,4 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     await this.bookmarkMngr.removeProjectFromBookmarks(element.project);
     this.refresh();
   }
-
-  /** */
-  /*private async fetchPackageFromTreeItem(
-    element?: BookmarkTreeItem,
-    forceUpdate: boolean = true
-  ): Promise<[boolean, Package]> {
-    if (
-      element === undefined ||
-      !isProjectTreeItem(element) ||
-      !isPackageTreeElement(element)
-    ) {
-      throw new Error(
-        "Called updatePackage on an invalid element: ".concat(
-          element?.contextValue ?? ""
-        )
-      );
-    }
-
-    const cachedPkg = await vscode.commands.executeCommand<Package>(
-      GET_PACKAGE_FROM_CACHE_COMMAND,
-      element.pkg
-    );
-    if (cachedPkg === undefined) {
-      this.logger.error(
-        "Could not retrieve the package %s/%s from the cache",
-        element.pkg.projectName,
-        element.pkg.name
-      );
-      return [false, element.pkg];
-    }
-
-    const apiUrl = element.parent.project.apiUrl;
-    const con = this.activeAccounts.getConfig(apiUrl)?.connection;
-    if (con === undefined) {
-      throw new Error(
-        `Cannot refresh package ${element.pkg.name}, no Connection for it exists`
-      );
-    }
-
-    if (!forceUpdate && cachedPkg.files !== undefined) {
-      return [false, cachedPkg];
-    }
-
-    const pkg = await fetchPackage(
-      con,
-      element.parent.project.name,
-      element.pkg.name,
-      { retrieveFileContents: false }
-    );
-    return [true, pkg];
-  }*/
-
-  /*private async fetchProjectFromTreeItem(
-    projElement?: BookmarkTreeItem,
-    forceUpdate: boolean = true
-  ): Promise<[boolean, Project]> {
-    if (
-      projElement === undefined ||
-      !isProjectTreeItem(projElement) ||
-      !isProjectTreeElement(projElement)
-    ) {
-      throw new Error(
-        `updateProject called on an invalid element, expected a ProjectTreeElement, but got a ${projElement?.contextValue}`
-      );
-    }
-
-    // we only fetch packages if there are none in the package
-    if (!forceUpdate && projElement.project.packages !== undefined) {
-      return [false, projElement.project];
-    }
-
-    const account = this.activeAccounts.getConfig(projElement.project.apiUrl);
-    if (account === undefined) {
-      const errMsg = `Cannot update the project ${projElement.project.name}, the corresponding account does not exist`;
-      throw new Error(errMsg);
-    }
-
-    const updatedProj = await fetchProject(
-      account.connection,
-      projElement.project.name,
-      true
-    );
-    return [true, updatedProj];
-  }*/
-
-  /**
-   * Function/Command to re-fetch a Project from the open build service.
-   *
-   * @param projElement
-   * @param forceUpdate  Refetch
-   */
-  /*@logAndReportExceptions()
-  private async updateProject(
-    projElement?: BookmarkTreeItem,
-    forceUpdate?: boolean
-  ): Promise<void> {
-    const [changed, proj] = await this.fetchProjectFromTreeItem(
-      projElement,
-      forceUpdate
-    );
-    // FIXME: should call reveal() here, maybe?
-    // probably not…
-
-    if (changed) {
-      // no need to fire the event here, as the bookmark update event will trigger
-      // a refresh anyway
-      await this.bookmarkMngr.addProjectToBookmarks(proj);
-    }
-  }*/
 }
