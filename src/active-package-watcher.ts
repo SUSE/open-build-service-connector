@@ -26,7 +26,7 @@ import {
   PathType,
   readInModifiedPackageFromDir
 } from "open-build-service-api";
-import { dirname, join, relative } from "path";
+import { dirname, join, relative, basename } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
@@ -177,7 +177,12 @@ export class ActivePackageWatcher extends ConnectionListenerLoggerBase {
   }
 
   @debounce(100)
-  private onActiveEditorChange(editor: vscode.TextEditor | undefined): void {
+  private async onActiveEditorChange(
+    editor: vscode.TextEditor | undefined
+  ): Promise<void> {
+    if (editor !== undefined) {
+      await this.addPackageFromTextDocument(editor.document);
+    }
     this.fireActivePackageEvent(this.getPkg(editor?.document));
   }
 
