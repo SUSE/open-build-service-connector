@@ -144,7 +144,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
 
     this.onDidChangeActiveProject = this.onDidChangeActiveProjectEmitter.event;
 
-    this.disposables = this.disposables.concat([
+    this.disposables.push(
       this.dotOscFsWatcher,
       this.dotOscFsWatcher.onDidChange(this.onDotOscModification, this),
       this.dotOscFsWatcher.onDidCreate(this.onDotOscModification, this),
@@ -168,7 +168,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
         this.updateCheckedOutProjectCommand,
         this
       )
-    ]);
+    );
   }
 
   public getActiveProject(): ActiveProject {
