@@ -55,6 +55,7 @@ import {
   fakeApi2ValidAcc
 } from "./test-data";
 import { castToAsyncFunc, testLogger } from "./test-utils";
+import { GET_INSTANCE_INFO_COMMAND } from "../../instance-info";
 
 const fooProj: obs_ts.Project = {
   apiUrl: fakeAccount1.apiUrl,
@@ -160,7 +161,15 @@ class BookmarkedProjectsTreeProviderFixture extends ProjectViewFixture {
       this.fetchProjectMock
     );
 
-    this.disposables.push(projTreeProv, this.projectBookmarkManager);
+    this.disposables.push(
+      projTreeProv,
+      this.projectBookmarkManager,
+      // required to get the list of projects
+      vscode.commands.registerCommand(
+        GET_INSTANCE_INFO_COMMAND,
+        () => undefined
+      )
+    );
 
     return projTreeProv;
   }

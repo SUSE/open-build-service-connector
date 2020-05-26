@@ -21,6 +21,9 @@
 
 import * as vscode from "vscode";
 import { Logger } from "pino";
+import { VscodeWindow } from "./vscode-dep";
+import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
+import { ignoreFocusOut } from "./constants";
 
 /**
  * Returns the difference `setA - setB` (all elements from A that are not in B).
@@ -94,7 +97,7 @@ export function logAndReportExceptionsWrapper<RT>(
   reportToUser: boolean = true,
   func: (...args: any[]) => Promise<RT>,
   ...args: any[]
-) {
+): () => Promise<RT | undefined> {
   const reportFunc = async (err: any) => {
     const errMsg =
       err.status !== undefined && err.status.summary !== undefined
@@ -127,5 +130,40 @@ export async function logException<RT>(
   } catch (err) {
     logger.error("%s failed with %s", description, err.toString());
     return undefined;
+  }
+}
+
+export async function promptUserForProjectName(
+  apiUrl: string,
+  prompt?: string,
+  vscodeWindow: VscodeWindow = vscode.window
+): Promise<string | undefined> {
+  const instanceInfo = await vscode.commands.executeCommand<ObsInstance>(
+    GET_INSTANCE_INFO_COMMAND,
+    apiUrl
+  );
+
+  if (
+    instanceInfo !== undefined &&
+    instanceInfo.projectList !== undefined &&
+    instanceInfo.projectList.length > 0
+  ) {
+    return await vscodeWindow.showQuickPick(
+      instanceInfo.projectList as string[],
+      {
+        canPickMany: false,
+        placeHolder: prompt,
+        ignoreFocusOut
+      }
+    );
+  } else {
+    return await vscodeWindow.showInputBox({
+      ignoreFocusOut,
+      prompt,
+      validateInput: (projName) =>
+        /\s/.test(projName) || projName === ""
+          ? "The project name must not contain any whitespace and must not be empty"
+          : undefined
+    });
   }
 }

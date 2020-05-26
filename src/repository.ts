@@ -36,9 +36,10 @@ import { AccountManager, ValidAccount } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { logAndReportExceptions } from "./decorators";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
-import { deepCopyProperties } from "./util";
+import { deepCopyProperties, promptUserForProjectName } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 import { ActiveProjectWatcher } from "./workspace";
+import { ignoreFocusOut } from "./constants";
 
 /** All architectures known by OBS in general */
 const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
@@ -432,8 +433,8 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     }
 
     assert(false, "This code should be unreachable");
-    return Promise.resolve([]);
   }
+
   private async addArchOrPathToRepo(
     action: "add" | "remove",
     property: "arch" | "path",
@@ -546,12 +547,11 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
             ? (archesToAdd as Arch[])
             : matchingRepo.arch.concat(archesToAdd as Arch[]);
       } else {
-        const projToAdd = await vscode.window.showInputBox({
-          ignoreFocusOut: true,
-          prompt: "Specify a project which repository should be added",
-          validateInput: (path) =>
-            path === "" ? "Path must not be empty" : undefined
-        });
+        const projToAdd = await promptUserForProjectName(
+          account.account.apiUrl,
+          "Specify a project which repository should be added",
+          this.vscodeWindow
+        );
         if (projToAdd === undefined) {
           return;
         }

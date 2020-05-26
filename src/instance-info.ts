@@ -23,7 +23,8 @@ import {
   Arch,
   Distribution,
   fetchConfiguration,
-  fetchHostedDistributions
+  fetchHostedDistributions,
+  fetchProjectList
 } from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -35,6 +36,7 @@ import { logAndReportExceptionsWrapper } from "./util";
 interface ObsFetchers {
   readonly fetchConfiguration: typeof fetchConfiguration;
   readonly fetchHostedDistributions: typeof fetchHostedDistributions;
+  readonly fetchProjectList: typeof fetchProjectList;
 }
 
 /** Information about an instance of the Open Build Service. */
@@ -98,7 +100,8 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
     logger: Logger,
     private readonly obsFetchers: ObsFetchers = {
       fetchConfiguration,
-      fetchHostedDistributions
+      fetchHostedDistributions,
+      fetchProjectList
     }
   ) {
     super(accountManager, logger);
@@ -195,10 +198,14 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
     const connection = this.activeAccounts.getConfig(apiUrl)?.connection;
 
     if (connection === undefined) {
+      this.logger.error(
+        "Tried to fetch the instance info for the API %s but got no connection",
+        apiUrl
+      );
       return undefined;
     }
 
-    const [conf, distros] = await Promise.all([
+    const [conf, hostedDistributions, projectList] = await Promise.all([
       logAndReportExceptionsWrapper(
         this,
         false,
@@ -210,13 +217,20 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
         false,
         this.obsFetchers.fetchHostedDistributions,
         connection
+      )(),
+      logAndReportExceptionsWrapper(
+        this,
+        false,
+        this.obsFetchers.fetchProjectList,
+        connection
       )()
     ]);
 
     return {
       apiUrl,
-      hostedDistributions: distros,
-      supportedArchitectures: conf?.schedulers
+      hostedDistributions,
+      supportedArchitectures: conf?.schedulers,
+      projectList: projectList?.map((proj) => proj.name)
     };
   }
 }

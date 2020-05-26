@@ -52,7 +52,7 @@ import {
   ProjectTreeElement,
   ProjectTreeItem
 } from "./project-view";
-import { logException } from "./util";
+import { logException, promptUserForProjectName } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 
 const cmdId = "obsProject";
@@ -529,14 +529,11 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
       return;
     }
 
-    const projectName = await this.vscodeWindow.showInputBox({
-      ignoreFocusOut: true,
-      prompt: "Provide the name of the project that you want to add",
-      validateInput: (projName) =>
-        /\s/.test(projName)
-          ? "The project name must not contain any whitespace"
-          : undefined
-    });
+    const projectName = await promptUserForProjectName(
+      apiUrl,
+      "Provide the name of the project that you want to add",
+      this.vscodeWindow
+    );
 
     if (projectName === undefined) {
       this.logger.trace(

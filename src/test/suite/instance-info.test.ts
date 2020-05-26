@@ -52,14 +52,11 @@ class ObsServerInformationFixture extends LoggingFixture {
 
   public fetchConfigurationMock = this.sandbox.stub();
   public fetchHostedDistributionsMock = this.sandbox.stub();
+  public fetchProjectListMock = this.sandbox.stub();
 
   public fakeAccountManager?: FakeAccountManager;
 
   public disposables: vscode.Disposable[] = [];
-
-  constructor(ctx: Context) {
-    super(ctx);
-  }
 
   public afterEach(ctx: Context) {
     this.sandbox.restore();
@@ -80,7 +77,8 @@ class ObsServerInformationFixture extends LoggingFixture {
       testLogger,
       {
         fetchConfiguration: this.fetchConfigurationMock,
-        fetchHostedDistributions: this.fetchHostedDistributionsMock
+        fetchHostedDistributions: this.fetchHostedDistributionsMock,
+        fetchProjectList: this.fetchProjectListMock
       }
     );
 
@@ -180,10 +178,13 @@ describe("ObsServerInformation", () => {
       version: "Tumbleweed"
     };
 
+    const projectList = ["openSUSE:Factory", "openSUSE", "home:fooUser"];
+
     const barInstanceInfo = {
       apiUrl: fakeAccount2.apiUrl,
       hostedDistributions: [Tumbleweed],
-      supportedArchitectures: ObsConfig.schedulers
+      supportedArchitectures: ObsConfig.schedulers,
+      projectList
     };
 
     beforeEach(function () {
@@ -198,6 +199,10 @@ describe("ObsServerInformation", () => {
       );
 
       this.fixture.fetchHostedDistributionsMock.resolves([Tumbleweed]);
+
+      this.fixture.fetchProjectListMock.resolves(
+        projectList.map((name) => ({ name }))
+      );
     });
 
     it(
@@ -213,7 +218,8 @@ describe("ObsServerInformation", () => {
         serverInfo.getInfo(fakeAccount1.apiUrl)!.should.deep.equal({
           apiUrl: fakeAccount1.apiUrl,
           hostedDistributions: [Tumbleweed],
-          supportedArchitectures: []
+          supportedArchitectures: [],
+          projectList
         });
 
         expect(serverInfo.getInfo("https://api.opensuse.org/")).to.equal(
@@ -255,7 +261,7 @@ describe("ObsServerInformation", () => {
 
         await vscode.commands
           .executeCommand(GET_INSTANCE_INFO_COMMAND, fakeAccount2.apiUrl)
-          .should.be.fulfilled.and.eventually.deep.equal(barInstanceInfo);
+          .should.eventually.deep.equal(barInstanceInfo);
       })
     );
 
@@ -273,15 +279,10 @@ describe("ObsServerInformation", () => {
           { url: thirdAccount.apiUrl }
         );
 
-        const serverInfo: ObsServerInformation = await this.fixture.createObsServerInformation(
-          [
-            [fakeAccount1.apiUrl, fakeApi1ValidAcc],
-            [
-              thirdAccount.apiUrl,
-              { account: thirdAccount, connection: thirdCon }
-            ]
-          ]
-        ).should.be.fulfilled;
+        const serverInfo = await this.fixture.createObsServerInformation([
+          [fakeAccount1.apiUrl, fakeApi1ValidAcc],
+          [thirdAccount.apiUrl, { account: thirdAccount, connection: thirdCon }]
+        ]);
 
         this.fixture.sandbox.assert.calledTwice(
           this.fixture.fetchConfigurationMock
@@ -293,7 +294,8 @@ describe("ObsServerInformation", () => {
         expect(serverInfo.getInfo(thirdAccount.apiUrl)).to.deep.equal({
           apiUrl: thirdAccount.apiUrl,
           hostedDistributions: [Tumbleweed],
-          supportedArchitectures: undefined
+          supportedArchitectures: undefined,
+          projectList
         });
       })
     );
