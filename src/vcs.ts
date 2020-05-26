@@ -25,7 +25,9 @@ import {
   addAndDeleteFilesFromPackage,
   commit,
   FileState,
-  ModifiedPackage
+  ModifiedPackage,
+  pathExists,
+  PathType
 } from "open-build-service-api";
 import { basename, dirname, join, sep } from "path";
 import { Logger } from "pino";
@@ -33,7 +35,8 @@ import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ActivePackageWatcher } from "./active-package-watcher";
 import { ConnectionListenerLoggerBase } from "./base-components";
-import { cmdPrefix } from "./constants";
+import { cmdPrefix, ignoreFocusOut } from "./constants";
+import { logAndReportExceptions } from "./decorators";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 
 interface LineChange {
@@ -58,6 +61,8 @@ export const DISCARD_CHANGES_COMMAND = `${cmdPrefix}.${cmdId}.discardChanges`;
 export const SHOW_DIFF_COMMAND = `${cmdPrefix}.${cmdId}.showDiff`;
 
 export const SHOW_DIFF_FROM_URI_COMMAND = `${cmdPrefix}.${cmdId}.showDiffFromUri`;
+
+export const ADD_CHANGELOG_ENTRY_COMMAND = `${cmdPrefix}.${cmdId}.addChangelogEntry`;
 
 /**
  * URI scheme for to get the file contents at HEAD for files under version
@@ -90,8 +95,6 @@ export class PackageScm extends ConnectionListenerLoggerBase
     logger: Logger
   ) {
     super(accountManager, logger);
-
-    this.updateScm();
 
     this.disposables.push(
       this.activePackageWatcher.onDidChangeActivePackage(function (
@@ -129,11 +132,17 @@ export class PackageScm extends ConnectionListenerLoggerBase
         this.discardChanges,
         this
       ),
+      vscode.commands.registerCommand(
+        ADD_CHANGELOG_ENTRY_COMMAND,
+        this.addChangelogEntryMenu,
+        this
+      ),
       vscode.workspace.registerTextDocumentContentProvider(
         OBS_FILE_AT_HEAD_SCHEME,
         this
       )
     );
+    this.updateScm();
   }
 
   public provideOriginalResource(
@@ -164,6 +173,137 @@ export class PackageScm extends ConnectionListenerLoggerBase
   public dispose() {
     this.scmDisposable?.dispose();
     super.dispose();
+  }
+
+  @logAndReportExceptions(true)
+  private async addChangelogEntryMenu(): Promise<void> {
+    if (this.curScm === undefined) {
+      this.logger.error(
+        "addChangelogEntry was invoked without an active SourceControl"
+      );
+      return;
+    }
+    let msg: string | undefined = this.curScm.inputBox.value;
+    if (msg === "") {
+      msg = await vscode.window.showInputBox({
+        prompt: "Enter a changelog entry",
+        ignoreFocusOut,
+        validateInput: (cur) =>
+          cur === "" ? "Changelog entry must not be empty" : undefined
+      });
+      if (msg === undefined) {
+        this.logger.error("User did not provide a changelog entry, aborting.");
+        return;
+      }
+    }
+    assert(msg !== undefined);
+
+    await this.addChangelogEntry(msg);
+  }
+
+  private async addChangelogEntry(msg: string): Promise<void> {
+    if (this.activePackage === undefined) {
+      throw new Error(
+        `Cannot add a changelog entry, no package is currently active`
+      );
+    }
+    const acc = this.activeAccounts.getConfig(this.activePackage.apiUrl)
+      ?.account;
+    if (
+      acc === undefined ||
+      acc.realname === undefined ||
+      acc.email === undefined
+    ) {
+      throw new Error(
+        `Cannot add a changelog entry, need a properly configured account (with email and real name)`
+      );
+    }
+
+    if (msg === undefined) {
+      this.logger.info("changelog entry requested with an empty message");
+    }
+
+    const fmtOptions = {
+      locale: "en-US",
+      calendar: "gregory",
+      numberingSystem: "latn",
+      timeZone: "UTC",
+      hourCycle: "h24",
+      hour12: false,
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short"
+    };
+    const [
+      weekday,
+      ,
+      month,
+      ,
+      day,
+      ,
+      year,
+      ,
+      hour,
+      ,
+      minute,
+      ,
+      second,
+      ,
+      tzName
+    ] = new Intl.DateTimeFormat("en-US", fmtOptions).formatToParts(new Date());
+
+    assert(
+      weekday.type === "weekday" &&
+        month.type === "month" &&
+        day.type === "day" &&
+        year.type === "year" &&
+        minute.type === "minute" &&
+        second.type === "second" &&
+        tzName.type === "timeZoneName"
+    );
+
+    const entry = `-------------------------------------------------------------------
+${weekday.value} ${month.value} ${day.value} ${hour.value}:${minute.value}:${second.value} ${tzName.value} ${year.value} - ${acc.realname} <${acc.email}>
+
+${msg}
+
+`;
+
+    const standardChangesFile = join(
+      this.activePackage.path,
+      `${this.activePackage.name}.changes`
+    );
+    let changesFile: string | undefined = standardChangesFile;
+    if (!(await pathExists(standardChangesFile, PathType.File))) {
+      changesFile = undefined;
+      const dentries = await fsPromises.readdir(this.activePackage.path, {
+        withFileTypes: true
+      });
+      for (const dentry of dentries) {
+        if (dentry.isFile && dentry.name.match(/\.changes$/)) {
+          changesFile = join(this.activePackage.path, dentry.name);
+          this.logger.debug("Using non-standard changes file: %s", changesFile);
+          break;
+        }
+      }
+    }
+
+    const oldContents =
+      changesFile === undefined
+        ? undefined
+        : await fsPromises.readFile(changesFile);
+    const fd = await fsPromises.open(changesFile ?? standardChangesFile, "w");
+    try {
+      await fd.write(entry);
+      oldContents !== undefined ? await fd.write(oldContents) : undefined;
+    } finally {
+      await fd.close();
+    }
   }
 
   private getPathOfOriginalResource(uri: vscode.Uri): string {
