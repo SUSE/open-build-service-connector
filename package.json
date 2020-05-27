@@ -156,11 +156,6 @@
     },
     "commands": [
       {
-        "icon": "$(remove)",
-        "title": "Remove this Bookmark",
-        "command": "vscodeObs.obsProject.removeBookmark"
-      },
-      {
         "icon": "media/ic_export_import.svg",
         "title": "Import accounts from osc's configuration file",
         "command": "vscodeObs.obsAccount.importAccountsFromOsrc"
@@ -177,11 +172,6 @@
       {
         "title": "Add an existing account from the Open Build Service to the extension",
         "command": "vscodeObs.obsAccount.newAccountWizard"
-      },
-      {
-        "icon": "media/add.svg",
-        "title": "Bookmark a project from the Open Build Service",
-        "command": "vscodeObs.obsProject.bookmarkProject"
       },
       {
         "icon": "$(add)",
@@ -212,6 +202,16 @@
         "icon": "$(add)",
         "title": "Add a repository from a Distribution",
         "command": "obsRepository.addRepositoryFromDistro"
+      },
+      {
+        "icon": "$(remove)",
+        "title": "Remove this Bookmark",
+        "command": "vscodeObs.obsProject.removeBookmark"
+      },
+      {
+        "icon": "$(add)",
+        "title": "Bookmark a project from the Open Build Service",
+        "command": "vscodeObs.obsProject.bookmarkProject"
       },
       {
         "icon": "$(refresh)",
