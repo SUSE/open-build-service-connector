@@ -623,8 +623,7 @@ ${msg}
     if (this.curScm?.inputBox.value !== undefined) {
       this.curScm.inputBox.value = "";
     }
-
-    // this.updateScm(await readInModifiedPackageFromDir(this.activePackage.path));
+    await this.activePackageWatcher.reloadCurrentPackage();
   }
 
   private updateScm(): void {

@@ -26,7 +26,7 @@ import {
   PathType,
   readInModifiedPackageFromDir
 } from "open-build-service-api";
-import { dirname, join, relative, basename } from "path";
+import { dirname, join, relative } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
@@ -125,6 +125,14 @@ export class ActivePackageWatcher extends ConnectionListenerLoggerBase {
     // we want to also return a package if the user views the diff
     const modPkgAndWatcher = this.modifiedPackageMap.get(fsPath);
     return modPkgAndWatcher === undefined ? undefined : modPkgAndWatcher[0];
+  }
+
+  public async reloadCurrentPackage(): Promise<void> {
+    if (vscode.window.activeTextEditor !== undefined) {
+      await this.addPackageFromTextDocument(
+        vscode.window.activeTextEditor.document
+      );
+    }
   }
 
   @debounce(100)
