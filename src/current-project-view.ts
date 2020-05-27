@@ -107,7 +107,7 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
     this.onDidChange = this.onDidChangeEmitter.event;
 
-    [
+    this.disposables.push(
       this.onDidChangeActiveProject((actProj) => {
         this.activeProject = actProj;
         this.refresh();
@@ -117,7 +117,7 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
       this.onAccountChange((_apiUrls) => {
         this.refresh();
       })
-    ].forEach((disposable) => this.disposables.push(disposable));
+    );
   }
 
   public refresh(): void {
