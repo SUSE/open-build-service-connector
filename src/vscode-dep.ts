@@ -32,4 +32,6 @@ export interface VscodeWindow {
   showInputBox: typeof vscode.window.showInputBox;
 
   showOpenDialog: typeof vscode.window.showOpenDialog;
+
+  withProgress: typeof vscode.window.withProgress;
 }

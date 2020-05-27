@@ -239,7 +239,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
     refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
   ): Promise<PackageFile> {
     const pkg = await this.getPackage(
-      new BasePackage(apiUrl, pkgFile.packageName, pkgFile.projectName),
+      new BasePackage(apiUrl, pkgFile.projectName, pkgFile.packageName),
       refreshBehavior
     );
     const fileContentsDir = join(

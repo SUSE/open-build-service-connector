@@ -30,11 +30,11 @@ export class BasePackage implements Package {
   public readonly projectName: string;
 
   constructor(pkg: Package);
-  constructor(apiUrl: string, name: string, projectName: string);
+  constructor(apiUrl: string, projectName: string, name: string);
   constructor(
     pkgOrApiUrl: string | Package,
-    name?: string,
-    projectName?: string
+    projectName?: string,
+    name?: string
   ) {
     if (typeof pkgOrApiUrl === "string") {
       this.apiUrl = pkgOrApiUrl;

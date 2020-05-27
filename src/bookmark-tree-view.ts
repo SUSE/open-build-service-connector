@@ -20,7 +20,13 @@
  */
 
 import * as assert from "assert";
-import { fetchProject, Package, Project } from "open-build-service-api";
+import {
+  fetchProject,
+  Package,
+  Project,
+  checkOutProject,
+  checkOutPackage
+} from "open-build-service-api";
 import { join } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -30,10 +36,14 @@ import {
   ApiUrl,
   promptUserForAccount
 } from "./accounts";
-import { ConnectionListenerLoggerBase } from "./base-components";
+import { ConnectionListenerLoggerBase, BasePackage } from "./base-components";
 import { cmdPrefix } from "./constants";
 import { logAndReportExceptions } from "./decorators";
-import { SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND } from "./package-file-contents";
+import {
+  SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND,
+  OBS_PACKAGE_FILE_URI_SCHEME,
+  RemotePackageFileContentProvider
+} from "./package-file-contents";
 import {
   ChangedObject,
   ChangeType,
@@ -52,7 +62,12 @@ import {
   ProjectTreeElement,
   ProjectTreeItem
 } from "./project-view";
-import { logException, promptUserForProjectName } from "./util";
+import {
+  logException,
+  promptUserForProjectName,
+  promptUserForPackage,
+  isUri
+} from "./util";
 import { VscodeWindow } from "./vscode-dep";
 
 const cmdId = "obsProject";
@@ -77,6 +92,12 @@ export const UPDATE_PROJECT_COMMAND = `${cmdPrefix}.${cmdId}.updateProject`;
  *     even if the package has already fetched files (defaults to true).
  */
 export const UPDATE_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.updatePackage`;
+
+/** ID of the command to check a package out to the file system. */
+export const CHECK_OUT_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.checkOutPackage`;
+
+/** ID of the command to check a project out to the file system. */
+export const CHECK_OUT_PROJECT_COMMAND = `${cmdPrefix}.${cmdId}.checkOutProject`;
 
 type BookmarkTreeItem =
   | ProjectTreeItem
@@ -140,6 +161,189 @@ const BOOKMARK_ICON = {
   dark: join(__filename, "..", "..", "media", "dark", "bookmark_border.svg"),
   light: join(__filename, "..", "..", "media", "light", "bookmark_border.svg")
 };
+
+export class CheckOutHandler extends ConnectionListenerLoggerBase {
+  constructor(
+    accountManager: AccountManager,
+    logger: Logger,
+    private readonly vscodeWindow: VscodeWindow = vscode.window
+  ) {
+    super(accountManager, logger);
+
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        CHECK_OUT_PROJECT_COMMAND,
+        this.checkOutProject,
+        this
+      ),
+      vscode.commands.registerCommand(
+        CHECK_OUT_PACKAGE_COMMAND,
+        this.checkOutPackage,
+        this
+      )
+    );
+  }
+
+  private async checkOutProject(elem?: BookmarkTreeItem): Promise<void> {
+    let apiUrl: string;
+    let projectName: string;
+    if (elem !== undefined && !isProjectTreeElement(elem)) {
+      this.logger.trace(
+        "checkOutProject called on the wrong element, expected a project but got: %s",
+        elem.contextValue
+      );
+      return;
+    }
+    if (elem === undefined) {
+      const apiUrlCandidate = await promptUserForAccount(
+        this.activeAccounts,
+        "Which account should be used to check out the project?",
+        this.vscodeWindow
+      );
+      if (apiUrlCandidate === undefined) {
+        return;
+      }
+      apiUrl = apiUrlCandidate;
+
+      const projectNameCandidate = await promptUserForProjectName(
+        apiUrl,
+        "Provide the name of the project that should be checked out.",
+        this.vscodeWindow
+      );
+      if (projectNameCandidate === undefined) {
+        return;
+      }
+      projectName = projectNameCandidate;
+    } else {
+      assert(isProjectTreeElement(elem));
+      apiUrl = elem.project.apiUrl;
+      projectName = elem.project.name;
+    }
+
+    const dest = await this.vscodeWindow.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false
+    });
+    if (dest === undefined || dest.length > 1) {
+      this.logger.error(
+        "User either did not select a destination or somehow selected multiple folders"
+      );
+      return;
+    }
+
+    const con = this.activeAccounts.getConfig(apiUrl)?.connection;
+    if (con === undefined) {
+      this.logger.error(
+        "Could not get a connection for the api %s although the user selected it previously",
+        apiUrl
+      );
+      return;
+    }
+
+    await this.vscodeWindow.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Checking out ${projectName} to ${dest[0].fsPath}`,
+        // FIXME: make this cancellable at some point
+        cancellable: false
+      },
+      async (progress) => {
+        let finishedPkgs = 0;
+        await checkOutProject(con, projectName, dest[0].fsPath, {
+          callback: (pkgName, _index, allPackages) => {
+            finishedPkgs++;
+            progress.report({
+              message: `Checked out package ${pkgName}`,
+              increment: Math.floor((100 * finishedPkgs) / allPackages.length)
+            });
+          }
+        });
+      }
+    );
+
+    const openProj = await this.vscodeWindow.showInformationMessage(
+      "Open the checked out project now?",
+      "Yes",
+      "No"
+    );
+
+    if (openProj === "Yes") {
+      await vscode.commands.executeCommand("vscode.openFolder", dest[0]);
+    }
+  }
+
+  private async checkOutPackage(
+    elemOrEditor?: BookmarkTreeItem | vscode.Uri
+  ): Promise<void> {
+    let pkg: BasePackage | undefined;
+
+    if (elemOrEditor === undefined) {
+      pkg = await promptUserForPackage(this.activeAccounts, this.vscodeWindow);
+    } else if (isPackageTreeElement(elemOrEditor)) {
+      pkg = new BasePackage(
+        elemOrEditor.parentProject.apiUrl,
+        elemOrEditor.parentProject.name,
+        elemOrEditor.packageName
+      );
+    } else if (
+      isUri(elemOrEditor) &&
+      elemOrEditor.scheme === OBS_PACKAGE_FILE_URI_SCHEME
+    ) {
+      const pkgFileInfo = RemotePackageFileContentProvider.uriToPackageFile(
+        elemOrEditor
+      );
+      pkg = new BasePackage(
+        pkgFileInfo.apiUrl,
+        pkgFileInfo.pkgFile.projectName,
+        pkgFileInfo.pkgFile.packageName
+      );
+    }
+
+    if (pkg === undefined) {
+      return undefined;
+    }
+
+    const con = this.activeAccounts.getConfig(pkg.apiUrl)?.connection;
+    assert(
+      con !== undefined,
+      "Connection must not be undefined at this point, as the user previously selected a valid API"
+    );
+
+    const dest = await this.vscodeWindow.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: "Folder to which the package should be checked out"
+    });
+    if (dest === undefined || dest.length > 1) {
+      this.logger.error(
+        "User either did not select a destination or somehow selected multiple folders"
+      );
+      return;
+    }
+
+    await this.vscodeWindow.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Checking out ${pkg.projectName}/${pkg.name} to ${dest[0].fsPath}`,
+        cancellable: false
+      },
+      async () =>
+        checkOutPackage(con, pkg!.projectName, pkg!.name, dest[0].fsPath)
+    );
+
+    const openPkg = await this.vscodeWindow.showInformationMessage(
+      "Open the checked out Package now?",
+      "Yes",
+      "No"
+    );
+
+    if (openPkg === "Yes") {
+      await vscode.commands.executeCommand("vscode.openFolder", dest[0]);
+    }
+  }
+}
 
 export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
   implements vscode.TreeDataProvider<BookmarkTreeItem> {

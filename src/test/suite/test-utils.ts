@@ -44,7 +44,8 @@ export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => ({
   showInformationMessage: sandbox.stub(),
   showInputBox: sandbox.stub(),
   showOpenDialog: sandbox.stub(),
-  showQuickPick: sandbox.stub()
+  showQuickPick: sandbox.stub(),
+  withProgress: sandbox.stub()
 });
 
 export async function waitForEvent<T>(

@@ -25,7 +25,10 @@ import * as pino from "pino";
 import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
 import { ActivePackageWatcher } from "./active-package-watcher";
-import { BookmarkedProjectsTreeProvider } from "./bookmark-tree-view";
+import {
+  BookmarkedProjectsTreeProvider,
+  CheckOutHandler
+} from "./bookmark-tree-view";
 import { CurrentProjectTreeProvider } from "./current-project-view";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 import { ObsServerInformation } from "./instance-info";
@@ -132,6 +135,7 @@ export async function activate(
     packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),
+    new CheckOutHandler(accountManager, logger),
     vscode.commands.registerCommand(
       "obsRepository.addArchitecturesToRepo",
       repoTreeProvider.addArchitecturesToRepo,

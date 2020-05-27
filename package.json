@@ -87,6 +87,16 @@
         },
         {
           "group": "inline",
+          "when": "view == bookmarkedProjectsTree && viewItem == package",
+          "command": "vscodeObs.obsProject.checkOutPackage"
+        },
+        {
+          "group": "inline",
+          "when": "view == bookmarkedProjectsTree && viewItem == project",
+          "command": "vscodeObs.obsProject.checkOutProject"
+        },
+        {
+          "group": "inline",
           "when": "view == repositoryTree && viewItem == architectureRoot",
           "command": "obsRepository.addArchitecturesToRepo"
         },
@@ -111,7 +121,13 @@
           "command": "obsRepository.removePathFromRepo"
         }
       ],
-      "editor/title": [],
+      "editor/title": [
+        {
+          "group": "navigation",
+          "command": "vscodeObs.obsProject.checkOutPackage",
+          "when": "resourceScheme == vscodeObsPackageFile"
+        }
+      ],
       "view/title": [
         {
           "group": "navigation",
@@ -227,6 +243,16 @@
         "icon": "$(refresh)",
         "title": "Update this Package and its content",
         "command": "vscodeObs.obsProject.updatePackage"
+      },
+      {
+        "icon": "$(repo-clone)",
+        "title": "Check out the project",
+        "command": "vscodeObs.obsProject.checkOutProject"
+      },
+      {
+        "icon": "$(repo-clone)",
+        "title": "Check out the package",
+        "command": "vscodeObs.obsProject.checkOutPackage"
       },
       {
         "command": "vscodeObs.obsScm.revertChange",

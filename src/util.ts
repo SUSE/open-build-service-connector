@@ -19,11 +19,15 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import * as vscode from "vscode";
+import * as assert from "assert";
+import { fetchProject } from "open-build-service-api";
 import { Logger } from "pino";
-import { VscodeWindow } from "./vscode-dep";
-import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
+import * as vscode from "vscode";
+import { ActiveAccounts, promptUserForAccount } from "./accounts";
+import { BasePackage } from "./base-components";
 import { ignoreFocusOut } from "./constants";
+import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
+import { VscodeWindow } from "./vscode-dep";
 
 /**
  * Returns the difference `setA - setB` (all elements from A that are not in B).
@@ -133,6 +137,24 @@ export async function logException<RT>(
   }
 }
 
+/**
+ * Ask the user to supply the name of a project belonging to the server with the
+ * supplied `apiUrl`.
+ *
+ * The user is either presented with a
+ * [`QuickPick`](https://code.visualstudio.com/api/references/vscode-api#QuickPick)
+ * (when a list of all projects from the OBS instance can be retrieved) or with
+ * an
+ * [`InputBox`](https://code.visualstudio.com/api/references/vscode-api#InputBox)
+ * as a free form field.
+ *
+ * @param prompt  This text is displayed under the `InputBox` or in the
+ *     `QuickPick` as guidance for the user.
+ * @param vscodeWindow  Optional dependency injection object for mocking the
+ *     calls to the vscode API.
+ *
+ * @return The project name or `undefined` when the user let the prompt time out.
+ */
 export async function promptUserForProjectName(
   apiUrl: string,
   prompt?: string,
@@ -166,4 +188,63 @@ export async function promptUserForProjectName(
           : undefined
     });
   }
+}
+
+export async function promptUserForPackage(
+  activeAccounts: ActiveAccounts,
+  vscodeWindow: VscodeWindow = vscode.window
+): Promise<BasePackage | undefined> {
+  const apiUrl = await promptUserForAccount(
+    activeAccounts,
+    "Select the account to which the package belongs",
+    vscodeWindow
+  );
+  if (apiUrl === undefined) {
+    return undefined;
+  }
+  const projectName = await promptUserForProjectName(
+    apiUrl,
+    "Provide the name of the project to which the package belongs",
+    vscodeWindow
+  );
+  if (projectName === undefined) {
+    return undefined;
+  }
+
+  const con = activeAccounts.getConfig(apiUrl)?.connection;
+  assert(
+    con !== undefined,
+    "Connection must not be undefined as the user selected a valid account"
+  );
+
+  const proj = await fetchProject(con, projectName, { getPackageList: true });
+
+  if (proj.packages.length === 0) {
+    await vscodeWindow.showErrorMessage(
+      `The project ${projectName} has no packages!`
+    );
+    return undefined;
+  }
+
+  const pkgName = await vscodeWindow.showQuickPick(
+    proj.packages.map((pkg) => pkg.name),
+    {
+      canPickMany: false,
+      placeHolder: "Select a package",
+      ignoreFocusOut
+    }
+  );
+
+  return pkgName === undefined
+    ? undefined
+    : new BasePackage(apiUrl, projectName, pkgName);
+}
+
+export function isUri(obj: any): obj is vscode.Uri {
+  for (const prop of ["scheme", "authority", "path", "query", "fragment"]) {
+    if (obj[prop] === undefined || typeof obj[prop] !== "string") {
+      return false;
+    }
+  }
+  return true;
 }
