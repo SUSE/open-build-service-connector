@@ -491,11 +491,9 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
 
     let proj: Project | undefined;
     try {
-      proj = await this.obsFetchProject(
-        accountConfig.connection,
-        projectName,
-        true
-      );
+      proj = await this.obsFetchProject(accountConfig.connection, projectName, {
+        getPackageList: true
+      });
     } catch (err) {
       const selected = await this.vscodeWindow.showErrorMessage(
         `Adding a bookmark for the project ${projectName} using the account ${accountConfig.account.accountName} failed with: ${err}.`,

@@ -195,7 +195,9 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
       throw new Error(`No account configured for the API ${proj.apiUrl}`);
     }
 
-    const newProj = await fetchProject(acc.connection, proj.name, true);
+    const newProj = await fetchProject(acc.connection, proj.name, {
+      getPackageList: true
+    });
     await updateCheckedOutProject(newProj, element.checkedOutPath);
 
     const projUri = vscode.Uri.file(element.checkedOutPath);
@@ -259,7 +261,9 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
               textDocument.uri
             );
           } else {
-            activeProject = await fetchProject(con, pkgFile.projectName, false);
+            activeProject = await fetchProject(con, pkgFile.projectName, {
+              getPackageList: false
+            });
           }
         }
       } catch (err) {

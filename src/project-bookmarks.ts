@@ -403,7 +403,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
       const freshProj = await this.obsFetchers.fetchProject(
         account.connection,
         proj.name,
-        true
+        { getPackageList: true }
       );
       await this.saveProject(freshProj);
       return freshProj;

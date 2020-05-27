@@ -341,12 +341,12 @@ describe("BookmarkedProjectsTreeProvider", () => {
           this.fixture.fetchProjectMock.should.have.been.calledWith(
             fakeApi1ValidAcc.connection,
             fooProj.name,
-            true
+            { getPackageList: true }
           );
           this.fixture.fetchProjectMock.should.have.been.calledWith(
             fakeApi1ValidAcc.connection,
             barProj.name,
-            true
+            { getPackageList: true }
           );
 
           this.fixture.fetchProjectMock.reset();
@@ -368,7 +368,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           this.fixture.fetchProjectMock.should.have.been.calledOnceWith(
             fakeApi2ValidAcc.connection,
             bazProj.name,
-            true
+            { getPackageList: true }
           );
           this.fixture.fetchPackageMock.should.have.not.been.called;
         })
@@ -409,7 +409,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           this.fixture.fetchProjectMock.should.have.been.calledOnceWith(
             fakeApi1ValidAcc.connection,
             fooProj.name,
-            true
+            { getPackageList: true }
           );
           this.fixture.fetchPackageMock.should.have.not.been.called;
         })
@@ -444,7 +444,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             this.fixture.fetchProjectMock.firstCall,
             fakeApi1ValidAcc.connection,
             fooProj.name,
-            true
+            { getPackageList: true }
           );
 
           this.fixture.fetchProjectMock.reset();
@@ -548,7 +548,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           this.fixture.fetchProjectMock.should.have.been.calledOnceWithExactly(
             fakeApi1ValidAcc.connection,
             barProj.name,
-            true
+            { getPackageList: true }
           );
           // this.fixture.fetchPackageMock.should.have.been.calledOnceWithExactly(
           //   fakeApi1ValidAcc.connection,
