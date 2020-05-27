@@ -87,6 +87,8 @@ export class PackageScm extends ConnectionListenerLoggerBase
 
   private curScm: vscode.SourceControl | undefined;
 
+  private scmStatusBar: vscode.StatusBarItem | undefined;
+
   private scmDisposable: vscode.Disposable | undefined;
 
   constructor(
@@ -627,12 +629,23 @@ ${msg}
   }
 
   private updateScm(): void {
-    this.curScm?.dispose();
+    this.scmDisposable?.dispose();
+
     this.activePackage = this.activePackageWatcher.activePackage;
 
-    if (this.activePackageWatcher.activePackage !== undefined) {
-      this.curScm = this.scmFromModifiedPackage(
-        this.activePackageWatcher.activePackage
+    if (this.activePackage !== undefined) {
+      this.curScm = this.scmFromModifiedPackage(this.activePackage);
+
+      this.scmStatusBar = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left
+      );
+
+      this.scmStatusBar.text = `$(package) ${this.activePackage.name}`;
+      this.scmStatusBar.show();
+
+      this.scmDisposable = vscode.Disposable.from(
+        this.curScm,
+        this.scmStatusBar
       );
     }
   }
