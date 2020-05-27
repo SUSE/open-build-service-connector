@@ -135,6 +135,7 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
     this.disposables.push(
+      this.onDidChangeTreeDataEmitter,
       activePackageWatcher.onDidChangeActivePackage(
         this.setCurrentPackage,
         this
