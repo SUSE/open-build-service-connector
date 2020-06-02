@@ -1,6 +1,4 @@
 stages:
-  - test
-  - lint
   - deploy
 variables:
   DISPLAY: ':99.0'
@@ -15,12 +13,6 @@ cache:
   before_script:
     - apt -y update
     - apt -y install libsecret-1-dev libnss3 libgtk-3-0 libxss1 libasound2 jq xvfb
-    # install SUSE's trusted root certificate to be able to get obs.ts from gitlab.suse.de
-    - curl http://ca.suse.de/certificates/ca/SUSE_Trust_Root.crt -o SUSE_Trust_Root.crt
-    - "[[ $(openssl x509 -noout -fingerprint -sha512 -inform pem -in SUSE_Trust_Root.crt) = 'SHA512 Fingerprint=CC:73:71:70:7C:E0:AA:EC:EA:C0:E5:3B:9D:E7:ED:20:FF:B5:F2:28:E6:16:66:5D:03:6D:17:5F:59:05:99:00:C1:0B:7B:B7:D0:2A:14:21:84:A9:FC:7F:3D:D7:FC:C1:F5:BD:8A:A1:50:CE:E5:B7:7C:DA:13:72:DB:17:D5:56' ]]"
-    - mv SUSE_Trust_Root.crt /usr/local/share/ca-certificates/
-    - update-ca-certificates
-    # setup local yarn cache
     - mkdir -p .yarn-cache
     - yarn config set cache-folder $(pwd)/.yarn-cache
     # the "reliable" package manager needs a few tries...
@@ -28,93 +20,13 @@ cache:
     # vscode doesn't start without X
     - "/usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &"
 
-.node_test: &run_tests
-  script:
-    - >
-      for VER in "1.37.0" "1.37.1" "1.38.0" "1.38.1" "1.39.0" "1.39.1" "1.39.2" "1.40.0" "1.40.1" "1.41.0" "insiders"; do
-         export VSCODE_VERSION=${VER}
-         echo "Running tests for VSCode ${VER}"
-         yarn run test
-      done
-
-tests_node_10:
-  image: node:10
-  stage: test
-  <<: *setup_env
-  <<: *run_tests
-
-tests_node_12:
-  image: node:12
-  stage: test
-  <<: *setup_env
-  <<: *run_tests
-
-tests_node_13:
-  image: node:13
-  stage: test
-  <<: *setup_env
-  <<: *run_tests
-
-license_check:
-  image: opensuse/tumbleweed
-  stage: lint
-  script:
-    - export GOPATH="$(pwd)/golang"
-    - mkdir -p ${GOPATH}
-    - zypper --non-interactive ref
-    - zypper --non-interactive in fd go git
-    - go get -u github.com/google/addlicense
-    - ${GOPATH}/bin/addlicense -c "SUSE LLC" -l mit $(fd '.*(\.ts|\.js|\.py|\.c|\.build)$')
-    - git diff --exit-code
-
-test_mocklibsecret:
-  image: opensuse/tumbleweed
-  stage: test
-  before_script:
-    - zypper --non-interactive in gcc meson ninja libsecret-devel glib2-devel nodejs npm python3
-    - npm install keytar
-  script:
-    - mkdir -p mocklibsecret/build
-    - pushd mocklibsecret/build
-    - meson ..
-    - ninja
-    - cd ..
-    - ./run_tests.py
-    - popd
-
 package:
   image: node:10
   stage: deploy
   <<: *setup_env
   script:
-    # FIXME: coverage reporting is broken inside a container for the ordinary release
-    - export VSCODE_VERSION="insiders"
-    - yarn run coverage
-    - export VSCODE_VERSION=""
+    - yarn run clean
     - yarn run package
-    - yarn run doc:devel
   artifacts:
     paths:
-      - vscode-obs-*.vsix
-      - documentation/
-      - coverage/
-
-pages:
-  image: node:10
-  stage: deploy
-  <<: *setup_env
-  script:
-    # FIXME: coverage reporting is broken inside a container for the ordinary release
-    - export VSCODE_VERSION="insiders"
-    - yarn run coverage
-    - export VSCODE_VERSION=""
-    - yarn run package
-    - yarn run doc:devel
-    - mv documentation/ public/
-    - mv coverage/ public/
-  artifacts:
-    paths:
-      - vscode-obs-*.vsix
-      - public/
-  only:
-    - master
+      - open-build-service-connector-*.vsix
