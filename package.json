@@ -39,7 +39,6 @@
     "pino": "^6",
     "xml2js": "^0.4.23"
   },
-  "_comment": "FIXME: need to drag in config-ini-parser and xml2js in from obs-ts, remove this once obs-ts has been properly released",
   "scripts": {
     "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --out ./documentation src/",
     "package": "vsce package --yarn",
@@ -410,6 +409,7 @@
     "workspaceContains:**/.osc_obs_ts"
   ],
   "categories": [
+    "SCM Providers",
     "Other"
   ],
   "engines": {
@@ -424,5 +424,15 @@
   "version": "0.0.1",
   "description": "Connector to the Open Build Service",
   "displayName": "Open Build Service Connector",
-  "name": "open-build-service-connector"
+  "name": "open-build-service-connector",
+  "icon": "media/obs-logo_meta.png",
+  "homepage": "https://github.com/SUSE/open-build-service-connector/blob/master/README.md",
+  "bugs": {
+    "url": "https://github.com/SUSE/open-build-service-connector/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SUSE/open-build-service-connector"
+  },
+  "preview": true
 }
