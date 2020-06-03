@@ -331,7 +331,7 @@
     "configuration": {
       "properties": {
         "vscode-obs.logLevel": {
-          "default": "info",
+          "default": "error",
           "enum": [
             "trace",
             "debug",

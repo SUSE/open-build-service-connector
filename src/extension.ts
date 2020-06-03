@@ -53,11 +53,9 @@ export async function activate(
   );
   const logger = pino(
     {
-      // FIXME: stop using trace by default
-      level:
-        "trace" /*vscode.workspace
+      level: vscode.workspace
         .getConfiguration("vscode-obs")
-        .get<pino.Level>("logLevel", "trace")*/
+        .get<pino.Level>("logLevel", "error")
     },
     dest
   );
