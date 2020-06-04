@@ -1,5 +1,7 @@
 # Open Build Service Connector
 
+[![Visual Studio Marketplace](https://vsmarketplacebadge.apphb.com/version/SUSE.open-build-service-connector.svg)](https://marketplace.visualstudio.com/items?itemName=SUSE.open-build-service-connector) [![Build Status](https://travis-ci.org/SUSE/open-build-service-connector.svg?branch=master)](https://travis-ci.org/SUSE/open-build-service-connector) [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://github.com/SUSE/open-build-service-connector/blob/master/LICENSE)
+
 Visual Studio Code extension for integration with the [Open Build
 Service](https://openbuildservice.org/): it allows you to view existing packages
 and project, check them out locally and integrates into VSCode's source
