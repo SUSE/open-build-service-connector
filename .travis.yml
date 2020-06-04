@@ -27,7 +27,6 @@ script:
       TMPDIR=$(realpath ./tmpdir) yarn run coverage
     done
 cache:
-  yarn: true
   apt: true
   directories:
     - "./.vscode-test"
