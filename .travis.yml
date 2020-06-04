@@ -6,22 +6,6 @@ node_js:
   - 10
   - 12
   - 13
-env:
-  - VSCODE_VERSION="1.40.0"
-  - VSCODE_VERSION="1.40.1"
-  - VSCODE_VERSION="1.41.0"
-  - VSCODE_VERSION="1.41.1"
-  - VSCODE_VERSION="1.42.0"
-  - VSCODE_VERSION="1.42.1"
-  - VSCODE_VERSION="1.43.0"
-  - VSCODE_VERSION="1.43.1"
-  - VSCODE_VERSION="1.43.2"
-  - VSCODE_VERSION="1.44.0"
-  - VSCODE_VERSION="1.44.1"
-  - VSCODE_VERSION="1.44.2"
-  - VSCODE_VERSION="1.45.0"
-  - VSCODE_VERSION="1.45.1"
-  - VSCODE_VERSION="insiders"
 services:
   - docker
 addons:
@@ -39,8 +23,13 @@ install:
 script:
   # try hard to install the packages
   - yarn install || yarn install || yarn install
-  - mkdir tmpdir
-  - TMPDIR=$(realpath ./tmpdir) yarn run coverage
+  - >
+    for VER in "1.40.0" "1.40.1" "1.41.0" "1.41.1" "1.42.0" "1.42.1" "1.43.0" "1.43.1" "1.43.2" "1.44.0" "1.44.1" "1.44.2" "1.45.0" "1.45.1" "insiders"; do
+      export VSCODE_VERSION=${VER}
+      echo "Running tests for VSCode ${VER}"
+      mkdir tmpdir
+      TMPDIR=$(realpath ./tmpdir) yarn run coverage
+    done
 cache:
   yarn: true
   apt: true
