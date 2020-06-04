@@ -34,7 +34,9 @@ if __name__ == "__main__":
         env["MOCK_SECRET_PASSWORD_CLEAR_RETVAL"] = clear_retval
         env["MOCK_SECRET_PASSWORD_STORE_RETVAL"] = store_retval
         env["LD_PRELOAD"] = "./build/libsecret.so"
-        retcode = subprocess.call("./test.js", env=env)
+        retcode = subprocess.call(
+            os.path.join(os.getcwd(), "test.js"), env=env
+        )
         if retcode != 0:
             raise ValueError(
                 f"Test with clear_retval={clear_retval} and "
