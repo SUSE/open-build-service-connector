@@ -1,9 +1,4 @@
 obs-logo.svg:                                https://openbuildservice.org/images/obs-logo.svg
+obs-logo_meta.png:                           https://raw.githubusercontent.com/openSUSE/open-build-service/master/src/api/app/assets/images/obs-logo_meta.png
 ic_export_import.svg:                        https://publicdomainvectors.org/en/free-clipart/Vector-image-of-round-grey-import-icon/17674.html
-
-add.svg:                                     https://gitlab.com/SUSE-UIUX/eos-icons/-/raw/master/svg/extended/add.svg
-add_circle.svg                               https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/add_circle.svg
-add_circle_outline.svg                       https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/add_circle_outline.svg
-remove_circle.svg                            https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/remove_circle.svg
-remove_circle_outline.svg                    https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/remove_circle_outline.svg
-bookmark_border.svg:                         https://gitlab.com/SUSE-UIUX/eos-icons/raw/master/svg/extended/bookmark_border.svg
+bookmark_border.svg:                         https://gitlab.com/SUSE-UIUX/eos-icons/-/raw/master/svg/material/bookmark_border.svg
