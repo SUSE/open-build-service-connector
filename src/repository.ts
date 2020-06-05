@@ -421,6 +421,10 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const matchingRepoIndex = repos.findIndex(
       (repo) => repo.name === expectedRepoName
     );
+    assert(
+      matchingRepoIndex !== -1,
+      `Must have found the repository with the name ${expectedRepoName}`
+    );
     const matchingRepo = deepCopyProperties(repos[matchingRepoIndex]);
 
     if (action === "remove") {
