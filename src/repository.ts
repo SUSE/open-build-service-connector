@@ -411,7 +411,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
     const expectedRepoName = element.repository.name;
 
-    const matchingRepoArr: BaseRepository[] | undefined = repos.filter(
+    const matchingRepoArr = repos.filter(
       (repo) => repo.name === expectedRepoName
     );
     assert(
