@@ -76,9 +76,12 @@ export async function saveMapToMemento<K, T>(
   await memento.update(storageKey, [...map.entries()]);
 }
 
+export function deepCopyProperties<T>(obj: undefined): undefined;
+export function deepCopyProperties<T>(obj: T): T;
+
 /** Create a deep copy of `obj` omitting **all** functions. */
-export function deepCopyProperties<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
+export function deepCopyProperties<T>(obj?: T): T | undefined {
+  return obj === undefined ? undefined : JSON.parse(JSON.stringify(obj));
 }
 
 /**

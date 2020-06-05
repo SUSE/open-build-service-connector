@@ -151,5 +151,9 @@ describe("utilities", () => {
         .to.deep.equal({ foo: "bar" })
         .and.to.not.have.property("baz");
     });
+
+    it("handles undefined objects", () => {
+      expect(deepCopyProperties(undefined)).to.equal(undefined);
+    });
   });
 });
