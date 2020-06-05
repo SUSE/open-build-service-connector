@@ -39,7 +39,6 @@ import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
 import { deepCopyProperties, promptUserForProjectName } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 import { ActiveProjectWatcher } from "./workspace";
-import { ignoreFocusOut } from "./constants";
 
 /** All architectures known by OBS in general */
 const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
