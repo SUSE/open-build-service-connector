@@ -10,3 +10,5 @@ logfile.json
 test-resources/
 open-build-service/
 mocklibsecret/.mypy_cache/*
+src/ui-tests/repositoryTreeView/fakeHome/*
+src/ui-tests/repositoryTreeView/settings.json

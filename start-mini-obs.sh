@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -euo pipefail
+set -euox pipefail
 
 export repo_dir="open-build-service"
 export obs_url="http://localhost:3000"
-obs_version=2.10.2
+obs_version=2.10.5
 
 pushd .
 
@@ -13,8 +13,8 @@ if [[ ! -d "${repo_dir}" ]]; then
 fi
 
 cd "${repo_dir}"
-git fetch origin master
-git reset --hard ${obs_version}
+git fetch -tp origin
+git checkout -b v${obs_version} ${obs_version} || git checkout v${obs_version}
 git submodule init
 git submodule update
 
@@ -33,19 +33,121 @@ done
 
 popd
 
-TEST_USER="vscodeObsUser"
+TEST_USER="obsTestUser"
 CREDENTIALS="Admin:opensuse"
 
-
-# setup the user for the UI tests
+# setup a test user
 curl --user ${CREDENTIALS} -X PUT ${obs_url}/person/${TEST_USER} -d "
 <person>
 <login>${TEST_USER}</login>
-<email>vscodeObs@notexisting.com</email>
+<email>${TEST_USER}@notexisting.com</email>
 <state>confirmed</state>
 </person>
 "
 curl --user ${CREDENTIALS} -X POST ${obs_url}/person/${TEST_USER}?cmd=change_password -d "nots3cr3t"
+
+curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/testers -d "<group>
+<title>testers</title>
+<person>
+<person user_id='${TEST_USER}'/>
+</person>
+</group>"
+
+curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/admins -d "<group>
+<title>admins</title>
+<person>
+<person user_id='Admin'/>
+</person>
+</group>"
+
+curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/everyone -d "<group>
+<title>everyone</title>
+<person>
+<person user_id='Admin'/>
+<person user_id='${TEST_USER}'/>
+</person>
+</group>"
+
+curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Tumbleweed/_meta -d "
+<project name='openSUSE:Tumbleweed'>
+  <title>Tumbleweed</title>
+  <description>Tumbleweed is the openSUSE Rolling Release</description>
+  <person userid='Admin' role='maintainer'/>
+  <build>
+    <disable/>
+  </build>
+  <repository name='standard_debug'>
+    <download arch='i586' url='https://download.opensuse.org/debug/tumbleweed/repo/oss' repotype='rpmmd'>
+      <archfilter>i686,i586</archfilter>
+    </download>
+    <download arch='x86_64' url='https://download.opensuse.org/debug/tumbleweed/repo/oss' repotype='rpmmd'>
+      <archfilter>x86_64</archfilter>
+    </download>
+    <arch>i586</arch>
+    <arch>x86_64</arch>
+  </repository>
+  <repository name='standard'>
+    <download arch='i586' url='https://download.opensuse.org/tumbleweed/repo/oss' repotype='rpmmd'>
+      <archfilter>i686,i586</archfilter>
+    </download>
+    <download arch='x86_64' url='https://download.opensuse.org/tumbleweed/repo/oss' repotype='rpmmd'>
+      <archfilter>x86_64</archfilter>
+    </download>
+    <download arch='armv6l' url='https://download.opensuse.org/ports/armv6hl/tumbleweed/repo/oss' repotype='rpmmd'>
+    </download>
+    <download arch='armv7l' url='https://download.opensuse.org/ports/armv7hl/tumbleweed/repo/oss' repotype='rpmmd'>
+    </download>
+    <download arch='aarch64' url='https://download.opensuse.org/ports/aarch64/tumbleweed/repo/oss' repotype='rpmmd'>
+    </download>
+    <path project='openSUSE:Tumbleweed' repository='standard_debug'/>
+    <path project='openSUSE:Factory' repository='ports'/>
+    <arch>i586</arch>
+    <arch>x86_64</arch>
+    <arch>aarch64</arch>
+    <arch>armv7l</arch>
+    <arch>armv6l</arch>
+  </repository>
+</project>
+"
+
+curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
+<project name='openSUSE:Factory'>
+  <title>The next openSUSE distribution</title>
+  <description>Have a look at http://en.opensuse.org/Portal:Factory for more details.</description>
+  <person userid='Admin' role='maintainer'/>
+  <lock>
+    <disable/>
+  </lock>
+  <build>
+    <disable repository='snapshot'/>
+    <disable repository='ports'/>
+  </build>
+  <publish>
+    <disable/>
+    <enable repository='standard'/>
+  </publish>
+  <debuginfo>
+    <enable/>
+  </debuginfo>
+  <repository name='standard' rebuild='local'>
+    <arch>x86_64</arch>
+    <arch>i586</arch>
+  </repository>
+  <repository name='snapshot'>
+    <path project='openSUSE:Tumbleweed' repository='standard'/>
+    <arch>x86_64</arch>
+    <arch>i586</arch>
+  </repository>
+  <repository name='ports'>
+    <arch>ppc64le</arch>
+    <arch>ppc64</arch>
+    <arch>ppc</arch>
+    <arch>armv6l</arch>
+    <arch>armv7l</arch>
+    <arch>aarch64</arch>
+  </repository>
+</project>
+"
 
 curl --user ${CREDENTIALS} -X PUT ${obs_url}/distributions -d '<distributions>
   <distribution vendor="openSUSE" version="Tumbleweed" id="13908">

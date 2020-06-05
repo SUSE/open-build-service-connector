@@ -2,6 +2,7 @@ language: node_js
 os:
   # - osx
   - linux
+dist: bionic
 node_js:
   - 10
   - 12
@@ -12,8 +13,17 @@ services:
 addons:
   apt:
     packages:
-      - libsecret-1-dev
       - jq
+      - gcc
+      - meson
+      - ninja-build
+      - libsecret-1-dev
+      - libglib2.0-dev
+      - python3
+
+stages:
+  - test
+  - lint
 
 install:
   # try hard to install the packages
@@ -25,6 +35,7 @@ script:
       echo "Running tests for VSCode ${VER}"
       mkdir tmpdir
       TMPDIR=$(realpath ./tmpdir) yarn run coverage
+      rm -rf tmpdir
     done
 cache:
   apt: true
@@ -35,19 +46,6 @@ jobs:
   include:
     - name: test mocklibsecret
       os: linux
-      dist: bionic
-      cache:
-        yarn: false
-        apt: true
-      addons:
-        apt:
-          packages:
-            - gcc
-            - meson
-            - ninja-build
-            - libsecret-1-dev
-            - libglib2.0-dev
-            - python3
       install:
         - npm install keytar
       script:
