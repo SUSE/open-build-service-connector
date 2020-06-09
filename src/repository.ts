@@ -58,6 +58,10 @@ export const ADD_REPOSITORY_COMMAND = `${cmdPrefix}.${cmdId}.addRepositoryFromDi
 
 export const REMOVE_REPOSITORY_COMMAND = `${cmdPrefix}.${cmdId}.removeRepository`;
 
+export const MOVE_PATH_UP_COMMAND = `${cmdPrefix}.${cmdId}.movePathUp`;
+
+export const MOVE_PATH_DOWN_COMMAND = `${cmdPrefix}.${cmdId}.movePathDown`;
+
 /**
  * This class represents the root element of the repository tree.
  */
@@ -97,9 +101,32 @@ function isRepositoryPathRootElement(
   return treeElement.contextValue === "pathRoot";
 }
 
+type RepositoryPathCtx =
+  | "immovableRepositoryPath"
+  | "upDownMovableRepositoryPath"
+  | "upMovableRepositoryPath"
+  | "downMovableRepositoryPath";
+
+const repositoryPathCtxValues: RepositoryPathCtx[] = [
+  "immovableRepositoryPath",
+  "upDownMovableRepositoryPath",
+  "upMovableRepositoryPath",
+  "downMovableRepositoryPath"
+];
+
+const indexOfPathInRepository = (
+  path: Path,
+  repository: BaseRepository
+): number =>
+  repository.path?.findIndex(
+    (presentPath) =>
+      presentPath.repository === path.repository &&
+      presentPath.project === path.project
+  ) ?? -1;
+
 /** An entry in the RepositoryTree representing a path entry. */
 class RepositoryPathTreeElement extends vscode.TreeItem {
-  public readonly contextValue = "repositoryPath";
+  public readonly contextValue: RepositoryPathCtx;
 
   constructor(
     public readonly path: Path,
@@ -109,13 +136,38 @@ class RepositoryPathTreeElement extends vscode.TreeItem {
       `${path.project}/${path.repository}`,
       vscode.TreeItemCollapsibleState.None
     );
+    assert(
+      repository.path !== undefined,
+      `Invalid repository ${repository.name} added: no paths are defined`
+    );
+    const pathIndex = indexOfPathInRepository(path, repository);
+    assert(
+      pathIndex !== -1,
+      `expected to find the repository ${path.project}/${path.repository} in ${repository.path}`
+    );
+    if (repository.path.length === 1) {
+      this.contextValue = "immovableRepositoryPath";
+    } else {
+      if (pathIndex === 0) {
+        this.contextValue = "downMovableRepositoryPath";
+      } else if (pathIndex === repository.path.length - 1) {
+        this.contextValue = "upMovableRepositoryPath";
+      } else {
+        this.contextValue = "upDownMovableRepositoryPath";
+      }
+    }
   }
 }
 
 function isRepositoryPathElement(
   treeElement: RepositoryElement
 ): treeElement is RepositoryPathTreeElement {
-  return treeElement.contextValue === "repositoryPath";
+  for (const val of repositoryPathCtxValues) {
+    if (treeElement.contextValue === val) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -231,6 +283,16 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
         this.removeRepository,
         this
       ),
+      vscode.commands.registerCommand(
+        MOVE_PATH_DOWN_COMMAND,
+        this.movePathDown,
+        this
+      ),
+      vscode.commands.registerCommand(
+        MOVE_PATH_UP_COMMAND,
+        this.movePathUp,
+        this
+      )
     );
   }
 
@@ -310,6 +372,44 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     this.activeProject!.meta = newMeta;
 
     this.refresh();
+  }
+
+  @logAndReportExceptions()
+  public movePathUp(element?: RepositoryElement): Promise<void> {
+    if (
+      !this.activeProjectHasRepositories() ||
+      element === undefined ||
+      !isRepositoryPathElement(element) ||
+      element.contextValue === "immovableRepositoryPath" ||
+      element.contextValue === "downMovableRepositoryPath"
+    ) {
+      this.logger.error(
+        "movePathUp called on an element with the wrong contextValue, expected 'upMovableRepositoryPath' or 'upDownMovableRepositoryPath' but got %s",
+        element?.contextValue
+      );
+      return Promise.resolve();
+    }
+
+    return this.movePathUpOrDown("up", element);
+  }
+
+  @logAndReportExceptions()
+  public movePathDown(element?: RepositoryElement): Promise<void> {
+    if (
+      !this.activeProjectHasRepositories() ||
+      element === undefined ||
+      !isRepositoryPathElement(element) ||
+      element.contextValue === "immovableRepositoryPath" ||
+      element.contextValue === "upMovableRepositoryPath"
+    ) {
+      this.logger.error(
+        "movePathDown called on an element with the wrong contextValue, expected 'downMovableRepositoryPath' or 'upDownMovableRepositoryPath' but got %s",
+        element?.contextValue
+      );
+      return Promise.resolve();
+    }
+
+    return this.movePathUpOrDown("down", element);
   }
 
   @logAndReportExceptions()
@@ -398,6 +498,61 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     }
 
     assert(false, "This code should be unreachable");
+  }
+
+  private async movePathUpOrDown(
+    direction: "up" | "down",
+    element: RepositoryPathTreeElement
+  ): Promise<void> {
+    const con = this.getConnectionOfCurrentProject();
+
+    const { repository, ...rest } = this.activeProject!.meta!;
+    assert(repository !== undefined);
+
+    const matchingRepoIndex = repository.findIndex(
+      (repo) => repo.name === element.repository.name
+    );
+    assert(
+      matchingRepoIndex !== -1,
+      `Expected to find the repository ${
+        element.repository.name
+      } in the project ${this.activeProject!.name}`
+    );
+
+    const pathIndex = indexOfPathInRepository(
+      element.path,
+      repository[matchingRepoIndex]
+    );
+    assert(
+      pathIndex !== -1,
+      `Expected to find the repository entry ${element.path.project}/${
+        element.path.repository
+      } in the repository paths of ${
+        this.activeProject!.name
+      } of the repository ${element.repository.name}`
+    );
+
+    assert(
+      repository[matchingRepoIndex].path !== undefined && direction === "down"
+        ? pathIndex < repository[matchingRepoIndex].path!.length - 1
+        : pathIndex > 0
+    );
+
+    [
+      repository[matchingRepoIndex].path![pathIndex],
+      repository[matchingRepoIndex].path![
+        direction === "down" ? pathIndex + 1 : pathIndex - 1
+      ]
+    ] = [
+      repository[matchingRepoIndex].path![
+        direction === "down" ? pathIndex + 1 : pathIndex - 1
+      ],
+      repository[matchingRepoIndex].path![pathIndex]
+    ];
+
+    await modifyProjectMeta(con, { repository, ...rest });
+    this.activeProject!.meta = { repository, ...rest };
+    this.refresh();
   }
 
   private async addArchOrPathToRepo(

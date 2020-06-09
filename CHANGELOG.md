@@ -10,6 +10,8 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Repository paths can now be moved up and down in the Repositories view.
+
 ### Changed
 
 - Fix not being able to add repositories to projects with no repositories

@@ -102,14 +102,39 @@ const twRepoName = tw.replace(" ", "_");
 
 const removeArchLabel = "Remove this architecture from the repository";
 const addArchLabel = "Add architectures to a repository";
+
 const addPathLabel = "Add a path from a Project to a repository";
 const removePathLabel = "Remove this path from the repository";
+
+const movePathUpLabel = "Move this path up";
+const movePathDownLabel = "Move this path down";
 
 const getArchChildren = (section: ViewSection) =>
   section.openItem(twRepoName, "Architectures");
 
+const addPathToRepository = async (
+  repositoriesSection: ViewSection,
+  projectName: string,
+  repositoryName: string
+): Promise<void> => {
+  const pathElement = await repositoriesSection.findItem("Paths");
+  await findAndClickButtonOnTreeItem(pathElement! as TreeItem, addPathLabel);
+
+  const projectNameInput = await InputBox.create();
+
+  await projectNameInput.setText(projectName);
+  await projectNameInput.confirm();
+  await projectNameInput.getDriver().sleep(100);
+
+  const reposInput = await InputBox.create();
+  await reposInput.setText(repositoryName);
+  await reposInput.confirm();
+
+  await projectNameInput.getDriver().sleep(3000);
+};
+
 describe("RepositoryTreeProvider", function () {
-  this.timeout(10000);
+  this.timeout(30000);
 
   before(async () => {
     await createProject(testCon, testProjMeta);
@@ -151,7 +176,7 @@ describe("RepositoryTreeProvider", function () {
     // initialize in the background
     const activityBar = new ActivityBar();
     await activityBar.getViewControl("Open Build Service").click();
-    await activityBar.getDriver().sleep(2000);
+    await activityBar.getDriver().sleep(3000);
   });
 
   after(async () => {
@@ -300,7 +325,7 @@ describe("RepositoryTreeProvider", function () {
     }
 
     // wait for the project meta change to propagate
-    section.getDriver().sleep(1000);
+    section.getDriver().sleep(3000);
 
     archChildren = await getArchChildren(section);
     expect(archChildren).to.be.an("array").and.have.length(1);
@@ -319,7 +344,7 @@ describe("RepositoryTreeProvider", function () {
     );
 
     // wait for the project meta change to propagate
-    section.getDriver().sleep(1000);
+    section.getDriver().sleep(3000);
 
     archChildren = await getArchChildren(section);
     expect(archChildren).to.be.an("array").and.have.length(0);
@@ -355,7 +380,7 @@ describe("RepositoryTreeProvider", function () {
 
     await inputArch.confirm();
 
-    await section.getDriver().sleep(1000);
+    await section.getDriver().sleep(3000);
 
     let archChildren = await getArchChildren(section);
     expect(archChildren).to.be.an("array").and.have.length(1);
@@ -397,7 +422,7 @@ describe("RepositoryTreeProvider", function () {
     await reposInput.setText("standard");
     await reposInput.confirm();
 
-    await section.getDriver().sleep(2000);
+    await section.getDriver().sleep(3000);
 
     const newPaths = await section.openItem(twRepoName, "Paths");
     expect(newPaths).to.be.an("array").and.have.length(2);
@@ -421,7 +446,7 @@ describe("RepositoryTreeProvider", function () {
       })
     );
 
-    await section.getDriver().sleep(2000);
+    await section.getDriver().sleep(3000);
 
     pathElements = await section.openItem(twRepoName, "Paths");
     expect(pathElements).to.be.an("array").and.have.length(1);
@@ -447,6 +472,145 @@ describe("RepositoryTreeProvider", function () {
     });
   });
 
+  it("does not display any move path buttons when only a single path is present", async () => {
+    const section = await focusOnSection("Repositories");
+
+    const pathElements = await section.openItem(twRepoName, "Paths");
+    expect(pathElements).to.be.an("array").and.have.length(1);
+
+    const buttons = await (pathElements as TreeItem[])[0].getActionButtons();
+
+    [movePathUpLabel, movePathDownLabel].forEach((label) =>
+      expect(buttons.find((button) => button.getLabel() === label)).to.equal(
+        undefined
+      )
+    );
+  });
+
+  it("shows the move path buttons on the movable entries", async () => {
+    const section = await focusOnSection("Repositories");
+
+    await addPathToRepository(section, "openSUSE:Factory", "standard");
+
+    let pathElementChildren = await section.openItem(twRepoName, "Paths");
+    expect(pathElementChildren).to.be.an("array").and.have.length(2);
+
+    const checkUpperButton = async (children: ViewItem[] | void) => {
+      const upperButtonLabels = (
+        await (children as TreeItem[])[0].getActionButtons()
+      ).map((button) => button.getLabel());
+      upperButtonLabels.should.include.a.thing.that.equals(movePathDownLabel);
+      upperButtonLabels.should.not.include.a.thing.that.equals(movePathUpLabel);
+    };
+    const checkLowerButton = async (children: ViewItem[] | void) => {
+      const lowerButtonLabels = (
+        await (children as TreeItem[])[
+          (children as TreeItem[]).length - 1
+        ].getActionButtons()
+      ).map((button) => button.getLabel());
+      lowerButtonLabels.should.include.a.thing.that.equals(movePathUpLabel);
+      lowerButtonLabels.should.not.include.a.thing.that.equals(
+        movePathDownLabel
+      );
+    };
+
+    await checkUpperButton(pathElementChildren);
+    await checkLowerButton(pathElementChildren);
+
+    await addPathToRepository(section, "openSUSE:Factory", "snapshot");
+
+    pathElementChildren = await section.openItem(twRepoName, "Paths");
+    expect(pathElementChildren).to.be.an("array").and.have.length(3);
+
+    await checkUpperButton(pathElementChildren);
+    await checkLowerButton(pathElementChildren);
+
+    const middleButtonLabels = (
+      await (pathElementChildren as TreeItem[])[1].getActionButtons()
+    ).map((button) => button.getLabel());
+    middleButtonLabels.should.include.a.thing.that.equals(movePathUpLabel);
+    middleButtonLabels.should.include.a.thing.that.equals(movePathDownLabel);
+  });
+
+  it("moves a path up when the respective button is pressed", async () => {
+    const section = await focusOnSection("Repositories");
+
+    const pathsBeforeMove = await section.openItem(twRepoName, "Paths");
+    expect(pathsBeforeMove).to.be.an("array").and.have.length(3);
+
+    const middlePathEntry = (pathsBeforeMove as TreeItem[])[1];
+    middlePathEntry.getLabel().should.deep.equal("openSUSE:Factory/standard");
+    const moveUpButton = await findAndClickButtonOnTreeItem(
+      middlePathEntry,
+      movePathUpLabel
+    );
+    await moveUpButton.getDriver().sleep(3000);
+
+    const pathsAfterMove = await section.openItem(twRepoName, "Paths");
+    expect(pathsAfterMove).to.be.an("array").and.have.length(3);
+
+    const labelsBeforeMove = (pathsBeforeMove as TreeItem[]).map((pth) =>
+      pth.getLabel()
+    );
+    const labelsAfterMove = (pathsAfterMove as TreeItem[]).map((pth) =>
+      pth.getLabel()
+    );
+
+    labelsAfterMove[0].should.deep.equal(labelsBeforeMove[1]);
+    labelsAfterMove[1].should.deep.equal(labelsBeforeMove[0]);
+    labelsAfterMove[2].should.deep.equal(labelsBeforeMove[2]);
+  });
+
+  it("moves a path down when the respective button is pressed", async () => {
+    const section = await focusOnSection("Repositories");
+
+    const pathsBeforeMove = await section.openItem(twRepoName, "Paths");
+    expect(pathsBeforeMove).to.be.an("array").and.have.length(3);
+
+    const middlePathEntry = (pathsBeforeMove as TreeItem[])[1];
+    middlePathEntry
+      .getLabel()
+      .should.deep.equal("openSUSE:Tumbleweed/standard");
+    const moveDownButton = await findAndClickButtonOnTreeItem(
+      middlePathEntry,
+      movePathDownLabel
+    );
+    await moveDownButton.getDriver().sleep(3000);
+
+    const pathsAfterMove = await section.openItem(twRepoName, "Paths");
+    expect(pathsAfterMove).to.be.an("array").and.have.length(3);
+
+    const labelsBeforeMove = (pathsBeforeMove as TreeItem[]).map((pth) =>
+      pth.getLabel()
+    );
+    const labelsAfterMove = (pathsAfterMove as TreeItem[]).map((pth) =>
+      pth.getLabel()
+    );
+    labelsAfterMove[0].should.deep.equal(labelsBeforeMove[0]);
+    labelsAfterMove[1].should.deep.equal(labelsBeforeMove[2]);
+    labelsAfterMove[2].should.deep.equal(labelsBeforeMove[1]);
+  });
+
+  it("modified the project's _meta", async () => {
+    await fetchProjectMeta(
+      testCon,
+      testProj.name
+    ).should.eventually.deep.include({
+      ...testProjMeta,
+      repository: [
+        {
+          name: "openSUSE_Tumbleweed",
+          path: [
+            { project: "openSUSE:Factory", repository: "standard" },
+            { project: "openSUSE:Factory", repository: "snapshot" },
+            { project: "openSUSE:Tumbleweed", repository: "standard" }
+          ],
+          arch: [Arch.Aarch64]
+        }
+      ]
+    });
+  });
+
   xit("Refreshes the project and sees the new repositories", async () => {
     const newMeta: ProjectMeta = {
       ...testProjMeta,
@@ -461,21 +625,25 @@ describe("RepositoryTreeProvider", function () {
 
     await modifyProjectMeta(testCon, newMeta);
 
-    const curProjSection = await new SideBarView()
-      .getContent()
-      .getSection("Current Project");
-    // const visibleItems = await curProjSection.getVisibleItems();
-    // console.log(visibleItems);
+    const curProjSection = await focusOnSection("Current Project");
 
-    let testProjEntry = await curProjSection.findItem(testProj.name, 1);
-    expect(testProjEntry).to.not.equal(undefined);
+    const visibleItems = await curProjSection.getVisibleItems();
+    expect(visibleItems).to.be.an("array").and.have.length(1);
 
-    testProjEntry = testProjEntry!;
-    console.log(inspect(testProjEntry));
-    // await testProjEntry.open;
-    // (await curProjSection.openItem(testProj.name, pkg.name))
-    console.log(await (await testProjEntry.openContextMenu()).getItems());
-    const children = await curProjSection.openItem(testProj.name, pkg.name);
-    console.log(children);
+    const testProjEntry = visibleItems[0] as TreeItem;
+    testProjEntry.getLabel().should.deep.equal(testProj.name);
+
+    const updateProj = await findAndClickButtonOnTreeItem(
+      testProjEntry,
+      "Update this Project"
+    );
+    await updateProj.getDriver().sleep(3000);
+
+    const repoSection = await focusOnSection("Repositories");
+    const pathsAfterMove = await repoSection.openItem(twRepoName, "Paths");
+    expect(pathsAfterMove).to.be.an("array").and.have.length(1);
+    (pathsAfterMove as TreeItem[])[0]
+      .getLabel()
+      .should.deep.equal("openSUSE:Factory/standard");
   });
 });

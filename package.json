@@ -115,8 +115,18 @@
         },
         {
           "group": "inline",
-          "when": "view == repositoryTree && viewItem == repositoryPath",
+          "when": "view == repositoryTree && viewItem =~ /(imm|upDownM|upM|downM)ovableRepositoryPath/",
           "command": "vscodeObs.obsRepository.removePathFromRepo"
+        },
+        {
+          "group": "inline",
+          "when": "view == repositoryTree && viewItem =~ /(upDownM|upM)ovableRepositoryPath/",
+          "command": "vscodeObs.obsRepository.movePathUp"
+        },
+        {
+          "group": "inline",
+          "when": "view == repositoryTree && viewItem =~ /(upDownM|downM)ovableRepositoryPath/",
+          "command": "vscodeObs.obsRepository.movePathDown"
         }
       ],
       "editor/title": [
@@ -206,6 +216,16 @@
         "icon": "$(remove)",
         "title": "Remove this path from the repository",
         "command": "vscodeObs.obsRepository.removePathFromRepo"
+      },
+      {
+        "icon": "$(arrow-up)",
+        "title": "Move this path up",
+        "command": "vscodeObs.obsRepository.movePathUp"
+      },
+      {
+        "icon": "$(arrow-down)",
+        "title": "Move this path down",
+        "command": "vscodeObs.obsRepository.movePathDown"
       },
       {
         "icon": "$(close)",
