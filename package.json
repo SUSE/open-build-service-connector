@@ -254,7 +254,7 @@
       },
       {
         "icon": "$(refresh)",
-        "title": "Refresh this Project",
+        "title": "Update this Project",
         "command": "vscodeObs.obsProject.updateCheckedOutProject"
       },
       {
