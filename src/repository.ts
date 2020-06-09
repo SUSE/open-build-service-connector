@@ -456,13 +456,6 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
     const expectedRepoName = element.repository.name;
 
-    const matchingRepoArr = repos.filter(
-      (repo) => repo.name === expectedRepoName
-    );
-    assert(
-      matchingRepoArr.length === 1,
-      `Expected to get exactly one repository with the name ${expectedRepoName}, but got ${matchingRepoArr.length}`
-    );
     const matchingRepoIndex = repos.findIndex(
       (repo) => repo.name === expectedRepoName
     );
