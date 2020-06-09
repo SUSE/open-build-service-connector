@@ -46,19 +46,28 @@ export async function activate(
 ): Promise<void> {
   const showCollapseAll = true;
 
-  await fsPromises.mkdir(context.logPath, { recursive: true });
-  console.log(context.logPath);
-  const dest = pino.destination(
-    join(context.logPath, `vscode-obs.${new Date().getTime()}.log`)
+  const logFile = join(
+    context.logPath,
+    `vscode-obs.${new Date().getTime()}.log`
   );
-  const logger = pino(
-    {
+
+  let options: pino.LoggerOptions;
+  if (process.env.EXTENSION_DEBUG === "1") {
+    options = {
+      level: "trace",
+      prettyPrint: true,
+      prettifier: require("pino-pretty")
+    };
+    console.log(logFile);
+  } else {
+    options = {
       level: vscode.workspace
         .getConfiguration("vscode-obs")
         .get<pino.Level>("logLevel", "error")
-    },
-    dest
-  );
+    };
+  }
+  await fsPromises.mkdir(context.logPath, { recursive: true });
+  const logger = pino(options, pino.destination(logFile));
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
@@ -170,7 +179,6 @@ export async function activate(
   await accountManager.promptForNotPresentAccountPasswords();
 }
 
-// this method is called when your extension is deactivated
 export function deactivate() {
   // NOP
 }

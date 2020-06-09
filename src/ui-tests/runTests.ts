@@ -185,6 +185,7 @@ async function main() {
 
     process.env.LD_PRELOAD = pathToLibsecret;
     process.env.HOME = testEnv.fakeHomeDir;
+    process.env.EXTENSION_DEBUG = "1";
     if (injectUserFromEnv) {
       process.env.MOCK_SECRET_PASSWORD_LOOKUP = testUser.password;
     }
