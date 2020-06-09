@@ -32,7 +32,7 @@ import {
 } from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
-import { AccountManager, ValidAccount } from "./accounts";
+import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix } from "./constants";
 import { logAndReportExceptions } from "./decorators";
@@ -244,12 +244,12 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
   @logAndReportExceptions()
   public async addRepositoryFromDistro(): Promise<void> {
-    const account = this.getAccountOfCurrentProject();
+    const con = this.getConnectionOfCurrentProject();
 
     // FIXME: what should we do if we need to fetch the meta?
     if (this.activeProject!.meta === undefined) {
       this.activeProject!.meta = await fetchProjectMeta(
-        account.connection,
+        con,
         this.activeProject!.name
       );
     }
@@ -258,9 +258,10 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       "The project meta must be defined at this point"
     );
 
+    const apiUrl = this.activeProject!.apiUrl;
     const instanceInfo = await vscode.commands.executeCommand<ObsInstance>(
       GET_INSTANCE_INFO_COMMAND,
-      account.account.apiUrl
+      apiUrl
     );
     if (
       instanceInfo === undefined ||
@@ -268,7 +269,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       instanceInfo.hostedDistributions.length === 0
     ) {
       throw new Error(
-        `Cannot add a repository from a distribution for the OBS instance '${account.account.apiUrl}': no distributions defined`
+        `Cannot add a repository from a distribution for the OBS instance '${apiUrl}': no distributions defined`
       );
     }
 
@@ -305,7 +306,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     });
 
     const newMeta = { ...rest, repository: presentRepos };
-    await modifyProjectMeta(account.connection!, newMeta);
+    await modifyProjectMeta(con, newMeta);
     this.activeProject!.meta = newMeta;
 
     this.refresh();
@@ -320,7 +321,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     ) {
       return;
     }
-    const instanceInfo = this.getAccountOfCurrentProject();
+    const con = this.getConnectionOfCurrentProject();
 
     // repository must be defined and have length >= 1
     const { repository, ...rest } = this.activeProject!.meta!;
@@ -329,7 +330,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const newRepos = repository!.filter((repo) => repo !== element.repository);
 
     const newMeta = { ...rest, repository: newRepos };
-    await modifyProjectMeta(instanceInfo.connection!, newMeta);
+    await modifyProjectMeta(con, newMeta);
     this.activeProject!.meta = newMeta;
 
     this.refresh();
@@ -587,17 +588,18 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     );
   }
 
-  private getAccountOfCurrentProject(): ValidAccount {
+  private getConnectionOfCurrentProject(): Connection {
     if (this.activeProject === undefined) {
       throw new Error("No project is active, cannot add a repository");
     }
-    const account = this.activeAccounts.getConfig(this.activeProject.apiUrl);
-    if (account === undefined) {
+    const con = this.activeAccounts.getConfig(this.activeProject.apiUrl)
+      ?.connection;
+    if (con === undefined) {
       throw new Error(
         `No account is properly configured to access the API ${this.activeProject.apiUrl}`
       );
     }
 
-    return account;
+    return con;
   }
 }
