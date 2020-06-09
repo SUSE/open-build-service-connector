@@ -96,27 +96,27 @@
         {
           "group": "inline",
           "when": "view == repositoryTree && viewItem == architectureRoot",
-          "command": "obsRepository.addArchitecturesToRepo"
+          "command": "vscodeObs.obsRepository.addArchitecturesToRepo"
         },
         {
           "group": "inline",
           "when": "view == repositoryTree && viewItem == architecture",
-          "command": "obsRepository.removeArchitectureFromRepo"
+          "command": "vscodeObs.obsRepository.removeArchitectureFromRepo"
         },
         {
           "group": "inline",
           "when": "view == repositoryTree && viewItem == repositoryRoot",
-          "command": "obsRepository.removeRepository"
+          "command": "vscodeObs.obsRepository.removeRepository"
         },
         {
           "group": "inline",
           "when": "view == repositoryTree && viewItem == pathRoot",
-          "command": "obsRepository.addPathToRepo"
+          "command": "vscodeObs.obsRepository.addPathToRepo"
         },
         {
           "group": "inline",
           "when": "view == repositoryTree && viewItem == repositoryPath",
-          "command": "obsRepository.removePathFromRepo"
+          "command": "vscodeObs.obsRepository.removePathFromRepo"
         }
       ],
       "editor/title": [
@@ -130,7 +130,7 @@
         {
           "group": "navigation",
           "when": "view == repositoryTree",
-          "command": "obsRepository.addRepositoryFromDistro"
+          "command": "vscodeObs.obsRepository.addRepositoryFromDistro"
         }
       ],
       "scm/title": [
@@ -190,32 +190,32 @@
       {
         "icon": "$(add)",
         "title": "Add architectures to a repository",
-        "command": "obsRepository.addArchitecturesToRepo"
+        "command": "vscodeObs.obsRepository.addArchitecturesToRepo"
       },
       {
         "icon": "$(remove)",
         "title": "Remove this architecture from the repository",
-        "command": "obsRepository.removeArchitectureFromRepo"
+        "command": "vscodeObs.obsRepository.removeArchitectureFromRepo"
       },
       {
         "icon": "$(add)",
         "title": "Add a path from a Project to a repository",
-        "command": "obsRepository.addPathToRepo"
+        "command": "vscodeObs.obsRepository.addPathToRepo"
       },
       {
         "icon": "$(remove)",
         "title": "Remove this path from the repository",
-        "command": "obsRepository.removePathFromRepo"
+        "command": "vscodeObs.obsRepository.removePathFromRepo"
       },
       {
         "icon": "$(close)",
         "title": "Remove this repository",
-        "command": "obsRepository.removeRepository"
+        "command": "vscodeObs.obsRepository.removeRepository"
       },
       {
         "icon": "$(add)",
         "title": "Add a repository from a Distribution",
-        "command": "obsRepository.addRepositoryFromDistro"
+        "command": "vscodeObs.obsRepository.addRepositoryFromDistro"
       },
       {
         "icon": "$(remove)",

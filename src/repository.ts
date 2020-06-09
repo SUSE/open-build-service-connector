@@ -34,6 +34,7 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ValidAccount } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
+import { cmdPrefix } from "./constants";
 import { logAndReportExceptions } from "./decorators";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
 import { deepCopyProperties, promptUserForProjectName } from "./util";
@@ -42,6 +43,20 @@ import { ActiveProjectWatcher } from "./workspace";
 
 /** All architectures known by OBS in general */
 const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
+
+const cmdId = "obsRepository";
+
+export const REMOVE_ARCH_COMMAND = `${cmdPrefix}.${cmdId}.removeArchitectureFromRepo`;
+
+export const ADD_ARCH_COMMAND = `${cmdPrefix}.${cmdId}.addArchitecturesToRepo`;
+
+export const REMOVE_PATH_COMMAND = `${cmdPrefix}.${cmdId}.removePathFromRepo`;
+
+export const ADD_PATH_COMMAND = `${cmdPrefix}.${cmdId}.addPathToRepo`;
+
+export const ADD_REPOSITORY_COMMAND = `${cmdPrefix}.${cmdId}.addRepositoryFromDistro`;
+
+export const REMOVE_REPOSITORY_COMMAND = `${cmdPrefix}.${cmdId}.removeRepository`;
 
 /**
  * This class represents the root element of the repository tree.
@@ -185,7 +200,37 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       }, this),
       this.onAccountChange((_apiUrls) => {
         this.refresh();
-      }, this)
+      }, this),
+      vscode.commands.registerCommand(
+        ADD_ARCH_COMMAND,
+        this.addArchitecturesToRepo,
+        this
+      ),
+      vscode.commands.registerCommand(
+        REMOVE_ARCH_COMMAND,
+        this.removeArchitectureFromRepo,
+        this
+      ),
+      vscode.commands.registerCommand(
+        REMOVE_PATH_COMMAND,
+        this.removePathFromRepo,
+        this
+      ),
+      vscode.commands.registerCommand(
+        ADD_PATH_COMMAND,
+        this.addPathToRepo,
+        this
+      ),
+      vscode.commands.registerCommand(
+        ADD_REPOSITORY_COMMAND,
+        this.addRepositoryFromDistro,
+        this
+      ),
+      vscode.commands.registerCommand(
+        REMOVE_REPOSITORY_COMMAND,
+        this.removeRepository,
+        this
+      ),
     );
   }
 

@@ -142,37 +142,7 @@ export async function activate(
     packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),
-    new CheckOutHandler(accountManager, logger),
-    vscode.commands.registerCommand(
-      "obsRepository.addArchitecturesToRepo",
-      repoTreeProvider.addArchitecturesToRepo,
-      repoTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsRepository.removeArchitectureFromRepo",
-      repoTreeProvider.removeArchitectureFromRepo,
-      repoTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsRepository.removePathFromRepo",
-      repoTreeProvider.removePathFromRepo,
-      repoTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsRepository.addPathToRepo",
-      repoTreeProvider.addPathToRepo,
-      repoTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsRepository.addRepositoryFromDistro",
-      repoTreeProvider.addRepositoryFromDistro,
-      repoTreeProvider
-    ),
-    vscode.commands.registerCommand(
-      "obsRepository.removeRepository",
-      repoTreeProvider.removeRepository,
-      repoTreeProvider
-    )
+    new CheckOutHandler(accountManager, logger)
   );
 
   await accountManager.promptForUninmportedAccountsInOscrc();
