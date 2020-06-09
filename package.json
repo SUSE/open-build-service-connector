@@ -437,7 +437,10 @@
   "prettier": {
     "trailingComma": "none"
   },
-  "repository": "https://github.com/SUSE/open-build-service-connector",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SUSE/open-build-service-connector"
+  },
   "license": "MIT",
   "publisher": "SUSE",
   "version": "0.0.1",
@@ -448,10 +451,6 @@
   "homepage": "https://github.com/SUSE/open-build-service-connector/blob/master/README.md",
   "bugs": {
     "url": "https://github.com/SUSE/open-build-service-connector/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/SUSE/open-build-service-connector"
   },
   "preview": true
 }
