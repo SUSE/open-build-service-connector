@@ -40,7 +40,7 @@
     "xml2js": "^0.4.23"
   },
   "scripts": {
-    "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --out ./documentation src/",
+    "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --exclude \"src/ui-tests/**\" --out ./documentation src/ doc/",
     "package": "vsce package --yarn",
     "cleandeps": "rm -rf node_modules/",
     "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources/ ./mocklibsecret/build/ ./.vscode-test/ ./src/ui-tests/repositoryTreeView/fakeHome/",

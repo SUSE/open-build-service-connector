@@ -1,0 +1,120 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [10.x, 12.x, 13.x, 14.x]
+        vscode_version: [1.40.0, 1.40.1, 1.41.0, 1.41.1, 1.42.0, 1.42.1, 1.43.0, 1.43.1, 1.43.2, 1.44.0, 1.44.1, 1.44.2, 1.45.0, 1.45.1, 1.46.0, insiders]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: install xvfb
+      run: |
+        sudo apt-get -y update
+        sudo apt-get -y install xvfb
+
+    - run: yarn install || yarn install || yarn install
+    - run: |
+        /usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        mkdir tmpdir
+        TMPDIR=$(realpath ./tmpdir) yarn run coverage
+        rm -rf tmpdir
+      env:
+        VSCODE_VERSION: ${{ matrix.vscode_version }}
+        DISPLAY: ':99.0'
+
+    - uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage/lcov.info
+
+  test_mocklibsecret:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x, 13.x, 14.x]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: install dependencies
+      run: |
+          sudo apt-get -y update
+          sudo apt-get -y install meson ninja-build libsecret-1-dev libglib2.0-dev python3
+          npm install keytar@$(< package.json jq ".dependencies.keytar"|sed 's/"//g')
+
+    - run: |
+          mkdir -p mocklibsecret/build
+          pushd mocklibsecret/build
+          meson ..
+          ninja
+          cd ..
+          ./run_tests.py
+          popd
+
+  add_license:
+    needs: build
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - run: |
+        sudo apt-get -y update
+        sudo apt-get -y install fd-find
+    - run: |
+        export GOPATH="$(pwd)/golang"
+        mkdir -p ${GOPATH}
+        go get -u github.com/google/addlicense
+        ${GOPATH}/bin/addlicense -c "SUSE LLC" -l mit $(fdfind '.*(\.ts|\.js|\.py|\.c|\.build)$')
+        git diff --exit-code
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+      with:
+        node-version: 14.x
+
+    - run: |
+        yarn install || yarn install || yarn install
+        yarn run package
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: open-build-service-connector.vsix
+        path: open-build-service-connector-*.vsix
+
+  documentation:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+      with:
+        node-version: 14.x
+
+    - run: |
+        yarn install || yarn install || yarn install
+        yarn run doc:devel
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: documentation
+        path: ./documentation/

@@ -1,0 +1,53 @@
+name: UI_tests
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [10.x, 12.x, 13.x, 14.x]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - run: yarn install || yarn install || yarn install
+    - name: install xvfb
+      run: |
+        sudo apt-get -y update
+        sudo apt-get -y install xvfb meson ninja-build libsecret-1-dev libglib2.0-dev
+    - run: ./start-mini-obs.sh
+
+    - name: run the UI tests
+      run: |
+        /usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        for VER in "1.40.0" "1.40.1" "1.41.0" "1.41.1" "1.42.0" "1.42.1" "1.43.0" "1.43.1" "1.43.2" "1.44.0" "1.44.1" "1.44.2" "1.45.0" "1.45.1" "1.46.0" "insiders"; do
+          export VSCODE_VERSION=${VER}
+          yarn run test:ui
+        done
+      env:
+        DISPLAY: ':99.0'
+
+    - name: cleanup big files from the
+      run: find test-resources/ \( -name *.tar.gz -o -name chromedriver* \) | xargs rm
+      if: failure()
+
+    - name: upload the test-resources directory in case the tests fail
+      uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        path: test-resources/
+
+    - name: cleanup
+      run: |
+        pushd open-build-service
+        docker-compose stop
+        popd
