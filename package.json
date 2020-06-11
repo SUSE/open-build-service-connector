@@ -448,6 +448,10 @@
   "displayName": "Open Build Service Connector",
   "name": "open-build-service-connector",
   "icon": "media/obs-logo_meta.png",
+  "galleryBanner": {
+    "color": "#6da741",
+    "theme": "light"
+  },
   "homepage": "https://github.com/SUSE/open-build-service-connector/blob/master/README.md",
   "bugs": {
     "url": "https://github.com/SUSE/open-build-service-connector/issues"
