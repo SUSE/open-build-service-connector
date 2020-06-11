@@ -194,6 +194,11 @@ settings in your `settings.json` and change the account password via the command
 Please also be sure to checkout the issue tracker!
 
 
+## Credits
+
+- [@hellcp](https://github.com/Hellcp) for the icon used in the Activity Bar
+
+
 ## Release Notes
 
 ### 2020-06-03: 0.0.1
