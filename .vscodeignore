@@ -25,3 +25,4 @@ open-build-service/**
 runTests.sh
 runUiTests.sh
 start-mini-obs.sh
+logfile.json
