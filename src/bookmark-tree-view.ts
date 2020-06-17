@@ -245,10 +245,9 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
       {
         location: vscode.ProgressLocation.Notification,
         title: `Checking out ${projectName} to ${dest[0].fsPath}`,
-        // FIXME: make this cancellable at some point
-        cancellable: false
+        cancellable: true
       },
-      async (progress) => {
+      async (progress, cancellationToken) => {
         let finishedPkgs = 0;
         await checkOutProject(con, projectName, dest[0].fsPath, {
           callback: (pkgName, _index, allPackages) => {
@@ -257,7 +256,8 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
               message: `Checked out package ${pkgName}`,
               increment: Math.floor((100 * finishedPkgs) / allPackages.length)
             });
-          }
+          },
+          cancellationToken
         });
       }
     );

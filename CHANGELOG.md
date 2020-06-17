@@ -16,6 +16,7 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fix not being able to add repositories to projects with no repositories
   defined.
+- Checking out projects can now be cancelled.
 
 ### Removed
 
