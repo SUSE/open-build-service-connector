@@ -19,7 +19,6 @@ coverage/**
 test-resources/**
 documentation/**
 doc/**
-node_modules/**
 open-build-service/**
 .ccls-cache/**
 runTests.sh
