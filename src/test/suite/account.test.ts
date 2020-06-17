@@ -582,7 +582,7 @@ describe("AccountManager", function () {
           this.fixture.readAccountsFromOscrcMock.resolves([fakeOscrcAccount]);
           this.fixture.vscodeWindow.showInputBox.resolves(undefined);
 
-          await mngr.importAccountsFromOsrc().should.be.fulfilled;
+          await mngr.importAccountsFromOsrc();
 
           this.fixture.sandbox.assert.notCalled(
             this.fixture.keytarSetPasswordMock
@@ -602,7 +602,7 @@ describe("AccountManager", function () {
             { ...fakeAccount1, aliases: [] }
           ]);
 
-          await mngr.importAccountsFromOsrc().should.be.fulfilled;
+          await mngr.importAccountsFromOsrc();
 
           this.fixture.sandbox.assert.notCalled(this.fixture.accountChangeSpy);
         })
@@ -634,7 +634,7 @@ describe("AccountManager", function () {
 
           await setCheckForUnimportedAccounts(false);
 
-          await mngr.promptForUninmportedAccountsInOscrc().should.be.fulfilled;
+          await mngr.promptForUninmportedAccountsInOscrc();
 
           this.fixture.sandbox.assert.notCalled(
             this.fixture.vscodeWindow.showInformationMessage
@@ -648,7 +648,7 @@ describe("AccountManager", function () {
           const mngr = await this.fixture.createAccountManager([fakeAccount1]);
           this.fixture.readAccountsFromOscrcMock.resolves([fakeAccount1]);
 
-          await mngr.promptForUninmportedAccountsInOscrc().should.be.fulfilled;
+          await mngr.promptForUninmportedAccountsInOscrc();
 
           this.fixture.sandbox.assert.notCalled(
             this.fixture.vscodeWindow.showInformationMessage
@@ -669,7 +669,7 @@ describe("AccountManager", function () {
           ]);
           this.fixture.vscodeWindow.showInformationMessage.resolves();
 
-          await mngr.promptForUninmportedAccountsInOscrc().should.be.fulfilled;
+          await mngr.promptForUninmportedAccountsInOscrc();
 
           this.fixture.sandbox.assert.calledOnce(
             this.fixture.vscodeWindow.showInformationMessage
@@ -702,7 +702,7 @@ describe("AccountManager", function () {
             "Never show this message again"
           );
 
-          await mngr.promptForUninmportedAccountsInOscrc().should.be.fulfilled;
+          await mngr.promptForUninmportedAccountsInOscrc();
 
           this.fixture.sandbox.assert.calledOnce(
             this.fixture.vscodeWindow.showInformationMessage
@@ -733,7 +733,7 @@ describe("AccountManager", function () {
           ]);
           this.fixture.vscodeWindow.showInformationMessage.resolves("Not now");
 
-          await mngr.promptForUninmportedAccountsInOscrc().should.be.fulfilled;
+          await mngr.promptForUninmportedAccountsInOscrc();
 
           this.fixture.sandbox.assert.calledOnce(
             this.fixture.vscodeWindow.showInformationMessage
@@ -766,7 +766,7 @@ describe("AccountManager", function () {
             "Import accounts now"
           );
 
-          await mngr.promptForUninmportedAccountsInOscrc().should.be.fulfilled;
+          await mngr.promptForUninmportedAccountsInOscrc();
 
           this.fixture.sandbox.assert.calledOnce(
             this.fixture.vscodeWindow.showInformationMessage
@@ -810,7 +810,7 @@ describe("AccountManager", function () {
         );
         this.fixture.vscodeWindow.showInformationMessage.resolves("Yes");
 
-        await mngr.removeAccountInteractive().should.be.fulfilled;
+        await mngr.removeAccountInteractive();
 
         this.fixture.sandbox.assert.calledOnce(
           this.fixture.keytarDeletePasswordMock
@@ -837,7 +837,7 @@ describe("AccountManager", function () {
         );
         this.fixture.vscodeWindow.showInformationMessage.resolves("Yes");
 
-        await mngr.removeAccountInteractive().should.be.fulfilled;
+        await mngr.removeAccountInteractive();
       })
     );
 
@@ -850,7 +850,7 @@ describe("AccountManager", function () {
         );
         this.fixture.vscodeWindow.showQuickPick.resolves(undefined);
 
-        await mngr.removeAccountInteractive().should.be.fulfilled;
+        await mngr.removeAccountInteractive();
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.keytarDeletePasswordMock
@@ -871,7 +871,7 @@ describe("AccountManager", function () {
         );
         this.fixture.vscodeWindow.showInformationMessage.resolves(undefined);
 
-        await mngr.removeAccountInteractive().should.be.fulfilled;
+        await mngr.removeAccountInteractive();
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.keytarDeletePasswordMock
@@ -892,7 +892,7 @@ describe("AccountManager", function () {
         );
         this.fixture.vscodeWindow.showInformationMessage.resolves("No");
 
-        await mngr.removeAccountInteractive().should.be.fulfilled;
+        await mngr.removeAccountInteractive();
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.keytarDeletePasswordMock
@@ -938,7 +938,7 @@ describe("AccountManager", function () {
           .to.be.an("array")
           .and.have.length(2);
 
-        await mngr.promptForNotPresentAccountPasswords().should.be.fulfilled;
+        await mngr.promptForNotPresentAccountPasswords();
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.vscodeWindow.showInformationMessage
@@ -956,7 +956,7 @@ describe("AccountManager", function () {
 
         this.fixture.vscodeWindow.showInformationMessage.resolves(undefined);
 
-        await mngr.promptForNotPresentAccountPasswords().should.be.fulfilled;
+        await mngr.promptForNotPresentAccountPasswords();
 
         this.fixture.sandbox.assert.calledOnce(
           this.fixture.vscodeWindow.showInformationMessage
@@ -984,7 +984,7 @@ describe("AccountManager", function () {
 
         this.fixture.vscodeWindow.showInformationMessage.resolves("No");
 
-        await mngr.promptForNotPresentAccountPasswords().should.be.fulfilled;
+        await mngr.promptForNotPresentAccountPasswords();
 
         this.fixture.sandbox.assert.calledOnce(
           this.fixture.vscodeWindow.showInformationMessage
@@ -1008,7 +1008,7 @@ describe("AccountManager", function () {
         this.fixture.vscodeWindow.showInformationMessage.resolves("Yes");
         this.fixture.vscodeWindow.showInputBox.resolves(newPassword);
 
-        await mngr.promptForNotPresentAccountPasswords().should.be.fulfilled;
+        await mngr.promptForNotPresentAccountPasswords();
         this.fixture.sandbox.assert.calledWith(
           this.fixture.vscodeWindow.showInformationMessage.firstCall,
           "The following account has no password set: foo. Would you like to set it now?",
@@ -1051,7 +1051,7 @@ describe("AccountManager", function () {
         this.fixture.vscodeWindow.showInformationMessage.resolves("Yes");
         this.fixture.vscodeWindow.showInputBox.resolves(undefined);
 
-        await mngr.promptForNotPresentAccountPasswords().should.be.fulfilled;
+        await mngr.promptForNotPresentAccountPasswords();
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.keytarSetPasswordMock
@@ -1069,9 +1069,7 @@ describe("AccountManager", function () {
           ["secure"]
         );
 
-        await mngr.setAccountPasswordInteractive(
-          "I'm not a url"
-        ).should.be.fulfilled;
+        await mngr.setAccountPasswordInteractive("I'm not a url");
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.keytarSetPasswordMock
@@ -1098,7 +1096,7 @@ describe("AccountManager", function () {
 
         expect(mngr.activeAccounts.getAllApis()).to.have.length(2);
 
-        await mngr.setAccountPasswordInteractive().should.be.fulfilled;
+        await mngr.setAccountPasswordInteractive();
 
         this.fixture.sandbox.assert.calledOnce(
           this.fixture.vscodeWindow.showQuickPick
@@ -1146,7 +1144,7 @@ describe("AccountManager", function () {
 
         expect(mngr.activeAccounts.getAllApis()).to.have.length(1);
 
-        await mngr.setAccountPasswordInteractive().should.be.fulfilled;
+        await mngr.setAccountPasswordInteractive();
 
         this.fixture.sandbox.assert.calledOnce(
           this.fixture.keytarSetPasswordMock
@@ -1172,7 +1170,7 @@ describe("AccountManager", function () {
 
         this.fixture.vscodeWindow.showQuickPick.resolves(undefined);
 
-        await mngr.setAccountPasswordInteractive().should.be.fulfilled;
+        await mngr.setAccountPasswordInteractive();
 
         this.fixture.sandbox.assert.calledOnce(
           this.fixture.vscodeWindow.showQuickPick
@@ -1199,7 +1197,7 @@ describe("AccountManager", function () {
 
         this.fixture.vscodeWindow.showInputBox.resolves(undefined);
 
-        await mngr.setAccountPasswordInteractive().should.be.fulfilled;
+        await mngr.setAccountPasswordInteractive();
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.keytarSetPasswordMock
@@ -1296,7 +1294,7 @@ Gwc=
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
-          await mngr.newAccountWizard().should.be.fulfilled;
+          await mngr.newAccountWizard();
 
           this.fixture.sandbox.assert.calledOnce(
             this.fixture.vscodeWindow.showQuickPick
@@ -1333,7 +1331,7 @@ Gwc=
 
           const mngr = await this.fixture.createAccountManager();
 
-          await mngr.newAccountWizard().should.be.fulfilled;
+          await mngr.newAccountWizard();
 
           this.fixture.sandbox.assert.calledOnce(this.fixture.accountChangeSpy);
           checkAccountAndCon(
@@ -1390,7 +1388,7 @@ Gwc=
             Buffer.from(caCertRootCertificate, "ascii")
           );
 
-          await mngr.newAccountWizard().should.be.fulfilled;
+          await mngr.newAccountWizard();
 
           this.fixture.sandbox.assert.calledTwice(
             this.fixture.vscodeWindow.showQuickPick
@@ -1430,7 +1428,7 @@ Gwc=
           const errMsg = `ENOENT: no such file or directory, open ${certPath}`;
           this.readFileMock.throws(Error(errMsg));
 
-          await mngr.newAccountWizard().should.be.fulfilled;
+          await mngr.newAccountWizard();
 
           this.fixture.sandbox.assert.calledTwice(
             this.fixture.vscodeWindow.showQuickPick

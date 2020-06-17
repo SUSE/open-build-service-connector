@@ -89,7 +89,7 @@ describe("decorators", () => {
     it(
       "reports the thrown exception",
       castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass.doesNothingOrThrowsAsync(true).should.be.fulfilled;
+        await this.testClass.doesNothingOrThrowsAsync(true);
 
         assert.calledOnce(this.testClass.loggingStub.error);
         assert.calledOnce(this.testClass.vscodeWindow.showErrorMessage);
@@ -115,10 +115,7 @@ describe("decorators", () => {
         const err = {
           status: { summary }
         };
-        await this.testClass.doesNothingOrThrowsAsync(
-          true,
-          err
-        ).should.be.fulfilled;
+        await this.testClass.doesNothingOrThrowsAsync(true, err);
 
         const errMsg = `Error performing API call: ${summary}`;
         assert.calledWith(this.testClass.loggingStub.error.firstCall, err);
@@ -132,9 +129,7 @@ describe("decorators", () => {
     it(
       "does nothing when no exception is thrown",
       castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass.doesNothingOrThrowsAsync(
-          false
-        ).should.be.fulfilled;
+        await this.testClass.doesNothingOrThrowsAsync(false);
 
         assert.notCalled(this.testClass.loggingStub.error);
         assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
@@ -144,7 +139,7 @@ describe("decorators", () => {
     it(
       "does not report the exception to the user but logs it",
       castToAsyncFunc<TestClassCtx>(async function () {
-        await this.testClass.decoratedButNoUserReport(true).should.be.fulfilled;
+        await this.testClass.decoratedButNoUserReport(true);
 
         assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
 
@@ -174,7 +169,7 @@ describe("decorators", () => {
       castToFunc<TestClassCtx>(async function () {
         await this.testClass
           .doesNothingOrThrows(false)
-          .should.be.fulfilled.and.eventually.equal(false);
+          .should.eventually.equal(false);
 
         assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
         assert.notCalled(this.testClass.loggingStub.error);
@@ -186,7 +181,7 @@ describe("decorators", () => {
       castToAsyncFunc<TestClassCtx>(async function () {
         await this.testClass
           .doesNothingOrThrowsAsync(false)
-          .should.be.fulfilled.and.eventually.equal(42);
+          .should.eventually.equal(42);
 
         assert.notCalled(this.testClass.vscodeWindow.showErrorMessage);
         assert.notCalled(this.testClass.loggingStub.error);
@@ -198,10 +193,10 @@ describe("decorators", () => {
       castToAsyncFunc<TestClassCtx>(async function () {
         await this.testClass
           .doesNothingOrThrows(true)
-          .should.be.fulfilled.and.eventually.equal(undefined);
+          .should.eventually.equal(undefined);
         await this.testClass
           .doesNothingOrThrowsAsync(true)
-          .should.be.fulfilled.and.eventually.equal(undefined);
+          .should.eventually.equal(undefined);
       })
     );
   });

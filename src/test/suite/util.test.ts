@@ -100,11 +100,7 @@ describe("utilities", () => {
         testMap.set("two", 2);
         testMap.set("cake", "a lie");
 
-        await saveMapToMemento(
-          this.mockMemento,
-          "bar",
-          testMap
-        ).should.be.fulfilled;
+        await saveMapToMemento(this.mockMemento, "bar", testMap);
 
         assert.calledOnce(this.mockMemento.update);
         expect(this.mockMemento.update.getCall(0).args[0]).to.equal("bar");

@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { expect } from "chai";
 import { promises as fsPromises } from "fs";
 import { afterEach, beforeEach, Context, describe, it, xit } from "mocha";
 import * as obs_ts from "open-build-service-api";
@@ -199,10 +200,9 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "returns a AddBookmark and MyBookmarks element",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider();
-          const children = await projectTree.getChildren(undefined).should.be
-            .fulfilled;
+          const children = await projectTree.getChildren(undefined);
 
-          children.should.deep.equal([
+          expect(children).to.deep.equal([
             new AddBookmarkElement(),
             new MyBookmarksElement()
           ]);
@@ -219,7 +219,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(myBookmarksElement)
-            .should.be.fulfilled.and.eventually.deep.equal([]);
+            .should.eventually.deep.equal([]);
         })
       );
 
@@ -233,7 +233,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(myBookmarksElement)
-            .should.be.fulfilled.and.eventually.deep.equal([]);
+            .should.eventually.deep.equal([]);
         })
       );
 
@@ -249,7 +249,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(myBookmarksElement)
-            .should.be.fulfilled.and.eventually.deep.equal([
+            .should.eventually.deep.equal([
               {
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 contextValue: "project",
@@ -277,9 +277,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const myBookmarksElement = new MyBookmarksElement();
 
-          const children = await projectTree.getChildren(myBookmarksElement)
-            .should.be.fulfilled;
-
+          const children = await projectTree.getChildren(myBookmarksElement);
           children.should.contain.a.thing.that.deep.equals({
             account: fakeAccount1,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
@@ -294,7 +292,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             iconPath: { id: "server" },
             label: fakeAccount2.accountName
           });
-          children.should.be.a("array").and.have.length(2);
+          expect(children).to.be.an("array").and.have.length(2);
         })
       );
     });
@@ -322,7 +320,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           const obsServer1Element = new ObsServerTreeElement(fakeAccount1);
           await projectTree
             .getChildren(obsServer1Element)
-            .should.be.fulfilled.and.eventually.deep.equal([
+            .should.eventually.deep.equal([
               {
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 contextValue,
@@ -356,7 +354,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           const obsServer2Element = new ObsServerTreeElement(fakeAccount2);
           await projectTree
             .getChildren(obsServer2Element)
-            .should.be.fulfilled.and.eventually.deep.equal([
+            .should.eventually.deep.equal([
               {
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 contextValue,
@@ -396,7 +394,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const children = await projectTree
             .getChildren(projElemen)
-            .should.be.fulfilled.and.eventually.be.an("array")
+            .should.eventually.be.an("array")
             .and.have.lengthOf(2);
 
           children.map((child: any, i: number) => {
@@ -429,7 +427,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const children = await projectTree
             .getChildren(projElemen)
-            .should.be.fulfilled.and.eventually.be.an("array")
+            .should.eventually.be.an("array")
             .and.have.lengthOf(2);
 
           children.map((child: any, i: number) => {
@@ -453,7 +451,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           // => no more fetching is necessary
           await projectTree
             .getChildren(projElemen)
-            .should.be.fulfilled.and.eventually.deep.equal(children);
+            .should.eventually.deep.equal(children);
 
           this.fixture.fetchProjectMock.should.have.callCount(0);
         })
@@ -471,7 +469,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(projElement)
-            .should.be.fulfilled.and.eventually.be.deep.equal([]);
+            .should.eventually.be.deep.equal([]);
 
           this.fixture.sandbox.assert.notCalled(this.fixture.fetchProjectMock);
         })
@@ -487,7 +485,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
 
           const projElement = new ProjectTreeElement(fooProj);
-          await projectTree.getChildren(projElement).should.be.fulfilled;
+          await projectTree.getChildren(projElement);
 
           this.fixture.sandbox.assert.notCalled(
             this.fixture.mockMemento.update
@@ -521,7 +519,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(pkgElement)
-            .should.be.fulfilled.and.eventually.deep.equal([]);
+            .should.eventually.deep.equal([]);
 
           this.fixture.fetchProjectMock.should.have.callCount(0);
         })
@@ -542,7 +540,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const fileElements = await projectTree
             .getChildren(pkgElement)
-            .should.be.fulfilled.and.eventually.be.an("array")
+            .should.eventually.be.an("array")
             .and.have.lengthOf(2);
 
           this.fixture.fetchProjectMock.should.have.been.calledOnceWithExactly(
@@ -584,7 +582,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const fileElements = await projectTree
             .getChildren(pkgElement)
-            .should.be.fulfilled.and.eventually.be.an("array")
+            .should.eventually.be.an("array")
             .and.have.lengthOf(2);
 
           barPkgWithFiles.files!.map((pkgFile, i) => {
@@ -609,7 +607,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           // thing again, then fetchPackage must not be called again
           await projectTree
             .getChildren(pkgElement)
-            .should.be.fulfilled.and.eventually.deep.equal(fileElements);
+            .should.eventually.deep.equal(fileElements);
 
           this.fixture.fetchProjectMock.should.have.callCount(0);
           this.fixture.fetchPackageMock.should.have.callCount(0);
@@ -627,8 +625,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const pkgElement = new PackageTreeElement(barPkg);
 
-          const fileElements = await projectTree.getChildren(pkgElement).should
-            .be.fulfilled;
+          const fileElements = await projectTree.getChildren(pkgElement);
 
           this.fixture.sandbox.assert.calledOnce(this.fixture.fetchPackageMock);
           this.fixture.sandbox.assert.notCalled(
@@ -639,7 +636,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           // again, we end up having to call fetchPackage again
           await projectTree
             .getChildren(pkgElement)
-            .should.be.fulfilled.and.eventually.deep.equal(fileElements);
+            .should.eventually.deep.equal(fileElements);
           this.fixture.sandbox.assert.calledTwice(
             this.fixture.fetchPackageMock
           );
@@ -715,7 +712,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         this.fixture.fetchProjectMock.resolves(barProjWithPackagesWithoutFiles);
         this.fixture.fetchPackageMock.resolves(barPkgWithFiles);
 
-        await projectTree.updatePackage(pkgTreeItem).should.be.fulfilled;
+        await projectTree.updatePackage(pkgTreeItem);
 
         this.fixture.fetchPackageMock.should.have.been.calledOnceWithExactly(
           fakeApi1ValidAcc.connection,
@@ -765,7 +762,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         this.fixture.fetchProjectMock.resolves(barProjWithPackages);
 
-        await projectTree.updatePackage(pkgTreeItem).should.be.fulfilled;
+        await projectTree.updatePackage(pkgTreeItem);
 
         this.fixture
           .projectBookmarkManager!.getBookmarkedProject(
@@ -787,7 +784,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           [[fakeAccount1.apiUrl, [barProjWithPackagesWithoutFiles]]]
         );
 
-        await projectTree.updatePackage(pkgTreeItem).should.be.fulfilled;
+        await projectTree.updatePackage(pkgTreeItem);
 
         this.fixture.sandbox.assert.notCalled(this.fixture.mockMemento.update);
       })
@@ -801,7 +798,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           []
         );
 
-        await projectTree.updatePackage(pkgTreeItem).should.be.fulfilled;
+        await projectTree.updatePackage(pkgTreeItem);
 
         this.fixture.sandbox.assert.notCalled(this.fixture.mockMemento.update);
       })
@@ -815,8 +812,8 @@ describe("BookmarkedProjectsTreeProvider", () => {
           [[fakeAccount1.apiUrl, [barProjWithPackagesWithoutFiles]]]
         );
 
-        await projectTree.updatePackage(projTreeItem).should.be.fulfilled;
-        await projectTree.updatePackage().should.be.fulfilled;
+        await projectTree.updatePackage(projTreeItem);
+        await projectTree.updatePackage();
 
         this.fixture.sandbox.assert.notCalled(this.fixture.mockMemento.update);
       })
@@ -837,9 +834,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
 
-        await projectTree.bookmarkProjectCommand(
-          new AddBookmarkElement()
-        ).should.be.fulfilled;
+        await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
         this.fixture.vscodeWindow.showInputBox.should.have.been.calledOnce;
         this.fixture.vscodeWindow.showInputBox.should.have.been.calledWithMatch(
@@ -889,9 +884,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             .onCall(0)
             .resolves("Yes");
 
-          await projectTree.bookmarkProjectCommand(
-            new AddBookmarkElement()
-          ).should.be.fulfilled;
+          await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
           this.fixture.vscodeWindow.showInformationMessage.should.have.been.calledOnceWith(
             "This project has 12 packages, add them all?",
@@ -924,9 +917,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             .onCall(0)
             .resolves(undefined);
 
-          await projectTree.bookmarkProjectCommand(
-            new AddBookmarkElement()
-          ).should.be.fulfilled;
+          await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
           this.fixture.sandbox.assert.notCalled(
             this.fixture.mockMemento.update
@@ -950,9 +941,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             .onCall(0)
             .resolves(pickedPkgNames);
 
-          await projectTree.bookmarkProjectCommand(
-            new AddBookmarkElement()
-          ).should.be.fulfilled;
+          await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
           this.fixture.vscodeWindow.showQuickPick.should.have.callCount(1);
 
@@ -995,9 +984,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             .resolves("No");
           this.fixture.vscodeWindow.showQuickPick.onCall(0).resolves(undefined);
 
-          await projectTree.bookmarkProjectCommand(
-            new AddBookmarkElement()
-          ).should.be.fulfilled;
+          await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
           this.fixture.vscodeWindow.showQuickPick.should.have.callCount(1);
           this.fixture.mockMemento.update.should.have.callCount(0);
@@ -1010,7 +997,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider();
 
-        await projectTree.bookmarkProjectCommand().should.be.fulfilled;
+        await projectTree.bookmarkProjectCommand();
 
         this.fixture.sandbox.assert.calledOnce(
           this.fixture.vscodeWindow.showErrorMessage
@@ -1033,9 +1020,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         this.fixture.vscodeWindow.showInputBox.onCall(0).resolves(undefined);
 
-        await projectTree.bookmarkProjectCommand(
-          new AddBookmarkElement()
-        ).should.be.fulfilled;
+        await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
         this.fixture.vscodeWindow.showInputBox.should.have.callCount(1);
         this.fixture.mockMemento.update.should.have.callCount(0);
@@ -1062,9 +1047,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             .onCall(0)
             .resolves("Cancel");
 
-          await projectTree.bookmarkProjectCommand(
-            new AddBookmarkElement()
-          ).should.be.fulfilled;
+          await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
           this.fixture.vscodeWindow.showInputBox.should.have.been.calledOnce;
           this.fixture.vscodeWindow.showErrorMessage.calledOnceWith(
@@ -1087,9 +1070,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
             .onCall(0)
             .resolves("Add anyway");
 
-          await projectTree.bookmarkProjectCommand(
-            new AddBookmarkElement()
-          ).should.be.fulfilled;
+          await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
           this.fixture.vscodeWindow.showInputBox.should.have.callCount(1);
           this.fixture.vscodeWindow.showErrorMessage.should.have.callCount(1);
@@ -1129,9 +1110,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
 
-        await projectTree.bookmarkProjectCommand(
-          fakeApi1ObsServerTreeElement
-        ).should.be.fulfilled;
+        await projectTree.bookmarkProjectCommand(fakeApi1ObsServerTreeElement);
 
         this.fixture.sandbox.assert.calledOnce(this.fixture.mockMemento.update);
         this.fixture.mockMemento.update
@@ -1159,7 +1138,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         const projElem = new ProjectTreeElement(barProj);
 
-        await projectTree.removeBookmark(projElem).should.be.fulfilled;
+        await projectTree.removeBookmark(projElem);
 
         this.fixture.sandbox.assert.calledOnce(this.fixture.mockMemento.update);
         this.fixture.mockMemento.update
@@ -1184,23 +1163,19 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         const projElem = new ProjectTreeElement(fooProj);
 
-        await vscode.commands.executeCommand(
-          UPDATE_PROJECT_COMMAND,
-          projElem
-        ).should.be.fulfilled;
+        await vscode.commands.executeCommand(UPDATE_PROJECT_COMMAND, projElem);
         this.fixture.mockMemento.update.should.have.callCount(0);
 
         // now we have to check that the project tree provider is actually aware
         // of this change, do that via getChildren() as we cannot access the
         // activeProject property
-        const pkgElems = await projectTree.getChildren(projElem).should.be
-          .fulfilled;
+        const pkgElems = await projectTree.getChildren(projElem);
 
-        pkgElems.should.be
-          .an("array")
+        expect(pkgElems)
+          .to.be.an("array")
           .and.have.length(fooProjWithPackages.packages!.length);
 
-        pkgElems.forEach((elem: PackageTreeElement, i: number) => {
+        pkgElems.forEach((elem, i) => {
           isPackageTreeElement(elem).should.be.true;
           elem.should.deep.include({
             packageName: fooProjWithPackages.packages![i].name,
@@ -1222,10 +1197,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         const projElem = new ProjectTreeElement(fooProj);
 
-        await vscode.commands.executeCommand(
-          UPDATE_PROJECT_COMMAND,
-          projElem
-        ).should.be.fulfilled;
+        await vscode.commands.executeCommand(UPDATE_PROJECT_COMMAND, projElem);
 
         this.fixture.sandbox.assert.calledOnce(this.fixture.mockMemento.update);
         this.fixture.mockMemento.update
@@ -1242,9 +1214,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         // const projectTree =
         await this.fixture.createBookmarkedProjectsTreeProvider();
 
-        await vscode.commands.executeCommand(
-          UPDATE_PROJECT_COMMAND
-        ).should.be.fulfilled;
+        await vscode.commands.executeCommand(UPDATE_PROJECT_COMMAND);
 
         this.fixture.sandbox.assert.notCalled(this.fixture.mockMemento.update);
       })
@@ -1263,7 +1233,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         await vscode.commands.executeCommand(
           UPDATE_PROJECT_COMMAND,
           fooProjTreeElem
-        ).should.be.fulfilled;
+        );
 
         this.fixture.vscodeWindow.showErrorMessage.should.have.been.calledOnceWith(
           match(

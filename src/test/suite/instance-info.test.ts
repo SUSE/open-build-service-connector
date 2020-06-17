@@ -105,7 +105,7 @@ describe("ObsServerInformation", () => {
     it(
       "does not fetch anything if no accounts are present",
       castToAsyncFunc<FixtureContext>(async function () {
-        await this.fixture.createObsServerInformation().should.be.fulfilled;
+        await this.fixture.createObsServerInformation();
 
         this.fixture.sandbox.assert.notCalled(
           this.fixture.fetchConfigurationMock
@@ -123,11 +123,9 @@ describe("ObsServerInformation", () => {
 
         await vscode.commands
           .executeCommand(GET_INSTANCE_INFO_COMMAND)
-          .should.be.fulfilled.and.eventually.equal(undefined);
+          .should.eventually.equal(undefined);
 
-        await vscode.commands.executeCommand(
-          UPDATE_INSTANCE_INFO_COMMAND
-        ).should.be.fulfilled;
+        await vscode.commands.executeCommand(UPDATE_INSTANCE_INFO_COMMAND);
       })
     );
 
@@ -208,12 +206,10 @@ describe("ObsServerInformation", () => {
     it(
       "returns the server infos about known instances",
       castToAsyncFunc<FixtureContext>(async function () {
-        const serverInfo: ObsServerInformation = await this.fixture.createObsServerInformation(
-          [
-            [fakeAccount1.apiUrl, fakeApi1ValidAcc],
-            [fakeAccount2.apiUrl, fakeApi2ValidAcc]
-          ]
-        ).should.be.fulfilled;
+        const serverInfo = await this.fixture.createObsServerInformation([
+          [fakeAccount1.apiUrl, fakeApi1ValidAcc],
+          [fakeAccount2.apiUrl, fakeApi2ValidAcc]
+        ]);
 
         serverInfo.getInfo(fakeAccount1.apiUrl)!.should.deep.equal({
           apiUrl: fakeAccount1.apiUrl,
@@ -237,9 +233,7 @@ describe("ObsServerInformation", () => {
         ].forEach(async (apiUrl) => {
           await vscode.commands
             .executeCommand(GET_INSTANCE_INFO_COMMAND, apiUrl)
-            .should.be.fulfilled.and.eventually.deep.equal(
-              serverInfo.getInfo(apiUrl)
-            );
+            .should.eventually.deep.equal(serverInfo.getInfo(apiUrl));
         });
       })
     );
@@ -249,7 +243,7 @@ describe("ObsServerInformation", () => {
       castToAsyncFunc<FixtureContext>(async function () {
         await this.fixture.createObsServerInformation([
           [fakeAccount1.apiUrl, fakeApi1ValidAcc]
-        ]).should.be.fulfilled;
+        ]);
 
         await this.fixture.fakeAccountManager!.activeAccounts.addAccount(
           fakeApi2ValidAcc
@@ -257,7 +251,7 @@ describe("ObsServerInformation", () => {
 
         // HACK: the fetching of the infos is asynchronous and events are not,
         // so we need to manually delay here
-        await sleep(100);
+        await sleep(500);
 
         await vscode.commands
           .executeCommand(GET_INSTANCE_INFO_COMMAND, fakeAccount2.apiUrl)
