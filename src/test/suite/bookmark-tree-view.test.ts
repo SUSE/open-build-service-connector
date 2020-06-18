@@ -738,7 +738,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
     );
 
     it(
-      "appends the package if the project bookmark has already packages",
+      "does not add additional packages to the bookmarks",
       castToAsyncFunc<FixtureContext>(async function () {
         const bar2Pkg: obs_ts.Package = {
           apiUrl: fakeAccount1.apiUrl,
@@ -760,7 +760,10 @@ describe("BookmarkedProjectsTreeProvider", () => {
           ]
         );
 
-        this.fixture.fetchProjectMock.resolves(barProjWithPackages);
+        this.fixture.fetchProjectMock.resolves({
+          ...barProj,
+          packages: [bar2Pkg, barPkgWithFiles]
+        });
 
         await projectTree.updatePackage(pkgTreeItem);
 
@@ -771,7 +774,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           )
           .should.eventually.deep.equal({
             ...barProj,
-            packages: [bar2Pkg, barPkgWithFiles]
+            packages: [bar2Pkg]
           });
       })
     );
