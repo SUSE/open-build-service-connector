@@ -68,6 +68,14 @@ curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/everyone -d "<group>
 </person>
 </group>"
 
+# setup interconnect
+curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE.org/_meta -d "<project name='openSUSE.org'>
+  <title>Standard OBS instance at build.opensuse.org</title>
+  <description>This instance delivers the default build targets for OBS.</description>
+  <remoteurl>https://api.opensuse.org/public</remoteurl>
+</project>
+"
+
 curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Tumbleweed/_meta -d "
 <project name='openSUSE:Tumbleweed'>
   <title>Tumbleweed</title>
