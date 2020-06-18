@@ -41,7 +41,6 @@ import {
   castToAsyncFunc,
   createStubbedVscodeWindow,
   LoggingFixture,
-  sleep,
   testLogger
 } from "./test-utils";
 
@@ -82,7 +81,9 @@ class ObsServerInformationFixture extends LoggingFixture {
       }
     );
 
-    await serverInfo.initialInstanceInfoRetrieved;
+    await serverInfo.updateInstanceInfosPromise.should.eventually.deep.equal(
+      this.fakeAccountManager.activeAccounts.getAllApis()
+    );
 
     this.disposables.push(serverInfo);
 
@@ -241,17 +242,16 @@ describe("ObsServerInformation", () => {
     it(
       "updates the server info on account changes",
       castToAsyncFunc<FixtureContext>(async function () {
-        await this.fixture.createObsServerInformation([
+        const serverInfo = await this.fixture.createObsServerInformation([
           [fakeAccount1.apiUrl, fakeApi1ValidAcc]
         ]);
 
         await this.fixture.fakeAccountManager!.activeAccounts.addAccount(
           fakeApi2ValidAcc
         );
-
-        // HACK: the fetching of the infos is asynchronous and events are not,
-        // so we need to manually delay here
-        await sleep(500);
+        await serverInfo.updateInstanceInfosPromise.should.eventually.deep.equal(
+          [fakeApi1ValidAcc.account.apiUrl, fakeApi2ValidAcc.account.apiUrl]
+        );
 
         await vscode.commands
           .executeCommand(GET_INSTANCE_INFO_COMMAND, fakeAccount2.apiUrl)

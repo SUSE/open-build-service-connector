@@ -89,9 +89,13 @@ export const UPDATE_INSTANCE_INFO_COMMAND = `${cmdPrefix}.ObsServerInfo.updateIn
  */
 export class ObsServerInformation extends ConnectionListenerLoggerBase {
   /**
-   * Promise that resolves once the initial ObsInstance data fetch is completed.
+   * Promise that resolves to the list of ApiUrls that were updated once the
+   * currently active ObsInstance data fetch is completed.
+   *
+   * In most cases you can simply ignore the result as this should all do the
+   * "right thing" in the background.
    */
-  public readonly initialInstanceInfoRetrieved: Promise<void>;
+  public updateInstanceInfosPromise: Promise<string[]>;
 
   private instances: ObsInstance[] = [];
 
@@ -107,10 +111,13 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
     super(accountManager, logger);
 
     this.disposables.push(
-      this.onAccountChange(
-        async (apiUrls) => this.updateAllInstanceInfos(apiUrls),
-        this
-      ),
+      this.onAccountChange(function (
+        this: ObsServerInformation,
+        apiUrls: ApiUrl[]
+      ) {
+        this.updateInstanceInfosPromise = this.updateAllInstanceInfos(apiUrls);
+      },
+      this),
       vscode.commands.registerCommand(
         GET_INSTANCE_INFO_COMMAND,
         this.getInfo,
@@ -127,7 +134,7 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
     // ages to resolve.
     // That is pretty hacky, but the called function *should* not throw any
     // exceptions and just log them.
-    this.initialInstanceInfoRetrieved = this.updateAllInstanceInfos(
+    this.updateInstanceInfosPromise = this.updateAllInstanceInfos(
       accountManager.activeAccounts.getAllApis()
     );
   }
@@ -170,18 +177,18 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
    *
    * Note: this function is automatically called on account changes and need
    * only be invoked if the stored data appear to be stale.
+   *
+   * @return The list of APIs that were successfully updated.
    */
-  public async updateAllInstanceInfos(apiUrls?: ApiUrl[]): Promise<void> {
-    if (apiUrls === undefined) {
-      apiUrls = this.activeAccounts.getAllApis();
-    }
+  public async updateAllInstanceInfos(apiUrls?: ApiUrl[]): Promise<string[]> {
+    const apisToUpdate = apiUrls ?? this.activeAccounts.getAllApis();
     this.logger.trace(
       "Updating all instanceInfos for the API(s): %s",
-      apiUrls.join(", ")
+      apisToUpdate.join(", ")
     );
 
     const instanceInfos = await Promise.all(
-      apiUrls.map((apiUrl) => this.fetchInstanceInfoForApi(apiUrl))
+      apisToUpdate.map((apiUrl) => this.fetchInstanceInfoForApi(apiUrl))
     );
 
     this.instances = [];
@@ -190,6 +197,7 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
         this.instances.push(instanceInfo);
       }
     });
+    return apisToUpdate;
   }
 
   private async fetchInstanceInfoForApi(
