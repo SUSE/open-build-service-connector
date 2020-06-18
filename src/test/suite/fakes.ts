@@ -29,31 +29,37 @@ import {
 import { ActiveProject, ActiveProjectWatcher } from "../../workspace";
 
 export interface FakeEvent<T> {
-  listeners: ((e: T) => any)[];
+  listeners: { callback: (e: T) => any; thisArg?: any }[];
 
   fire: (e: T) => Promise<void>;
 
-  event: (listener: (e: T) => any) => vscode.Disposable;
+  event: (listener: (e: T) => any, thisArg?: any) => vscode.Disposable;
 }
 
 export function makeFakeEvent<T>(): FakeEvent<T> {
-  const listeners: ((e: T) => any)[] = [];
+  const listeners: { callback: (e: T) => any; thisArg?: any }[] = [];
 
-  const fire = async (e: T) => {
-    listeners.map(async (listener) => {
-      // const res = listener(e);
-      // if (res.then !== undefined) {
-      //   await res;
-      // }
-      await listener(e);
-    });
+  const fire = async (e: T): Promise<void> => {
+    await Promise.all(
+      listeners.map(async (listener) => {
+        const res = listener.callback.call(listener.thisArg, e);
+        if (res !== undefined && res.then !== undefined) {
+          await res;
+        }
+      })
+    );
   };
 
-  const event = (listener: (e: T) => any) => {
-    listeners.push(listener);
+  const event = (listener: (e: T) => any, thisArg?: any) => {
+    listeners.push({ callback: listener, thisArg });
     return {
       dispose: () => {
-        // do nothing on purpose
+        const listenerInd = listeners.findIndex(
+          (lst) => lst.callback === listener
+        );
+        if (listenerInd > -1) {
+          listeners.splice(listenerInd, 1);
+        }
       }
     };
   };
@@ -82,7 +88,7 @@ class FakeActiveAccounts implements ActiveAccounts {
     }
   }
 
-  public async addAccount(acc: ValidAccount) {
+  public async addAccount(acc: ValidAccount): Promise<void> {
     this.accountMap.set(acc.account.apiUrl, acc);
     await this.onAccountChangeEmitter.fire(this.getAllApis());
   }
@@ -144,6 +150,6 @@ export class FakeActiveProjectWatcher implements ActiveProjectWatcher {
 
   public async setActiveProject(activeProject: ActiveProject): Promise<void> {
     this.activeProject = activeProject;
-    await this.onDidChangeActiveProjectEmitter.fire(activeProject);
+    return this.onDidChangeActiveProjectEmitter.fire(activeProject);
   }
 }
