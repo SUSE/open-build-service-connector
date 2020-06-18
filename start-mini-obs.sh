@@ -36,31 +36,33 @@ popd
 TEST_USER="obsTestUser"
 CREDENTIALS="Admin:opensuse"
 
+CURL="curl -f --user ${CREDENTIALS}"
+
 # setup a test user
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/person/${TEST_USER} -d "
+${CURL} -X PUT ${obs_url}/person/${TEST_USER} -d "
 <person>
 <login>${TEST_USER}</login>
 <email>${TEST_USER}@notexisting.com</email>
 <state>confirmed</state>
 </person>
 "
-curl --user ${CREDENTIALS} -X POST ${obs_url}/person/${TEST_USER}?cmd=change_password -d "nots3cr3t"
+${CURL} -X POST ${obs_url}/person/${TEST_USER}?cmd=change_password -d "nots3cr3t"
 
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/testers -d "<group>
+${CURL} -X PUT ${obs_url}/group/testers -d "<group>
 <title>testers</title>
 <person>
 <person user_id='${TEST_USER}'/>
 </person>
 </group>"
 
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/admins -d "<group>
+${CURL} -X PUT ${obs_url}/group/admins -d "<group>
 <title>admins</title>
 <person>
 <person user_id='Admin'/>
 </person>
 </group>"
 
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/everyone -d "<group>
+${CURL} -X PUT ${obs_url}/group/everyone -d "<group>
 <title>everyone</title>
 <person>
 <person user_id='Admin'/>
@@ -69,7 +71,7 @@ curl --user ${CREDENTIALS} -X PUT ${obs_url}/group/everyone -d "<group>
 </group>"
 
 # setup interconnect
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE.org/_meta -d "<project name='openSUSE.org'>
+${CURL} -X PUT ${obs_url}/source/openSUSE.org/_meta -d "<project name='openSUSE.org'>
   <title>Standard OBS instance at build.opensuse.org</title>
   <description>This instance delivers the default build targets for OBS.</description>
   <remoteurl>https://api.opensuse.org/public</remoteurl>
@@ -78,7 +80,7 @@ curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE.org/_meta -d "<proj
 
 # create openSUSE:Factory first without any repos to avoid the circular
 # dependency between Factory and Tumbleweed
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
+${CURL} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
 <project name='openSUSE:Factory'>
   <title>The next openSUSE distribution</title>
   <description>Have a look at http://en.opensuse.org/Portal:Factory for more details.</description>
@@ -93,7 +95,7 @@ curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
 </project>
 "
 
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Tumbleweed/_meta -d "
+${CURL} -X PUT ${obs_url}/source/openSUSE:Tumbleweed/_meta -d "
 <project name='openSUSE:Tumbleweed'>
   <title>Tumbleweed</title>
   <description>Tumbleweed is the openSUSE Rolling Release</description>
@@ -135,7 +137,7 @@ curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Tumbleweed/_meta -d
 </project>
 "
 
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
+${CURL} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
 <project name='openSUSE:Factory'>
   <title>The next openSUSE distribution</title>
   <description>Have a look at http://en.opensuse.org/Portal:Factory for more details.</description>
@@ -174,7 +176,7 @@ curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
 </project>
 "
 
-curl --user ${CREDENTIALS} -X PUT ${obs_url}/distributions -d '<distributions>
+${CURL} -X PUT ${obs_url}/distributions -d '<distributions>
   <distribution vendor="openSUSE" version="Tumbleweed" id="13908">
     <name>openSUSE Tumbleweed</name>
     <project>openSUSE:Factory</project>
