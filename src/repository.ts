@@ -41,9 +41,6 @@ import { deepCopyProperties, promptUserForProjectName } from "./util";
 import { VscodeWindow } from "./vscode-dep";
 import { ActiveProjectWatcher } from "./workspace";
 
-/** All architectures known by OBS in general */
-const ALL_ARCHES: Arch[] = Object.keys(Arch) as Arch[];
-
 const cmdId = "obsRepository";
 
 export const REMOVE_ARCH_COMMAND = `${cmdPrefix}.${cmdId}.removeArchitectureFromRepo`;
