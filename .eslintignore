@@ -1,0 +1,4 @@
+out/
+node_modules/
+src/test/
+src/ui-tests/
