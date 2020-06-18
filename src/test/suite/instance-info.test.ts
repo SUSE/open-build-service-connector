@@ -149,7 +149,7 @@ describe("ObsServerInformation", () => {
   });
 
   describe("#getInfo", () => {
-    const ObsConfig: openBuildServiceApi.Configuration = {
+    const obsConfig: openBuildServiceApi.Configuration = {
       description:
         "The openSUSE Build Service is the public instance of the Open Build Service (OBS)",
       disableBranchPublishing: true,
@@ -160,14 +160,14 @@ describe("ObsServerInformation", () => {
       title: "openSUSE Build Service"
     };
 
-    const FooInstanceConfig: openBuildServiceApi.Configuration = {
+    const fooInstanceConfig: openBuildServiceApi.Configuration = {
       description: "This is just a test instance",
       disableBranchPublishing: true,
       schedulers: [],
       title: "Test"
     };
 
-    const Tumbleweed: openBuildServiceApi.Distribution = {
+    const tumbleweed: openBuildServiceApi.Distribution = {
       link: new URL("http://www.opensuse.org/"),
       name: "openSUSE Tumbleweed",
       project: "openSUSE:Factory",
@@ -181,23 +181,23 @@ describe("ObsServerInformation", () => {
 
     const barInstanceInfo = {
       apiUrl: fakeAccount2.apiUrl,
-      hostedDistributions: [Tumbleweed],
-      supportedArchitectures: ObsConfig.schedulers,
+      hostedDistributions: [tumbleweed],
+      supportedArchitectures: obsConfig.schedulers,
       projectList
     };
 
     beforeEach(function () {
       this.fixture.fetchConfigurationMock
         .withArgs(match.has("url", fakeAccount2.apiUrl))
-        .resolves(ObsConfig);
+        .resolves(obsConfig);
       this.fixture.fetchConfigurationMock
         .withArgs(match.has("url", fakeAccount1.apiUrl))
-        .resolves(FooInstanceConfig);
+        .resolves(fooInstanceConfig);
       this.fixture.fetchConfigurationMock.rejects(
         Error("Cannot fetch the configuration for this API")
       );
 
-      this.fixture.fetchHostedDistributionsMock.resolves([Tumbleweed]);
+      this.fixture.fetchHostedDistributionsMock.resolves([tumbleweed]);
 
       this.fixture.fetchProjectListMock.resolves(
         projectList.map((name) => ({ name }))
@@ -214,7 +214,7 @@ describe("ObsServerInformation", () => {
 
         serverInfo.getInfo(fakeAccount1.apiUrl)!.should.deep.equal({
           apiUrl: fakeAccount1.apiUrl,
-          hostedDistributions: [Tumbleweed],
+          hostedDistributions: [tumbleweed],
           supportedArchitectures: [],
           projectList
         });
@@ -287,7 +287,7 @@ describe("ObsServerInformation", () => {
 
         expect(serverInfo.getInfo(thirdAccount.apiUrl)).to.deep.equal({
           apiUrl: thirdAccount.apiUrl,
-          hostedDistributions: [Tumbleweed],
+          hostedDistributions: [tumbleweed],
           supportedArchitectures: undefined,
           projectList
         });
