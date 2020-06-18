@@ -76,6 +76,23 @@ curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE.org/_meta -d "<proj
 </project>
 "
 
+# create openSUSE:Factory first without any repos to avoid the circular
+# dependency between Factory and Tumbleweed
+curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Factory/_meta -d "
+<project name='openSUSE:Factory'>
+  <title>The next openSUSE distribution</title>
+  <description>Have a look at http://en.opensuse.org/Portal:Factory for more details.</description>
+  <repository name='ports'>
+    <arch>ppc64le</arch>
+    <arch>ppc64</arch>
+    <arch>ppc</arch>
+    <arch>armv6l</arch>
+    <arch>armv7l</arch>
+    <arch>aarch64</arch>
+  </repository>
+</project>
+"
+
 curl --user ${CREDENTIALS} -X PUT ${obs_url}/source/openSUSE:Tumbleweed/_meta -d "
 <project name='openSUSE:Tumbleweed'>
   <title>Tumbleweed</title>
