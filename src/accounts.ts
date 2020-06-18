@@ -286,7 +286,10 @@ interface ConfigChangeResult {
 class RuntimeAccountConfiguration extends LoggingBase {
   public readonly activeAccounts: ActiveAccounts;
 
-  private readonly apiAccountMap: ApiAccountMapping = new Map();
+  private readonly apiAccountMap: ApiAccountMapping = new Map<
+    ApiUrl,
+    ValidAccount
+  >();
 
   constructor(logger: Logger) {
     super(logger);
@@ -587,7 +590,9 @@ class RuntimeAccountConfiguration extends LoggingBase {
     } catch (err) {
       // the url error message looks like an internal error => remove the nasty
       // looking bits so that the user doesn't think they hit an application bug
-      const msg = err.toString().replace("TypeError [ERR_INVALID_URL]: ", "");
+      const msg: string = (err as Error)
+        .toString()
+        .replace("TypeError [ERR_INVALID_URL]: ", "");
       return `Got an invalid settings for the account ${account.accountName}: ${msg}`;
     }
 
@@ -930,7 +935,7 @@ export class AccountManagerImpl extends LoggingBase {
               await fsPromises.readFile(certPath)
             ).toString("ascii");
           } catch (err) {
-            const errMsg = `Could not read the server certificate from the file '${certPath}', got the following error: ${err.toString()}`;
+            const errMsg = `Could not read the server certificate from the file '${certPath}', got the following error: ${(err as Error).toString()}`;
             this.logger.error(errMsg);
             await this.vscodeWindow.showErrorMessage(
               errMsg.concat(". This is not a fatal error.")

@@ -82,7 +82,7 @@ export class ActivePackageWatcher extends ConnectionListenerLoggerBase {
   private modifiedPackageMap: Map<
     string,
     [ModifiedPackage, vscode.FileSystemWatcher]
-  > = new Map();
+  > = new Map<string, [ModifiedPackage, vscode.FileSystemWatcher]>();
 
   private onDidChangeActivePackageEmitter: vscode.EventEmitter<
     ModifiedPackage | undefined
@@ -247,7 +247,7 @@ export class ActivePackageWatcher extends ConnectionListenerLoggerBase {
           this.logger.error(
             "Failed to read in the package at '%s', got: %s",
             pkg.path,
-            err.toString()
+            (err as Error).toString()
           );
           this.removePkgFromMap(pkg.path);
           return;
@@ -321,7 +321,7 @@ export class ActivePackageWatcher extends ConnectionListenerLoggerBase {
       this.logger.trace(
         "Tried to read in a package from %s but got the error: %s",
         dir,
-        err.toString()
+        (err as Error).toString()
       );
       return;
     }
