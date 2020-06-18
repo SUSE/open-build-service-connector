@@ -300,7 +300,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
           "wsFolder must be defined in this branch"
         );
         isCheckedOut = true;
-        checkedOutPath = wsFolder!.uri.fsPath;
+        checkedOutPath = wsFolder.uri.fsPath;
         // XXX: is this really necessary?
         isBookmark =
           (await vscode.commands.executeCommand<Project | undefined>(

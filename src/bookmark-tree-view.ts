@@ -568,7 +568,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
           accStorage !== undefined,
           `Could not get an account for the API ${element.project.apiUrl}, but it must exist`
         );
-        return new ObsServerTreeElement(accStorage!);
+        return new ObsServerTreeElement(accStorage);
       } else {
         return new MyBookmarksElement();
       }
@@ -720,7 +720,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
 
       const addAll =
         // FIXME: make this number configurable?
-        proj.packages!.length < 10
+        proj.packages.length < 10
           ? "Yes"
           : await this.vscodeWindow.showInformationMessage(
               `This project has ${proj.packages?.length} packages, add them all?`,
@@ -732,7 +732,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
       }
       if (addAll === "No") {
         const pkgs = await this.vscodeWindow.showQuickPick(
-          proj.packages!.map((pkg) => pkg.name),
+          proj.packages.map((pkg) => pkg.name),
           {
             canPickMany: true,
             placeHolder: "Select packages to be bookmarked"

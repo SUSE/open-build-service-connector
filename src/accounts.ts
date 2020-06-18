@@ -256,7 +256,7 @@ export async function promptUserForAccount(
 
     return apiUrlAccountNames.find(
       ([_, accName]) => accName === accountName
-    )![0];
+    )?.[0];
   }
 }
 

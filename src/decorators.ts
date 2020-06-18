@@ -82,9 +82,9 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
         key
       )} from the target ${target}: cannot get the descriptor`
     );
-    const originalMethod = descriptor!.value;
+    const originalMethod = descriptor.value;
 
-    descriptor!.value = async function () {
+    descriptor.value = async function () {
       const args = [];
 
       for (let i = 0; i < arguments.length; i++) {
