@@ -18,8 +18,10 @@ git checkout -b v${obs_version} ${obs_version} || git checkout v${obs_version}
 git submodule init
 git submodule update
 
+# don't build the containers for testing, we don't need them and it just takes ages
+sed -i '/docker-compose.*docker-compose\.yml.*docker-compose\.minitest\.yml.*docker-compose\.minitest-user\.yml.*build.*minitest/d' Rakefile
 rake docker:build
-docker-compose up &
+docker-compose up -d
 
 # from openSUSE-release-tools/dist/ci/docker-compose-test.sh:
 c=0
