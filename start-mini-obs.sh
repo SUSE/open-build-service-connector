@@ -4,7 +4,7 @@ set -euox pipefail
 
 export repo_dir="open-build-service"
 export obs_url="http://localhost:3000"
-obs_version=2.10.5
+obs_version=2.10.6
 
 pushd .
 
