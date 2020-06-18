@@ -507,7 +507,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
       `Invalid element: ${element.contextValue}. Must not be a MyBookmarksElement, ObsServerTreeElement or a AddBookmarkElement`
     );
 
-    const projTreeItem: ProjectTreeItem = element as ProjectTreeItem;
+    const projTreeItem: ProjectTreeItem = element;
 
     if (isProjectTreeElement(projTreeItem)) {
       const projFromBookmark = await logException(

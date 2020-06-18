@@ -59,9 +59,9 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
         ? "Error performing API call: ".concat(err.status.summary)
         : err.toString();
 
-    (decoratedObj as any).logger.error(err);
+    decoratedObj.logger.error(err);
     if (reportToUser) {
-      await (decoratedObj as any).vscodeWindow.showErrorMessage(errMsg);
+      await decoratedObj.vscodeWindow.showErrorMessage(errMsg);
     }
   };
   return (

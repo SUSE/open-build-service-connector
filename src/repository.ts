@@ -627,7 +627,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
           `Element ${element} must be a RepositoryArchElement, but its contextValue is: '${element.contextValue}'`
         );
         matchingRepo.arch = matchingRepo.arch?.filter(
-          (arch) => arch !== (element as RepositoryArchTreeElement).architecture
+          (arch) => arch !== element.architecture
         );
       } else {
         assert(
@@ -636,9 +636,8 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
         );
         matchingRepo.path = matchingRepo.path?.filter(
           (path) =>
-            path.repository !==
-              (element as RepositoryPathTreeElement).path.repository ||
-            path.project !== (element as RepositoryPathTreeElement).path.project
+            path.repository !== element.path.repository ||
+            path.project !== element.path.project
         );
       }
     } else {
