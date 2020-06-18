@@ -37,11 +37,12 @@ jobs:
         DISPLAY: ':99.0'
 
     - name: create an archive of the logfiles and screenshots
-      run: find test-resources/ \( -name *png -o -name *log \) | tar -cvf logs.tar -T -
+      run: find test-resources/ \( -name *png -o -name *log \) | tar -cvf logs-${{ matrix.node-version }}.tar -T -
       if: failure()
 
     - name: upload the archive of the logfiles and screenshots
       uses: actions/upload-artifact@v2
       if: failure()
       with:
-        path: logs.tar
+        name: logs-${{ matrix.node-version }}
+        path: logs-${{ matrix.node-version }}.tar
