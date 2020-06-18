@@ -107,6 +107,8 @@ class TestEnv {
     newSettingsJson["workbench.enableExperiments"] = false;
 
     newSettingsJson["vscode-obs.logLevel"] = "trace";
+    // the docker compose setup uses http
+    newSettingsJson["vscode-obs.forceHttps"] = false;
 
     if (this.injectTestUserIntoSettings) {
       newSettingsJson["vscode-obs.accounts"] = [
