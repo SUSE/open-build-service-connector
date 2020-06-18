@@ -776,16 +776,6 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
       return;
     }
 
-    const apiUrl = element.project.apiUrl;
-    const projects = await this.bookmarkMngr.getAllBookmarkedProjects(apiUrl);
-    if (projects === undefined) {
-      this.logger.error(
-        "No project bookmarks are present for the API %s",
-        apiUrl
-      );
-      return;
-    }
-
     await this.bookmarkMngr.removeProjectFromBookmarks(element.project);
     this.refresh();
   }
