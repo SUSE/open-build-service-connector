@@ -65,7 +65,7 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
     }
   };
   return (
-    target: object,
+    target: any,
     key: string | symbol,
     descriptor: PropertyDescriptor | undefined
   ) => {
