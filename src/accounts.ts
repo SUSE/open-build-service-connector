@@ -392,11 +392,10 @@ class RuntimeAccountConfiguration extends LoggingBase {
       } else {
         // old account that got modified
         // verify that it actually exists in the map, although that would be very weird
-        if (this.apiAccountMap.has(newAcc.apiUrl)) {
+        const existingValidAcc = this.apiAccountMap.get(newAcc.apiUrl);
+        if (existingValidAcc !== undefined) {
           configModified = true;
-          const { account, connection } = this.apiAccountMap.get(
-            newAcc.apiUrl
-          )!;
+          const { account, connection } = existingValidAcc;
 
           if (
             account.username !== newAcc.username ||
