@@ -359,8 +359,8 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
   }
 
   private async adjustWorkspaceFolders(
-    addedWorkspaces: ReadonlyArray<vscode.WorkspaceFolder>,
-    removedWorkspaces: ReadonlyArray<vscode.WorkspaceFolder>
+    addedWorkspaces: readonly vscode.WorkspaceFolder[],
+    removedWorkspaces: readonly vscode.WorkspaceFolder[]
   ): Promise<void> {
     await Promise.all(addedWorkspaces.map((ws) => this.addWorkspace(ws)));
 
