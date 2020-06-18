@@ -36,15 +36,15 @@ jobs:
       env:
         DISPLAY: ':99.0'
 
-    - name: cleanup big files from the
-      run: find test-resources/ \( -name *.tar.gz -o -name chromedriver* \) | xargs rm
+    - name: create an archive of the logfiles and screenshots
+      run: find test-resources/ \( -name *png -o -name *log \) | tar -cvf logs.tar -T -
       if: failure()
 
-    - name: upload the test-resources directory in case the tests fail
+    - name: upload the archive of the logfiles and screenshots
       uses: actions/upload-artifact@v2
       if: failure()
       with:
-        path: test-resources/
+        path: logs.tar
 
     - name: cleanup
       run: |
