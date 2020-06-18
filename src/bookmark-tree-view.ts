@@ -625,7 +625,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     );
     if (newProj === undefined) {
       // TODO: not very helpful error message, can we maybe get a failure reason out of that?
-      this.vscodeWindow.showErrorMessage(
+      await this.vscodeWindow.showErrorMessage(
         `Updating the project ${element.project.name} failed.`
       );
       return;
@@ -777,7 +777,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     }
 
     const apiUrl = element.project.apiUrl;
-    const projects = this.bookmarkMngr.getAllBookmarkedProjects(apiUrl);
+    const projects = await this.bookmarkMngr.getAllBookmarkedProjects(apiUrl);
     if (projects === undefined) {
       this.logger.error(
         "No project bookmarks are present for the API %s",

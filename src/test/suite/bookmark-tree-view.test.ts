@@ -36,6 +36,7 @@ import {
   ObsServerTreeElement,
   UPDATE_PROJECT_COMMAND
 } from "../../bookmark-tree-view";
+import { GET_INSTANCE_INFO_COMMAND } from "../../instance-info";
 import { SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND } from "../../package-file-contents";
 import {
   ProjectBookmarkManager,
@@ -56,7 +57,6 @@ import {
   fakeApi2ValidAcc
 } from "./test-data";
 import { castToAsyncFunc, testLogger } from "./test-utils";
-import { GET_INSTANCE_INFO_COMMAND } from "../../instance-info";
 
 const fooProj: obs_ts.Project = {
   apiUrl: fakeAccount1.apiUrl,
@@ -190,8 +190,8 @@ describe("BookmarkedProjectsTreeProvider", () => {
     this.fixture = new BookmarkedProjectsTreeProviderFixture(this);
   });
 
-  afterEach(function () {
-    return this.fixture.afterEach(this);
+  afterEach(async function () {
+    await this.fixture.afterEach(this);
   });
 
   describe("#getChildren", () => {
@@ -724,7 +724,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         this.fixture.fetchProjectMock.reset();
 
         // verify that the updated package contents are there:
-        this.fixture
+        await this.fixture
           .projectBookmarkManager!.getBookmarkedProject(
             barProj.apiUrl,
             barProj.name,
@@ -764,7 +764,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         await projectTree.updatePackage(pkgTreeItem);
 
-        this.fixture
+        await this.fixture
           .projectBookmarkManager!.getBookmarkedProject(
             barProj.apiUrl,
             barProj.name
@@ -844,7 +844,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           })
         );
 
-        this.fixture
+        await this.fixture
           .projectBookmarkManager!.getBookmarkedProject(
             fooProj.apiUrl,
             fooProj.name

@@ -226,15 +226,15 @@ describe("ObsServerInformation", () => {
           barInstanceInfo
         );
 
-        [
+        for (const apiUrl of [
           fakeAccount1.apiUrl,
           fakeAccount2.apiUrl,
           "https://api.opensuse.org/"
-        ].forEach(async (apiUrl) => {
+        ]) {
           await vscode.commands
             .executeCommand(GET_INSTANCE_INFO_COMMAND, apiUrl)
             .should.eventually.deep.equal(serverInfo.getInfo(apiUrl));
-        });
+        }
       })
     );
 
