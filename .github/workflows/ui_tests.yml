@@ -45,9 +45,3 @@ jobs:
       if: failure()
       with:
         path: logs.tar
-
-    - name: cleanup
-      run: |
-        pushd open-build-service
-        docker-compose stop
-        popd
