@@ -157,10 +157,7 @@ function isMyBookmarksElement(
   return treeItem.contextValue === "MyBookmarksElement";
 }
 
-const BOOKMARK_ICON = {
-  dark: join(__filename, "..", "..", "media", "dark", "bookmark_border.svg"),
-  light: join(__filename, "..", "..", "media", "light", "bookmark_border.svg")
-};
+const BOOKMARK_ICON = new vscode.ThemeIcon("bookmark");
 
 export class CheckOutHandler extends ConnectionListenerLoggerBase {
   constructor(

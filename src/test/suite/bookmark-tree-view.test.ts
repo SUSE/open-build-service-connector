@@ -668,15 +668,9 @@ describe("BookmarkedProjectsTreeProvider", () => {
         const projElem = new ProjectTreeElement(fooProj);
         const projTreeItem = projectTree.getTreeItem(projElem);
 
-        projTreeItem.should.have.property("iconPath");
-        const iconPath = projTreeItem.iconPath!;
-
-        iconPath.should.have
-          .property("dark")
-          .that.matches(/bookmark_border\.svg/);
-        iconPath.should.have
-          .property("light")
-          .that.matches(/bookmark_border\.svg/);
+        projTreeItem.should.have
+          .property("iconPath")
+          .that.deep.equals(new vscode.ThemeIcon("bookmark"));
       })
     );
 
