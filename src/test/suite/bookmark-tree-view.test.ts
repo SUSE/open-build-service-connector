@@ -282,14 +282,14 @@ describe("BookmarkedProjectsTreeProvider", () => {
             account: fakeAccount1,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             contextValue: "ObsServer",
-            iconPath: { id: "server" },
+            iconPath: new vscode.ThemeIcon("server"),
             label: fakeAccount1.accountName
           });
           children.should.contain.a.thing.that.deep.equals({
             account: fakeAccount2,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             contextValue: "ObsServer",
-            iconPath: { id: "server" },
+            iconPath: new vscode.ThemeIcon("server"),
             label: fakeAccount2.accountName
           });
           expect(children).to.be.an("array").and.have.length(2);
@@ -377,7 +377,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
       const commonPackageEntries = {
         collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
         contextValue: "package",
-        iconPath: { id: "package" }
+        iconPath: new vscode.ThemeIcon("package")
       };
 
       it(
