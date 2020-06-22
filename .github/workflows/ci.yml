@@ -25,6 +25,18 @@ jobs:
         sudo apt-get -y update
         sudo apt-get -y install xvfb
 
+    - name: Get yarn cache directory path
+      id: yarn-cache-dir-path
+      run: echo "::set-output name=dir::$(yarn cache dir)"
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          node_modules/*
+        key: ${{ matrix.node-version }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ matrix.node-version }}-yarn-
+
     - run: yarn install || yarn install || yarn install
     - run: |
         /usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
@@ -92,6 +104,18 @@ jobs:
       with:
         node-version: 14.x
 
+    - name: Get yarn cache directory path
+      id: yarn-cache-dir-path
+      run: echo "::set-output name=dir::$(yarn cache dir)"
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          node_modules/*
+        key: 14.x-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          14.x-yarn-
+
     - run: |
         yarn install || yarn install || yarn install
         yarn run package
@@ -109,6 +133,18 @@ jobs:
     - uses: actions/setup-node@v1
       with:
         node-version: 14.x
+
+    - name: Get yarn cache directory path
+      id: yarn-cache-dir-path
+      run: echo "::set-output name=dir::$(yarn cache dir)"
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          node_modules/*
+        key: 14.x-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          14.x-yarn-
 
     - run: |
         yarn install || yarn install || yarn install

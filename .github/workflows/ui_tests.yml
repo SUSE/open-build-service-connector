@@ -19,11 +19,30 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
+    - name: get yarn cache directory path
+      id: yarn-cache-dir-path
+      run: echo "::set-output name=dir::$(yarn cache dir)"
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          node_modules/*
+        key: ${{ matrix.node-version }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ matrix.node-version }}-yarn-
+
     - run: yarn install || yarn install || yarn install
     - name: install xvfb
       run: |
         sudo apt-get -y update
         sudo apt-get -y install xvfb meson ninja-build libsecret-1-dev libglib2.0-dev
+
+    - uses: actions/cache@v2
+      with:
+        path: open-build-service/*
+        key: open-build-service
+        restore-keys: |
+          open-build-service
     - run: ./start-mini-obs.sh
 
     - name: run the UI tests
