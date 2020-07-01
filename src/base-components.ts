@@ -110,8 +110,10 @@ export class LoggingBase {
 export class DisposableBase {
   protected disposables: vscode.Disposable[] = [];
 
-  public dispose() {
-    this.disposables.forEach((disp) => disp.dispose());
+  public dispose(): void {
+    for (const disposable of this.disposables) {
+      disposable.dispose();
+    }
   }
 }
 
