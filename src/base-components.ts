@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import * as assert from "assert";
 import { Package, PackageFile, Project } from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -37,9 +38,13 @@ export class BasePackage implements Package {
     name?: string
   ) {
     if (typeof pkgOrApiUrl === "string") {
+      assert(
+        name !== undefined && projectName !== undefined,
+        "Invalid usage of the overload of the BasePackage constructor: 'name' and 'projectName' must be defined"
+      );
       this.apiUrl = pkgOrApiUrl;
-      this.name = name!;
-      this.projectName = projectName!;
+      this.name = name;
+      this.projectName = projectName;
     } else {
       this.apiUrl = pkgOrApiUrl.apiUrl;
       this.projectName = pkgOrApiUrl.projectName;
@@ -56,8 +61,12 @@ export class BaseProject implements Project {
   constructor(apiUrl: string, name: string);
   constructor(projectOrApiUrl: string | Project, name?: string) {
     if (typeof projectOrApiUrl === "string") {
+      assert(
+        name !== undefined,
+        "Invalid usage of the BaseProject overload: name and packages must be defined"
+      );
       this.apiUrl = projectOrApiUrl;
-      this.name = name!;
+      this.name = name;
     } else {
       this.apiUrl = projectOrApiUrl.apiUrl;
       this.name = projectOrApiUrl.name;
@@ -78,9 +87,13 @@ export class BasePackageFile implements PackageFile {
     projectName?: string
   ) {
     if (typeof pkgFileOrName === "string") {
+      assert(
+        packageName !== undefined && projectName !== undefined,
+        "Invalid usage of the BasePackageFile overload: packageName and projectName must be defined"
+      );
       this.name = pkgFileOrName;
-      this.packageName = packageName!;
-      this.projectName = projectName!;
+      this.packageName = packageName;
+      this.projectName = projectName;
     } else {
       this.name = pkgFileOrName.name;
       this.projectName = pkgFileOrName.projectName;
