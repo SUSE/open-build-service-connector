@@ -26,7 +26,8 @@ import {
   deepCopyProperties,
   loadMapFromMemento,
   saveMapToMemento,
-  setDifference
+  setDifference,
+  setUnion
 } from "../../util";
 import { castToAsyncFunc, castToFunc } from "./test-utils";
 
@@ -60,6 +61,18 @@ describe("utilities", () => {
         .to.be.a("set")
         .and.to.have.length(1)
         .and.to.include(1);
+    });
+  });
+
+  describe("#setUnion", () => {
+    it("works for empty sets", () => {
+      expect(setUnion(new Set(), new Set())).to.be.a("set").and.have.length(0);
+    });
+
+    it("returns the union", () => {
+      expect(setUnion(new Set([1, 2, 3]), new Set([4, 5])))
+        .to.be.a("set")
+        .and.to.deep.equal(new Set([1, 2, 3, 5, 4]));
     });
   });
 

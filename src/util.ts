@@ -43,6 +43,13 @@ export function setDifference<T>(setA: Set<T>, setB: Set<T>): Set<T> {
   return difference;
 }
 
+/** Returns the union of the sets `setA` and `setB` */
+export function setUnion<T>(setA: Set<T>, setB: Set<T>): Set<T> {
+  const union = new Set<T>();
+  [...setA.values(), ...setB.values()].forEach((val) => union.add(val));
+  return union;
+}
+
 /**
  * Given a Map that was stored in the memento under the key `storageKey` as an
  * array of Tuples of the type `[K, T]`, this function constructs the Map and
