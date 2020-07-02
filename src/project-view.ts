@@ -161,6 +161,4 @@ export function getChildrenOfProjectTreeItem(
     false,
     `This code must be unreachable, but reached it via a ${element.contextValue} Element`
   );
-
-  return [] as never;
 }
