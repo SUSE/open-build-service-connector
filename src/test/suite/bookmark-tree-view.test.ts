@@ -58,64 +58,6 @@ import {
 } from "./test-data";
 import { castToAsyncFunc, testLogger } from "./test-utils";
 
-const fooProj: obs_ts.Project = {
-  apiUrl: fakeAccount1.apiUrl,
-  name: "fooProj"
-};
-
-const barProj: obs_ts.Project = {
-  apiUrl: fakeAccount1.apiUrl,
-  name: "barProj"
-};
-
-const bazProj: obs_ts.Project = {
-  apiUrl: fakeAccount2.apiUrl,
-  name: "bazProj"
-};
-
-const fooPkg: obs_ts.Package = {
-  apiUrl: fakeAccount1.apiUrl,
-  name: "fooPkg",
-  projectName: fooProj.name
-};
-const foo2Pkg: obs_ts.Package = {
-  apiUrl: fakeAccount1.apiUrl,
-  name: "foo2Pkg",
-  projectName: fooProj.name
-};
-const packages = [fooPkg, foo2Pkg];
-
-const fooProjWithPackages: obs_ts.Project = {
-  ...fooProj,
-  packages
-};
-
-const barPkg: obs_ts.Package = {
-  apiUrl: fakeAccount1.apiUrl,
-  name: "barPkg",
-  projectName: barProj.name
-};
-
-const [fileA, fileB]: obs_ts.PackageFile[] = ["fileA", "fileB"].map((name) => ({
-  name,
-  packageName: barPkg.name,
-  projectName: barPkg.projectName
-}));
-
-const barPkgWithFiles: obs_ts.Package = {
-  ...barPkg,
-  files: [fileA, fileB]
-};
-
-const barProjWithPackages: obs_ts.Project = {
-  ...barProj,
-  packages: [barPkgWithFiles]
-};
-
-const barProjWithPackagesWithoutFiles: obs_ts.Project = {
-  ...barProj,
-  packages: [barPkg]
-};
 
 class BookmarkedProjectsTreeProviderFixture extends ProjectViewFixture {
   public projectBookmarkManager?: ProjectBookmarkManager;

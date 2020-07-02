@@ -19,7 +19,12 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { Connection } from "open-build-service-api";
+import {
+  Connection,
+  Package,
+  PackageFile,
+  Project
+} from "open-build-service-api";
 import { AccountStorage, ValidAccount } from "../../accounts";
 
 export const fakeAccount1: AccountStorage = {
@@ -46,4 +51,63 @@ export const fakeApi2ValidAcc: ValidAccount = {
   connection: new Connection(fakeAccount2.username, fakeAccount2.username, {
     url: fakeAccount2.apiUrl
   })
+};
+
+export const fooProj: Project = {
+  apiUrl: fakeAccount1.apiUrl,
+  name: "fooProj"
+};
+
+export const barProj: Project = {
+  apiUrl: fakeAccount1.apiUrl,
+  name: "barProj"
+};
+
+export const bazProj: Project = {
+  apiUrl: fakeAccount2.apiUrl,
+  name: "bazProj"
+};
+
+export const fooPkg: Package = {
+  apiUrl: fakeAccount1.apiUrl,
+  name: "fooPkg",
+  projectName: fooProj.name
+};
+export const foo2Pkg: Package = {
+  apiUrl: fakeAccount1.apiUrl,
+  name: "foo2Pkg",
+  projectName: fooProj.name
+};
+export const packages = [fooPkg, foo2Pkg];
+
+export const fooProjWithPackages: Project = {
+  ...fooProj,
+  packages
+};
+
+export const barPkg: Package = {
+  apiUrl: fakeAccount1.apiUrl,
+  name: "barPkg",
+  projectName: barProj.name
+};
+
+export const [fileA, fileB]: PackageFile[] = ["fileA", "fileB"].map((name) => ({
+  name,
+  packageName: barPkg.name,
+  projectName: barPkg.projectName
+}));
+
+export const barPkgWithFiles: Package = {
+  ...barPkg,
+  files: [fileA, fileB]
+};
+
+export const barProjWithPackages: Project = {
+  ...barProj,
+  packages: [barPkgWithFiles]
+};
+
+export const barProjWithPackagesWithoutFiles: Project = {
+  ...barProj,
+  packages: [barPkg]
 };
