@@ -258,3 +258,28 @@ export function isUri(obj: any): obj is vscode.Uri {
   }
   return true;
 }
+
+/**
+ * Returns a function that inserts a new array into `items` before the specified
+ * index (or appends it if `insertBeforeIndex` is undefined).
+ *
+ * This function caches intermediate results and should be faster for large
+ * arrays if `insertBeforeIndex` is defined and non-zero than a direct
+ * implementation.
+ */
+export function createItemInserter<T>(
+  items: T[] | readonly T[],
+  insertBeforeIndex?: number
+): (newItems: T[] | readonly T[]) => T[] | readonly T[] {
+  if (insertBeforeIndex === undefined) {
+    return (newItems) => items.concat(newItems);
+  } else if (insertBeforeIndex === 0) {
+    return (newItems) => newItems.concat(items);
+  } else {
+    const [firstPart, secondPart] = [
+      items.slice(0, insertBeforeIndex),
+      items.slice(insertBeforeIndex)
+    ];
+    return (newItems) => firstPart.concat(newItems, secondPart);
+  }
+}

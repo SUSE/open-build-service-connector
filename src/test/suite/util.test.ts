@@ -27,7 +27,8 @@ import {
   loadMapFromMemento,
   saveMapToMemento,
   setDifference,
-  setUnion
+  setUnion,
+  createItemInserter
 } from "../../util";
 import { castToAsyncFunc, castToFunc } from "./test-utils";
 
@@ -163,6 +164,32 @@ describe("utilities", () => {
 
     it("handles undefined objects", () => {
       expect(deepCopyProperties(undefined)).to.equal(undefined);
+    });
+  });
+
+  describe("#createItemInserter", () => {
+    it("appends the new entries if insertBeforeIndex is not provided", () => {
+      const arr = [1, 3, 18];
+      const inserter = createItemInserter(arr);
+
+      expect(inserter([5])).to.deep.equal([1, 3, 18, 5]);
+      expect(inserter([18, 4])).to.deep.equal([1, 3, 18, 18, 4]);
+    });
+
+    it("prepends the new entries if insertBeforeIndex is zero", () => {
+      const arr = [1, 3, 16];
+      const inserter = createItemInserter(arr, 0);
+
+      expect(inserter([5])).to.deep.equal([5, 1, 3, 16]);
+      expect(inserter([28, 42])).to.deep.equal([28, 42, 1, 3, 16]);
+    });
+
+    it("inserts the new entries if insertBeforeIndex is non-zero", () => {
+      const arr = [1, 3, 16];
+      const inserter = createItemInserter(arr, 1);
+
+      expect(inserter([5])).to.deep.equal([1, 5, 3, 16]);
+      expect(inserter([28, 42])).to.deep.equal([1, 28, 42, 3, 16]);
     });
   });
 });
