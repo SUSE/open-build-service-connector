@@ -48,7 +48,7 @@ jobs:
     - name: run the UI tests
       run: |
         /usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        for VER in "1.40.0" "1.40.1" "1.41.0" "1.41.1" "1.42.0" "1.42.1" "1.43.0" "1.43.1" "1.43.2" "1.44.0" "1.44.1" "1.44.2" "1.45.0" "1.45.1" "1.46.0" "1.46.1" "insiders"; do
+        for VER in "1.40.0" "1.40.1" "1.41.0" "1.41.1" "1.42.0" "1.42.1" "1.43.0" "1.43.1" "1.43.2" "1.44.0" "1.44.1" "1.44.2" "1.45.0" "1.45.1" "1.46.0" "1.46.1" "1.47.0" "1.47.1" "1.47.2" "insiders"; do
           export VSCODE_VERSION=${VER}
           yarn run test:ui
           # try really hard to clean up after the test
