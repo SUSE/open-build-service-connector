@@ -2510,9 +2510,9 @@ lodash.padstart@^4.1.0:
   integrity sha1-0uPuv/DZ05rVD1y9G1KnvOa7YRs=
 
 lodash@^4, lodash@^4.15.0, lodash@^4.17.13, lodash@^4.17.14, lodash@^4.17.15:
-  version "4.17.15"
-  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.15.tgz#b447f6670a0455bbfeedd11392eff330ea097548"
-  integrity sha512-8xOcRHvCjnocdS5cpwXQXVzmmh5e5+saE2QGoeQmbKmRS6J3VQppPOIt0MnmE+4xlZoumy0GPG0D0MVIQbNA1A==
+  version "4.17.19"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.19.tgz#e48ddedbe30b3321783c5b4301fbd353bc1e4a4b"
+  integrity sha512-JNvd8XER9GQX0v2qJgsaN/mzFCNA5BRe/j8JN9d+tWyGLSodKQHKFicdwNYzWwI3wjRnaKPsGj1XkBjx/F96DQ==
 
 log-symbols@3.0.0:
   version "3.0.0"
@@ -2561,8 +2561,9 @@ memory-stream@0:
   dependencies:
     readable-stream "~1.0.26-2"
 
-"merge-deep@github:jrichter1/merge-deep#functions":
+merge-deep@jrichter1/merge-deep#functions:
   version "3.0.2"
+  uid "9ffe23b32f281de41bce111e8c38294d96fed34e"
   resolved "https://codeload.github.com/jrichter1/merge-deep/tar.gz/9ffe23b32f281de41bce111e8c38294d96fed34e"
   dependencies:
     arr-union "^3.1.0"
