@@ -29,6 +29,7 @@ import {
 } from "open-build-service-api";
 import { dirname, normalize, resolve } from "path";
 import { Logger } from "pino";
+import { inspect } from "util";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
@@ -196,8 +197,14 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
     }
 
     const newProj = await fetchProject(acc.connection, proj.name, {
-      getPackageList: true
+      fetchPackageList: true
     });
+    assert(
+      newProj.packages !== undefined && Array.isArray(newProj.packages),
+      `fetchProject() must reply with a populated package list when invoked with 'fetchPackageList: true', but got ${inspect(
+        newProj.packages
+      )} instead`
+    );
     await updateCheckedOutProject(newProj, element.checkedOutPath);
 
     const projUri = vscode.Uri.file(element.checkedOutPath);
@@ -262,7 +269,7 @@ export class ActiveProjectWatcherImpl extends ConnectionListenerLoggerBase
             );
           } else {
             activeProject = await fetchProject(con, pkgFile.projectName, {
-              getPackageList: false
+              fetchPackageList: false
             });
           }
         }
