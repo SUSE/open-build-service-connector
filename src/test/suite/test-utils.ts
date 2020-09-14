@@ -28,6 +28,7 @@ import { SinonSandbox } from "sinon";
 import * as sinonChai from "sinon-chai";
 import * as vscode from "vscode";
 import { DisposableBase } from "../../base-components";
+import { makeFakeEventEmitter } from "./fakes";
 
 use(chaiThings);
 use(chaiAsPromised);
@@ -39,14 +40,45 @@ export const testLogger = pino(
   pino.destination("./logfile.json")
 );
 
-export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => ({
-  showErrorMessage: sandbox.stub(),
-  showInformationMessage: sandbox.stub(),
-  showInputBox: sandbox.stub(),
-  showOpenDialog: sandbox.stub(),
-  showQuickPick: sandbox.stub(),
-  withProgress: sandbox.stub()
-});
+export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => {
+  const emiter = makeFakeEventEmitter<vscode.TextEditor | undefined>();
+
+  return {
+    showErrorMessage: sandbox.stub(),
+    showInformationMessage: sandbox.stub(),
+    showInputBox: sandbox.stub(),
+    showOpenDialog: sandbox.stub(),
+    showQuickPick: sandbox.stub(),
+    withProgress: sandbox.stub(),
+    onDidChangeActiveTextEditorEmiter: emiter,
+    onDidChangeActiveTextEditor: emiter.event,
+    activeTextEditor: undefined as vscode.TextEditor | undefined,
+    visibleTextEditors: [] as vscode.TextEditor[]
+  };
+};
+
+export const createStubbedVscodeWorkspace = (sandbox: SinonSandbox) => {
+  const onDidCreateEmitter = makeFakeEventEmitter<vscode.Uri>();
+  const onDidChangeEmitter = makeFakeEventEmitter<vscode.Uri>();
+  const onDidDeleteEmitter = makeFakeEventEmitter<vscode.Uri>();
+  const watcher = {
+    onDidCreateEmitter,
+    onDidChangeEmitter,
+    onDidDeleteEmitter,
+    onDidCreate: onDidCreateEmitter.event,
+    onDidChange: onDidChangeEmitter.event,
+    onDidDelete: onDidDeleteEmitter.event,
+    dispose: sandbox.stub()
+  };
+  const createFileSystemWatcher = sandbox.stub();
+  createFileSystemWatcher.returns(watcher);
+  return {
+    watcher,
+    textDocuments: [],
+    getWorkspaceFolder: sandbox.stub(),
+    createFileSystemWatcher
+  };
+};
 
 export async function waitForEvent<T>(
   event: vscode.Event<T>
