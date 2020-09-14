@@ -110,6 +110,7 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
 
 // stolen from: https://github.com/JohnstonCode/svn-scm/blob/master/src/decorators.ts
 // published under the MIT license as well
+/** Apply the `decorator` function to a member function of a class */
 function decorate(
   decorator: (fn: (...args: any[]) => void, key: string) => void
 ): (_target: any, key: string, descriptor: any) => void {
@@ -133,6 +134,11 @@ function decorate(
   };
 }
 
+/**
+ * Decorator for class properties that ensures that the decorated method is
+ * called with a delay of `delayMs`. Repeated calls during the delay reset the
+ * timer.
+ */
 export function debounce(
   delayMs: number
 ): (_target: any, key: string, descriptor: any) => void {

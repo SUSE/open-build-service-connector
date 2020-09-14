@@ -21,10 +21,18 @@
 
 import { expect } from "chai";
 import { afterEach, beforeEach, Context, describe, it } from "mocha";
+import { sleep } from "open-build-service-api/lib/util";
 import { Logger } from "pino";
-import { assert, createSandbox, SinonSandbox, SinonStub } from "sinon";
+import {
+  assert,
+  createSandbox,
+  SinonSandbox,
+  SinonSpy,
+  SinonStub,
+  spy
+} from "sinon";
 import { LoggingBase } from "../../base-components";
-import { logAndReportExceptions } from "../../decorators";
+import { debounce, logAndReportExceptions } from "../../decorators";
 import {
   castToAsyncFunc,
   castToFunc,
@@ -199,5 +207,37 @@ describe("decorators", () => {
           .should.eventually.equal(undefined);
       })
     );
+  });
+
+  describe("#debounce", () => {
+    class TestClass {
+      constructor(public readonly spy: SinonSpy) {}
+
+      @debounce(200)
+      public debounced(): void {
+        this.spy();
+      }
+    }
+
+    it("prevents member functions from being called as frequently as possible", async () => {
+      const before = new Date();
+      let after = new Date();
+
+      const test = new TestClass(spy());
+      let actualCallCount = 0;
+      do {
+        await sleep(50);
+
+        test.debounced();
+        actualCallCount++;
+        after = new Date();
+      } while (after.getTime() - before.getTime() < 200);
+
+      // give the spy the chance to actually get called
+      await sleep(300);
+
+      test.spy.should.have.been.calledOnce;
+      expect(actualCallCount > 1);
+    });
   });
 });
