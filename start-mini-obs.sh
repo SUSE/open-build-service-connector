@@ -20,6 +20,8 @@ git submodule update
 
 # don't build the containers for testing, we don't need them and it just takes ages
 sed -i '/docker-compose.*docker-compose\.yml.*docker-compose\.minitest\.yml.*docker-compose\.minitest-user\.yml.*build.*minitest/d' Rakefile
+# temporary workaround for codecov 0.1.14 no longer being available
+sed -i 's/codecov (0\.1\.14)/codecov (0.2.8)/' src/api/Gemfile.lock
 rake docker:build
 docker-compose up -d
 
