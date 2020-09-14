@@ -244,7 +244,7 @@ export async function promptUserForAccount(
       }
     });
     const accountName = await vscodeWindow.showQuickPick(
-      apiUrlAccountNames.map(([_, accName]) => accName),
+      apiUrlAccountNames.map(([_apiUrl, accName]) => accName),
       {
         canPickMany: false,
         placeHolder: actionDescription
@@ -255,7 +255,7 @@ export async function promptUserForAccount(
     }
 
     return apiUrlAccountNames.find(
-      ([_, accName]) => accName === accountName
+      ([_apiUrl, accName]) => accName === accountName
     )?.[0];
   }
 }
@@ -725,7 +725,9 @@ export class AccountManagerImpl extends LoggingBase {
     if (this.onDidChangeConfigurationDisposable !== undefined) {
       this.onDidChangeConfigurationDisposable.dispose();
     }
-    this.disposables.forEach((disp) => disp.dispose());
+    for (const disp of this.disposables) {
+      disp.dispose();
+    }
   }
 
   /**
