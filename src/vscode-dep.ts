@@ -34,4 +34,18 @@ export interface VscodeWindow {
   showOpenDialog: typeof vscode.window.showOpenDialog;
 
   withProgress: typeof vscode.window.withProgress;
+
+  onDidChangeActiveTextEditor: typeof vscode.window.onDidChangeActiveTextEditor;
+
+  activeTextEditor: typeof vscode.window.activeTextEditor;
+
+  visibleTextEditors: typeof vscode.window.visibleTextEditors;
+}
+
+export interface VscodeWorkspace {
+  getWorkspaceFolder: typeof vscode.workspace.getWorkspaceFolder;
+
+  createFileSystemWatcher: typeof vscode.workspace.createFileSystemWatcher;
+
+  textDocuments: typeof vscode.workspace.textDocuments;
 }
