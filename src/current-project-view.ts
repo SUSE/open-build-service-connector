@@ -25,6 +25,10 @@ import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import {
+  CurrentPackage,
+  CurrentPackageWatcher
+} from "./current-package-watcher";
+import {
   FileTreeElement,
   getChildrenOfProjectTreeItem,
   isFileTreeElement,
@@ -32,21 +36,19 @@ import {
   ProjectTreeElement,
   ProjectTreeItem
 } from "./project-view";
-import { ActiveProject, ActiveProjectWatcher } from "./workspace";
 
 const PROJECT_ICON = new vscode.ThemeIcon("project");
 
 export const LOCAL_PROJECT_TREE_ELEMENT_CTX_VAL = "localProject";
 
 export class LocalProjectTreeElement extends ProjectTreeElement {
-  public readonly contextValue: string;
+  public readonly contextValue = LOCAL_PROJECT_TREE_ELEMENT_CTX_VAL;
 
   constructor(
     projectTreeElement: ProjectTreeElement,
     public readonly checkedOutPath: string
   ) {
     super(projectTreeElement.project);
-    this.contextValue = LOCAL_PROJECT_TREE_ELEMENT_CTX_VAL;
   }
 }
 
@@ -83,7 +85,7 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
 
   public onDidChange: vscode.Event<vscode.Uri>;
 
-  private activeProject: ActiveProject;
+  private currentPackage: CurrentPackage;
 
   private onDidChangeTreeDataEmitter: vscode.EventEmitter<
     ProjectTreeItem | undefined
@@ -91,25 +93,21 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
 
   private onDidChangeEmitter = new vscode.EventEmitter<vscode.Uri>();
 
-  private readonly onDidChangeActiveProject: vscode.Event<ActiveProject>;
-
   constructor(
-    activeProjectWatcher: ActiveProjectWatcher,
+    currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
     logger: Logger
   ) {
     super(accountManager, logger);
 
-    this.onDidChangeActiveProject =
-      activeProjectWatcher.onDidChangeActiveProject;
-    this.activeProject = activeProjectWatcher.getActiveProject();
+    this.currentPackage = currentPackageWatcher.currentPackage;
 
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
     this.onDidChange = this.onDidChangeEmitter.event;
 
     this.disposables.push(
-      this.onDidChangeActiveProject((actProj) => {
-        this.activeProject = actProj;
+      currentPackageWatcher.onDidChangeCurrentPackage((curPkg) => {
+        this.currentPackage = curPkg;
         this.refresh();
       }, this),
       this.onDidChangeTreeDataEmitter,
@@ -132,16 +130,16 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
   }
 
   public getChildren(element?: ProjectTreeItem): ProjectTreeItem[] {
-    if (this.activeProject.activeProject === undefined) {
+    if (this.currentPackage.currentProject === undefined) {
       return [];
     }
 
     const children = getChildrenOfProjectTreeItem(
-      this.activeProject.activeProject,
+      this.currentPackage.currentProject,
       element
     );
 
-    const checkedOutPath = this.activeProject.properties?.checkedOutPath;
+    const checkedOutPath = this.currentPackage.properties?.checkedOutPath;
     const transformCheckedOut: (
       elem: ProjectTreeItem
     ) => ProjectTreeItem | LocalProjectTreeElement | LocalFileTreeElement = (
@@ -158,8 +156,8 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
       return elem;
     };
 
-    return this.activeProject.activeProject === undefined ||
-      this.activeProject.properties?.checkedOutPath === undefined
+    return this.currentPackage.currentProject === undefined ||
+      this.currentPackage.properties?.checkedOutPath === undefined
       ? children
       : children.map(transformCheckedOut);
   }

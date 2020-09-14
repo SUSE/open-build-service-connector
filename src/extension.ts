@@ -24,11 +24,11 @@ import { join } from "path";
 import * as pino from "pino";
 import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
-import { ActivePackageWatcher } from "./active-package-watcher";
 import {
   BookmarkedProjectsTreeProvider,
   CheckOutHandler
 } from "./bookmark-tree-view";
+import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 import { ObsServerInformation } from "./instance-info";
@@ -37,7 +37,6 @@ import { ProjectBookmarkManager } from "./project-bookmarks";
 import { RepositoryTreeProvider } from "./repository";
 import { PackageScmHistoryTree } from "./scm-history";
 import { PackageScm } from "./vcs";
-import { ActiveProjectWatcherImpl } from "./workspace";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -71,18 +70,16 @@ export async function activate(
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
-  const [
-    projectBookmarks,
-    actProjWatcher,
-    activePackageWatcher
-  ] = await Promise.all([
+  const [projectBookmarks, currentPackageWatcher] = await Promise.all([
     ProjectBookmarkManager.createProjectBookmarkManager(
       context,
       accountManager,
       logger
     ),
-    ActiveProjectWatcherImpl.createActiveProjectWatcher(accountManager, logger),
-    ActivePackageWatcher.createActivePackageWatcher(accountManager, logger)
+    CurrentPackageWatcherImpl.createCurrentPackageWatcher(
+      accountManager,
+      logger
+    )
   ]);
 
   const bookmarkedProjectsTreeProvider = new BookmarkedProjectsTreeProvider(
@@ -99,7 +96,7 @@ export async function activate(
   );
 
   const currentProjectTreeProvider = new CurrentProjectTreeProvider(
-    actProjWatcher,
+    currentPackageWatcher,
     accountManager,
     logger
   );
@@ -109,7 +106,7 @@ export async function activate(
   );
 
   const repoTreeProvider = new RepositoryTreeProvider(
-    actProjWatcher,
+    currentPackageWatcher,
     accountManager,
     logger
   );
@@ -118,7 +115,7 @@ export async function activate(
     treeDataProvider: repoTreeProvider
   });
   const packageScmHistoryTreeProvider = await PackageScmHistoryTree.createPackageScmHistoryTree(
-    activePackageWatcher,
+    currentPackageWatcher,
     accountManager,
     logger
   );
@@ -138,7 +135,8 @@ export async function activate(
     accountManager,
     bookmarkedProjectsTree,
     pkgFileProv,
-    new PackageScm(activePackageWatcher, accountManager, logger),
+    currentPackageWatcher,
+    new PackageScm(currentPackageWatcher, accountManager, logger),
     packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),

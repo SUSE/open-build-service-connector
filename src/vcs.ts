@@ -33,9 +33,12 @@ import { basename, dirname, join, sep } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
-import { ActivePackageWatcher } from "./active-package-watcher";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix, ignoreFocusOut } from "./constants";
+import {
+  CurrentPackageWatcher,
+  isModifiedPackage
+} from "./current-package-watcher";
 import { logAndReportExceptions } from "./decorators";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 
@@ -83,7 +86,7 @@ export const fileAtHeadUri = {
 
 export class PackageScm extends ConnectionListenerLoggerBase
   implements vscode.QuickDiffProvider, vscode.TextDocumentContentProvider {
-  private activePackage: ModifiedPackage | undefined;
+  private currentPackage: ModifiedPackage | undefined;
 
   private curScm: vscode.SourceControl | undefined;
 
@@ -92,21 +95,21 @@ export class PackageScm extends ConnectionListenerLoggerBase
   private scmDisposable: vscode.Disposable | undefined;
 
   constructor(
-    private readonly activePackageWatcher: ActivePackageWatcher,
+    private readonly currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
     logger: Logger
   ) {
     super(accountManager, logger);
 
     this.disposables.push(
-      this.activePackageWatcher.onDidChangeActivePackage(function (
+      this.currentPackageWatcher.onDidChangeCurrentPackage(function (
         this: PackageScm,
         _modPkg
       ) {
         this.updateScm();
       },
       this),
-      this.activePackageWatcher,
+      this.currentPackageWatcher,
       vscode.commands.registerCommand(
         REVERT_CHANGE_COMMAND,
         this.revertChange,
@@ -204,12 +207,12 @@ export class PackageScm extends ConnectionListenerLoggerBase
   }
 
   private async addChangelogEntry(msg: string): Promise<void> {
-    if (this.activePackage === undefined) {
+    if (this.currentPackage === undefined) {
       throw new Error(
         `Cannot add a changelog entry, no package is currently active`
       );
     }
-    const acc = this.activeAccounts.getConfig(this.activePackage.apiUrl)
+    const acc = this.activeAccounts.getConfig(this.currentPackage.apiUrl)
       ?.account;
     if (
       acc === undefined ||
@@ -277,18 +280,19 @@ ${msg}
 `;
 
     const standardChangesFile = join(
-      this.activePackage.path,
-      `${this.activePackage.name}.changes`
+      this.currentPackage.path,
+      `${this.currentPackage.name}.changes`
     );
     let changesFile: string | undefined = standardChangesFile;
     if (!(await pathExists(standardChangesFile, PathType.File))) {
       changesFile = undefined;
-      const dentries = await fsPromises.readdir(this.activePackage.path, {
+      const dentries = await fsPromises.readdir(this.currentPackage.path, {
         withFileTypes: true
       });
       for (const dentry of dentries) {
-        if (dentry.isFile && dentry.name.match(/\.changes$/)) {
-          changesFile = join(this.activePackage.path, dentry.name);
+        const re = RegExp(".changes$");
+        if (dentry.isFile && re.exec(dentry.name) !== null) {
+          changesFile = join(this.currentPackage.path, dentry.name);
           this.logger.debug("Using non-standard changes file: %s", changesFile);
           break;
         }
@@ -314,11 +318,11 @@ ${msg}
   }
 
   private getUriOfOriginalResource(uri: vscode.Uri): vscode.Uri | undefined {
-    if (this.activePackage === undefined) {
+    if (this.currentPackage === undefined) {
       return undefined;
     }
     const splitPath = uri.fsPath.split(sep);
-    const matchingFile = this.activePackage.files.find(
+    const matchingFile = this.currentPackage.files.find(
       (f) => f.name === splitPath[splitPath.length - 1]
     );
 
@@ -333,12 +337,12 @@ ${msg}
       return;
     }
     assert(
-      this.activePackage !== undefined,
+      this.currentPackage !== undefined,
       "A package must be currently active"
     );
 
     const fname = basename(uri.fsPath);
-    const fileState = this.activePackage.filesInWorkdir.find(
+    const fileState = this.currentPackage.filesInWorkdir.find(
       (f) => f.name === fname
     )!.state;
 
@@ -389,10 +393,11 @@ ${msg}
       basename(state.resourceUri.fsPath)
     );
     assert(
-      this.activePackage !== undefined,
+      this.currentPackage !== undefined,
       "A package must be currently active"
     );
-    await addAndDeleteFilesFromPackage(this.activePackage, [], filesToAdd);
+    await addAndDeleteFilesFromPackage(this.currentPackage, [], filesToAdd);
+    await this.currentPackageWatcher.reloadCurrentPackage();
   }
 
   private async removeFile(
@@ -402,10 +407,11 @@ ${msg}
       basename(state.resourceUri.fsPath)
     );
     assert(
-      this.activePackage !== undefined,
+      this.currentPackage !== undefined,
       "A package must be currently active"
     );
-    await addAndDeleteFilesFromPackage(this.activePackage, filesToDelete, []);
+    await addAndDeleteFilesFromPackage(this.currentPackage, filesToDelete, []);
+    await this.currentPackageWatcher.reloadCurrentPackage();
   }
 
   private async discardChanges(
@@ -446,8 +452,8 @@ ${msg}
             this.logger.error(
               "could not get original content for the file %s from %s/%s",
               resourceState.resourceUri.fsPath,
-              this.activePackage?.projectName,
-              this.activePackage?.name
+              this.currentPackage?.projectName,
+              this.currentPackage?.name
             );
             return;
           }
@@ -497,7 +503,7 @@ ${msg}
     );
     const change = changes[index];
 
-    if (this.activePackage === undefined) {
+    if (this.currentPackage === undefined) {
       this.logger.error(
         "Revert of the line change [%d:%d] in %s was requested, but no activePackage exists",
         change.modifiedStartLineNumber,
@@ -589,17 +595,17 @@ ${msg}
   }
 
   private async commitChanges(scm?: vscode.SourceControl): Promise<void> {
-    if (this.activePackage === undefined) {
+    if (this.currentPackage === undefined) {
       this.logger.error("Cannot commit changes: no activePackage is set");
       return;
     }
 
-    const con = this.activeAccounts.getConfig(this.activePackage.apiUrl)
+    const con = this.activeAccounts.getConfig(this.currentPackage.apiUrl)
       ?.connection;
     if (con === undefined) {
       this.logger.error(
         "Cannot commit changes: no connection for the API '%s' exists",
-        this.activePackage.apiUrl
+        this.currentPackage.apiUrl
       );
       return;
     }
@@ -621,11 +627,11 @@ ${msg}
       }
     }
 
-    await commit(con, this.activePackage, commitMsg);
+    await commit(con, this.currentPackage, commitMsg);
     if (this.curScm?.inputBox.value !== undefined) {
       this.curScm.inputBox.value = "";
     }
-    await this.activePackageWatcher.reloadCurrentPackage();
+    await this.currentPackageWatcher.reloadCurrentPackage();
   }
 
   private updateScm(): void {

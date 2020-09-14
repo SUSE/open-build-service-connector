@@ -34,12 +34,13 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
+import { ProjectBookmark } from "./bookmarks";
 import { cmdPrefix } from "./constants";
+import { CurrentPackageWatcher } from "./current-package-watcher";
 import { logAndReportExceptions } from "./decorators";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
 import { deepCopyProperties, promptUserForProjectName } from "./util";
 import { VscodeWindow } from "./vscode-dep";
-import { ActiveProjectWatcher } from "./workspace";
 
 const cmdId = "obsRepository";
 
@@ -219,14 +220,14 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
   implements vscode.TreeDataProvider<RepositoryElement> {
   public onDidChangeTreeData: vscode.Event<RepositoryElement | undefined>;
 
-  public activeProject: Project | undefined;
+  public currentProject: Project | ProjectBookmark | undefined;
 
   private onDidChangeTreeDataEmitter: vscode.EventEmitter<
     RepositoryElement | undefined
   > = new vscode.EventEmitter<RepositoryElement | undefined>();
 
   constructor(
-    activeProjectWatcher: ActiveProjectWatcher,
+    currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
     logger: Logger,
     private readonly vscodeWindow: VscodeWindow = vscode.window
@@ -234,15 +235,15 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     super(accountManager, logger);
 
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
-    this.activeProject = activeProjectWatcher.getActiveProject().activeProject;
+    this.currentProject = currentPackageWatcher.currentPackage.currentProject;
 
     this.disposables.push(
       this.onDidChangeTreeDataEmitter,
-      activeProjectWatcher.onDidChangeActiveProject((activeProj) => {
-        this.activeProject = activeProj.activeProject;
+      currentPackageWatcher.onDidChangeCurrentPackage((currentPackage) => {
+        this.currentProject = currentPackage.currentProject;
         this.logger.debug(
-          this.activeProject
-            ? `RepositoryTreeProvider was notified of the active project ${this.activeProject.name}`
+          this.currentProject
+            ? `RepositoryTreeProvider was notified of the active project ${this.currentProject.name}`
             : "RepositoryTreeProvider was notified that no project is active"
         );
         this.refresh();
@@ -306,18 +307,18 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const con = this.getConnectionOfCurrentProject();
 
     // FIXME: what should we do if we need to fetch the meta?
-    if (this.activeProject!.meta === undefined) {
-      this.activeProject!.meta = await fetchProjectMeta(
+    if (this.currentProject!.meta === undefined) {
+      this.currentProject!.meta = await fetchProjectMeta(
         con,
-        this.activeProject!.name
+        this.currentProject!.name
       );
     }
     assert(
-      this.activeProject!.meta !== undefined,
+      this.currentProject!.meta !== undefined,
       "The project meta must be defined at this point"
     );
 
-    const apiUrl = this.activeProject!.apiUrl;
+    const apiUrl = this.currentProject!.apiUrl;
     const instanceInfo = await vscode.commands.executeCommand<ObsInstance>(
       GET_INSTANCE_INFO_COMMAND,
       apiUrl
@@ -334,7 +335,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
     const hostedDistros = instanceInfo.hostedDistributions;
 
-    const { repository, ...rest } = this.activeProject!.meta;
+    const { repository, ...rest } = this.currentProject!.meta;
     const presentRepos = deepCopyProperties(repository) ?? [];
 
     const distrosToAddNames = await this.vscodeWindow.showQuickPick(
@@ -366,7 +367,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
 
     const newMeta = { ...rest, repository: presentRepos };
     await modifyProjectMeta(con, newMeta);
-    this.activeProject!.meta = newMeta;
+    this.currentProject!.meta = newMeta;
 
     this.refresh();
   }
@@ -421,14 +422,14 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     const con = this.getConnectionOfCurrentProject();
 
     // repository must be defined and have length >= 1
-    const { repository, ...rest } = this.activeProject!.meta!;
+    const { repository, ...rest } = this.currentProject!.meta!;
 
     // FIXME: need a better comparison here
     const newRepos = repository!.filter((repo) => repo !== element.repository);
 
     const newMeta = { ...rest, repository: newRepos };
     await modifyProjectMeta(con, newMeta);
-    this.activeProject!.meta = newMeta;
+    this.currentProject!.meta = newMeta;
 
     this.refresh();
   }
@@ -463,7 +464,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     }
 
     // this is ok, the previous if ensures this
-    const repos = this.activeProject!.meta!.repository!;
+    const repos = this.currentProject!.meta!.repository!;
 
     if (element === undefined) {
       return Promise.resolve(
@@ -503,7 +504,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
   ): Promise<void> {
     const con = this.getConnectionOfCurrentProject();
 
-    const { repository, ...rest } = this.activeProject!.meta!;
+    const { repository, ...rest } = this.currentProject!.meta!;
     assert(repository !== undefined);
 
     const matchingRepoIndex = repository.findIndex(
@@ -513,7 +514,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       matchingRepoIndex !== -1,
       `Expected to find the repository ${
         element.repository.name
-      } in the project ${this.activeProject!.name}`
+      } in the project ${this.currentProject!.name}`
     );
 
     const pathIndex = indexOfPathInRepository(
@@ -525,7 +526,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       `Expected to find the repository entry ${element.path.project}/${
         element.path.repository
       } in the repository paths of ${
-        this.activeProject!.name
+        this.currentProject!.name
       } of the repository ${element.repository.name}`
     );
 
@@ -548,7 +549,7 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     ];
 
     await modifyProjectMeta(con, { repository, ...rest });
-    this.activeProject!.meta = { repository, ...rest };
+    this.currentProject!.meta = { repository, ...rest };
     this.refresh();
   }
 
@@ -587,12 +588,12 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
       this.logger.debug(
         "Not ading an architecture because element is invalid (%s) or the active project has no _meta associated with it (%s)",
         element,
-        this.activeProject
+        this.currentProject
       );
       return;
     }
 
-    const activeProj = this.activeProject!;
+    const activeProj = this.currentProject!;
     const repos = activeProj.meta!.repository!;
 
     const account = this.activeAccounts.getConfig(activeProj.apiUrl);
@@ -709,10 +710,10 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
     newMeta.repository![matchingRepoIndex] = matchingRepo;
 
     await modifyProjectMeta(account.connection, newMeta);
-    this.activeProject!.meta = newMeta;
+    this.currentProject!.meta = newMeta;
 
     if (projFolder !== undefined) {
-      await updateCheckedOutProject(this.activeProject!, projFolder);
+      await updateCheckedOutProject(this.currentProject!, projFolder);
     }
 
     this.refresh();
@@ -725,22 +726,22 @@ export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
    */
   private activeProjectHasRepositories(): boolean {
     return (
-      this.activeProject !== undefined &&
-      this.activeProject.meta !== undefined &&
-      this.activeProject.meta.repository !== undefined &&
-      this.activeProject.meta.repository.length > 0
+      this.currentProject !== undefined &&
+      this.currentProject.meta !== undefined &&
+      this.currentProject.meta.repository !== undefined &&
+      this.currentProject.meta.repository.length > 0
     );
   }
 
   private getConnectionOfCurrentProject(): Connection {
-    if (this.activeProject === undefined) {
+    if (this.currentProject === undefined) {
       throw new Error("No project is active, cannot add a repository");
     }
-    const con = this.activeAccounts.getConfig(this.activeProject.apiUrl)
+    const con = this.activeAccounts.getConfig(this.currentProject.apiUrl)
       ?.connection;
     if (con === undefined) {
       throw new Error(
-        `No account is properly configured to access the API ${this.activeProject.apiUrl}`
+        `No account is properly configured to access the API ${this.currentProject.apiUrl}`
       );
     }
 
