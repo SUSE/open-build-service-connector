@@ -21,6 +21,7 @@
 
 import * as assert from "assert";
 import { fetchProject } from "open-build-service-api";
+import { zip } from "open-build-service-api/lib/util";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { ActiveAccounts, promptUserForAccount } from "./accounts";
@@ -89,6 +90,85 @@ export function deepCopyProperties<T>(obj: T): T;
 /** Create a deep copy of `obj` omitting **all** functions. */
 export function deepCopyProperties<T>(obj?: T): T | undefined {
   return obj === undefined ? undefined : JSON.parse(JSON.stringify(obj));
+}
+
+/**
+ * Checks whether the objects `obj1` and `obj2` have the same keys and whether
+ * all elements are equal.
+ */
+function objsEqual(obj1: any, obj2: any): boolean {
+  const keysOf1 = Object.keys(obj1);
+  const keysOf2 = Object.keys(obj2);
+
+  if (!arraysEqual(keysOf1, keysOf2)) {
+    return false;
+  }
+  for (const key of keysOf1) {
+    if (!deepEqual(obj1[key], obj2[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function arraysEqual<T, U>(
+  arr1: T[] | readonly T[],
+  arr2: U[] | readonly U[]
+): boolean {
+  if (arr1.length !== arr2.length) {
+    return false;
+  }
+  for (const [elem1, elem2] of zip(arr1, arr2)) {
+    if (!deepEqual(elem1, elem2)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Perform a check of two arbitrary objects for deep equality.
+ *
+ * This function recursively checks all elements or entries of `a` and `b` for
+ * equality until either one of them does not match or if all are equal, then
+ * `true` is returned.
+ *
+ * Objects are compared by checking each key for equality. Arrays are compared
+ * element wise. All other types are compared using the equality operator `===`.
+ */
+export function deepEqual(a: any, b: any): boolean {
+  if (a === b) {
+    return true;
+  }
+
+  const typeOfA = typeof a;
+
+  if (typeOfA !== typeof b) {
+    return false;
+  }
+
+  if (
+    typeOfA === "string" ||
+    typeOfA === "boolean" ||
+    typeOfA === "number" ||
+    typeOfA === "bigint" ||
+    typeOfA === "undefined" ||
+    typeOfA === "function"
+  ) {
+    // FIXME: this will probably always return false as we checked whether a === b in the first line
+    return a === b;
+  } else if (typeOfA === "symbol") {
+    // FIXME: don't know how to handle symbols
+    return false;
+  }
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return arraysEqual(a, b);
+  } else if (!Array.isArray(a) && !Array.isArray(b)) {
+    return objsEqual(a, b);
+  } else {
+    return false;
+  }
 }
 
 /**

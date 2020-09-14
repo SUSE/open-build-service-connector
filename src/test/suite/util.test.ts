@@ -28,7 +28,8 @@ import {
   saveMapToMemento,
   setDifference,
   setUnion,
-  createItemInserter
+  createItemInserter,
+  deepEqual
 } from "../../util";
 import { castToAsyncFunc, castToFunc } from "./test-utils";
 
@@ -190,6 +191,72 @@ describe("utilities", () => {
 
       expect(inserter([5])).to.deep.equal([1, 5, 3, 16]);
       expect(inserter([28, 42])).to.deep.equal([1, 28, 42, 3, 16]);
+    });
+  });
+
+  describe("#deepEqual", () => {
+    it("reports different types as unequal", () => {
+      deepEqual("a", true).should.equal(false);
+      deepEqual("a", [1, 2]).should.equal(false);
+      deepEqual({ a: 1 }, [1, 2]).should.equal(false);
+    });
+
+    it("correctly checks arrays", () => {
+      deepEqual(["a"], ["a"]).should.equal(true);
+      deepEqual(["a"], ["aasd"]).should.equal(false);
+
+      deepEqual([1, 2], [3, 4]).should.equal(false);
+    });
+
+    it("correctly checks arrays of objects", () => {
+      deepEqual(
+        [{ a: 1, b: 3 }, { c: ["sixteen"] }],
+        [{ a: 1, b: 3 }, { c: ["sixteen"] }]
+      ).should.equal(true);
+
+      deepEqual(
+        [{ a: 1, b: 3 }, { c: ["sixteen"] }],
+        [{ c: ["sixteen"] }, { a: 1, b: 3 }]
+      ).should.equal(false);
+
+      deepEqual(
+        [{ a: 1, b: 3 }, { c: ["sixteen"] }],
+        [{ a: 1, b: 3 }, { c: ["sixteen", "seventeen"] }]
+      ).should.equal(false);
+      deepEqual(
+        [{ a: 1, b: 3 }, { c: ["sixteen"] }],
+        [{ a: 1, b: 3 }, { c: ["Sixteen"] }]
+      ).should.equal(false);
+    });
+
+    it("correctly checks nested objects", () => {
+      deepEqual(
+        { a: [1, 2, 3], b: { c: 1, d: "foo", e: { baz: "bar" } } },
+        { a: [1, 2, 3], b: { c: 1, d: "foo", e: { baz: "bar" } } }
+      ).should.equal(true);
+
+      deepEqual(
+        { a: [1, 2, 3], b: { c: 1, d: "foo", e: { baz: "bar" } } },
+        { a: [1, 2, 3], b: { c: 2, d: "foo", e: { baz: "bar" } } }
+      ).should.equal(false);
+      deepEqual(
+        { a: [1, 2, 3], b: { c: 1, d: "foo", e: { baz: "bar" } } },
+        { a: [1, 2, 3], b: { c: 1, d: "foo", e: { baz: "Bar" } } }
+      ).should.equal(false);
+    });
+
+    it("correctly checks Buffers", () => {
+      deepEqual(Buffer.from("foo"), Buffer.from("foo")).should.equal(true);
+      deepEqual(
+        { a: Buffer.from("foo") },
+        { a: Buffer.from("foo") }
+      ).should.equal(true);
+
+      const strings = ["bar", "foo", "something"];
+      deepEqual(
+        strings.map((s) => Buffer.from(s)),
+        strings.map((s) => Buffer.from(s))
+      ).should.equal(true);
     });
   });
 });
