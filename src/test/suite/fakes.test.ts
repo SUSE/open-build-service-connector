@@ -18,11 +18,12 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
+import { expect } from "chai";
 import { afterEach, beforeEach, describe, it } from "mocha";
-import { createSandbox } from "sinon";
-import { makeFakeEvent } from "./fakes";
-import { sleep } from "./test-utils";
+import { createSandbox, SinonSandbox } from "sinon";
+import { Context } from "vm";
+import { FakeVscodeWorkspace, makeFakeEventEmitter } from "./fakes";
+import { castToFunc, sleep } from "./test-utils";
 
 interface Foo {
   prop: string;
@@ -133,5 +134,104 @@ describe("fakes", () => {
         listener2.should.have.been.calledOnce;
       });
     });
+  });
+
+  describe("#FakeVscodeWorkspace", () => {
+    type Ctx = Context & { sandbox: SinonSandbox };
+
+    beforeEach(function () {
+      this.sandbox = createSandbox();
+    });
+
+    afterEach(function () {
+      this.sandbox.restore();
+    });
+
+    it(
+      "creates a fake FileSystemWatcher",
+      castToFunc<Ctx>(function () {
+        const ws = new FakeVscodeWorkspace(this.sandbox);
+        const pattern = "**/*";
+        const watcher = ws.createFileSystemWatcher(pattern);
+        expect(watcher).to.have.property("onDidCreate");
+        expect(watcher).to.have.property("onDidDelete");
+        expect(watcher).to.have.property("onDidChange");
+
+        expect(ws.fakeWatchers).to.have.length(1);
+        ws.fakeWatchers[0].globPattern.should.deep.equal(pattern);
+        ws.createFileSystemWatcherSpy.should.have.been.calledOnceWithExactly(
+          pattern
+        );
+      })
+    );
+
+    it(
+      "creates multiple FileSystemWatchers",
+      castToFunc<Ctx>(function () {
+        const ws = new FakeVscodeWorkspace(this.sandbox);
+        const pattern1 = "**/*";
+        const pattern2 = "**/*foo*";
+
+        const watcher1 = ws.createFileSystemWatcher(pattern1);
+        const watcher2 = ws.createFileSystemWatcher(pattern2);
+
+        [watcher1, watcher2].forEach((w) => {
+          ["onDidCreate", "onDidDelete", "onDidChange"].forEach((p) =>
+            w.should.have.property(p)
+          );
+        });
+
+        expect(ws.fakeWatchers).to.have.length(2);
+        ws.createFileSystemWatcherSpy.should.have.callCount(2);
+
+        [pattern1, pattern2].forEach((p) => {
+          ws.fakeWatchers
+            .map((f) => f.globPattern)
+            .should.include.a.thing.that.equals(p);
+          ws.createFileSystemWatcherSpy.should.have.been.calledWithExactly(p);
+        });
+      })
+    );
+
+    it(
+      "removes the correct watcher via dispose()",
+      castToFunc<Ctx>(function () {
+        const ws = new FakeVscodeWorkspace(this.sandbox);
+        const pattern1 = "**/*";
+        const pattern2 = "**/*foo*";
+
+        const watcher1 = ws.createFileSystemWatcher(pattern1);
+        const watcher2 = ws.createFileSystemWatcher(pattern2);
+        const watcher3 = ws.createFileSystemWatcher(pattern2);
+
+        expect(ws.fakeWatchers).to.have.length(3);
+
+        watcher2.dispose();
+
+        expect(ws.fakeWatchers).to.have.length(2);
+        [pattern1, pattern2].forEach((p) =>
+          ws.fakeWatchers
+            .map((f) => f.globPattern)
+            .should.include.a.thing.that.equals(p)
+        );
+
+        // calling it twice does nothing bad (TM)
+        watcher2.dispose();
+        expect(ws.fakeWatchers).to.have.length(2);
+
+        watcher1.dispose();
+        expect(ws.fakeWatchers.map((f) => f.globPattern)).to.deep.equal([
+          pattern2
+        ]);
+
+        watcher3.dispose();
+        expect(ws.fakeWatchers).to.have.length(0);
+
+        [watcher1, watcher3].forEach((w) =>
+          w.disposeSpy.should.have.callCount(1)
+        );
+        watcher2.disposeSpy.should.have.callCount(2);
+      })
+    );
   });
 });
