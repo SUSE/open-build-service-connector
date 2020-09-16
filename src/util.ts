@@ -354,6 +354,9 @@ export async function promptUserForPackage(
 }
 
 export function isUri(obj: any): obj is vscode.Uri {
+  if (obj === undefined) {
+    return false;
+  }
   for (const prop of ["scheme", "authority", "path", "query", "fragment"]) {
     if (obj[prop] === undefined || typeof obj[prop] !== "string") {
       return false;
