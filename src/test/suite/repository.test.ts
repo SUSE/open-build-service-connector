@@ -23,13 +23,13 @@ import { afterEach, beforeEach, describe } from "mocha";
 import { createSandbox } from "sinon";
 import { RepositoryTreeProvider } from "../../repository";
 import { VscodeWindow } from "../../vscode-dep";
-import { ActiveProject } from "../../workspace";
 import {
   AccountMapInitializer,
   FakeAccountManager,
-  FakeActiveProjectWatcher
+  FakeCurrentPackageWatcher
 } from "./fakes";
 import { createStubbedVscodeWindow, testLogger } from "./test-utils";
+import { CurrentPackage } from "../../current-package-watcher";
 
 class RepositoryTreeProviderFixture {
   public readonly sandbox = createSandbox();
@@ -39,7 +39,7 @@ class RepositoryTreeProviderFixture {
     update: this.sandbox.stub()
   };
 
-  public fakeActiveProjectWatcher?: FakeActiveProjectWatcher;
+  public fakeCurrentPackageWatcher?: FakeCurrentPackageWatcher;
 
   public fakeAccountManager?: FakeAccountManager;
 
@@ -48,15 +48,15 @@ class RepositoryTreeProviderFixture {
   );
 
   public createRepositoryTreeProvider(
-    initialActiveProject?: ActiveProject,
+    initialCurrentPackage?: CurrentPackage,
     initialAccountMap?: AccountMapInitializer
   ): RepositoryTreeProvider {
-    this.fakeActiveProjectWatcher = new FakeActiveProjectWatcher(
-      initialActiveProject
+    this.fakeCurrentPackageWatcher = new FakeCurrentPackageWatcher(
+      initialCurrentPackage
     );
     this.fakeAccountManager = new FakeAccountManager(initialAccountMap);
     return new RepositoryTreeProvider(
-      this.fakeActiveProjectWatcher,
+      this.fakeCurrentPackageWatcher,
       this.fakeAccountManager,
       testLogger,
       this.vscodeWindow

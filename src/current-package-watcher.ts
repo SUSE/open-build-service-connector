@@ -19,12 +19,13 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// import * as assert from "assert";
+import * as assert from "assert";
 import {
   fetchPackage,
   fetchProject,
   ModifiedPackage,
   Package,
+  PackageFile,
   pathExists,
   PathType,
   Project,
@@ -46,7 +47,11 @@ import {
   GET_BOOKMARKED_PACKAGE_COMMAND,
   GET_BOOKMARKED_PROJECT_COMMAND
 } from "./project-bookmarks";
+import { deepEqual } from "./util";
 import { getPkgPathFromVcsUri } from "./vcs";
+import { VscodeWindow, VscodeWorkspace } from "./vscode-dep";
+
+export const EDITOR_CHANGE_DELAY_MS = 100;
 
 /** Currently active project of the current text editor window. */
 export interface CurrentPackage {
@@ -69,9 +74,9 @@ export interface CurrentPackage {
   readonly currentFilename: string | undefined;
 
   /**
-   * additional properties of the [[activeProject]].
+   * additional properties of the [[currentProject]].
    *
-   * This field must be present when [[activeProject]] is not undefined.
+   * This field must be present when [[currentProject]] is not undefined.
    */
   properties?: {
     /**
@@ -82,119 +87,8 @@ export interface CurrentPackage {
   };
 }
 
-/* class WatchedProject extends DisposableBase {
-  private _watchedPackages: string[];
-  private _packages: ModifiedPackage[] = [];
-  private _projMeta: ProjectMeta | undefined;
-
-  private watcher: vscode.FileSystemWatcher;
-
-  private onProjectUpdateEmitter = new vscode.EventEmitter<ProjectUpdate>();
-
-  public static async createWatchedProject(
-    fsPath: string,
-    packages: string[]
-  ): Promise<WatchedProject> {
-    const watchedProject = new WatchedProject(fsPath, packages);
-    try {
-      watchedProject._projMeta = (await readInCheckedOutProject(fsPath)).meta;
-    } catch (err) {}
-
-    await Promise.all(
-      packages.map(async (packageName, index) => {
-        try {
-          watchedProject._packages[index] = await readInModifiedPackageFromDir(
-            join(fsPath, packageName)
-          );
-          assert(
-            watchedProject._packages[index].name ===
-              watchedProject._watchedPackages[index]
-          );
-        } catch (err) {}
-      })
-    );
-    return watchedProject;
-  }
-
-  public readonly onProjectUpdate = this.onProjectUpdateEmitter.event;
-
-  get watchedPackages(): string[] {
-    return this._watchedPackages;
-  }
-
-  get projectMeta(): ProjectMeta | undefined {
-    return this._projMeta;
-  }
-
-  public async getPackage(
-    pkgName: string
-  ): Promise<ModifiedPackage | undefined> {
-    const pkgInd = this._watchedPackages.findIndex((name) => name === pkgName);
-    return pkgInd === -1 ? undefined : this._packages[pkgInd];
-  }
-
-  public async addWatchedPackage(pkgName: string): Promise<void> {
-    if (this._watchedPackages.find((name) => name === pkgName) === undefined) {
-      this._watchedPackages.push(pkgName);
-      this._packages.push(
-        await readInModifiedPackageFromDir(join(this.fsPath, pkgName))
-      );
-    }
-  }
-
-  public ensurePackageNotWatched(pkgName: string): void {
-    const ind = this._watchedPackages.findIndex((name) => name === pkgName);
-    if (ind > -1) {
-      this._watchedPackages.splice(ind, 1);
-      this._packages.splice(ind, 1);
-    }
-  }
-
-  private constructor(public readonly fsPath: string, packages: string[]) {
-    super();
-
-    this.fsPath = fsPath;
-    this._watchedPackages = packages;
-
-    const wsFolder = vscode.workspace.getWorkspaceFolder(
-      vscode.Uri.file(fsPath)
-    );
-    if (wsFolder === undefined) {
-      throw new Error(
-        `Cannot get workspace folder from project in path: ${fsPath}`
-      );
-    }
-    const relPath = relative(wsFolder.uri.fsPath, fsPath);
-    this.watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(wsFolder, `${relPath}/**`)
-    );
-
-    this.disposables.push(
-      this.watcher.onDidCreate(this.pkgUpdateCallback, this),
-      this.watcher.onDidDelete(this.pkgUpdateCallback, this),
-      this.watcher.onDidChange(this.pkgUpdateCallback, this),
-      this.watcher,
-      this.onProjectUpdateEmitter
-    );
-  }
-}*/
-
-async function getProjectOfPackage(
-  packagePath: string
-): Promise<Project | undefined> {
-  const potentialProjPath = dirname(packagePath);
-  const wsFolder = vscode.workspace.getWorkspaceFolder(
-    vscode.Uri.file(potentialProjPath)
-  );
-  if (wsFolder === undefined) {
-    return undefined;
-  }
-  try {
-    return readInCheckedOutProject(potentialProjPath);
-  } catch (_err) {
-    return undefined;
-  }
-}
+const normalizePath = (path: string): string =>
+  path[path.length - 1] === "/" ? path.slice(0, path.length - 1) : path;
 
 interface LocalPackage {
   pkg: ModifiedPackage;
@@ -233,7 +127,83 @@ function isCheckedOutProject(
   );
 }
 
-const EMPTY_CUR_PKG: CurrentPackage = Object.freeze({
+const strcmp = (str1: string, str2: string): number =>
+  str1 === str2 ? 0 : str1 > str2 ? 1 : -1;
+
+const cmpFiles = (f1: PackageFile, f2: PackageFile): number =>
+  strcmp(f1.name, f2.name);
+
+export function currentPackagesEqual(
+  pkg1: CurrentPackage | undefined,
+  pkg2: CurrentPackage | undefined
+): boolean {
+  if (pkg1 === undefined && pkg2 === undefined) {
+    return true;
+  } else if (
+    (pkg1 !== undefined && pkg2 === undefined) ||
+    (pkg1 === undefined && pkg2 !== undefined)
+  ) {
+    return false;
+  }
+
+  assert(pkg1 !== undefined && pkg2 !== undefined);
+
+  if (!deepEqual(pkg1.currentProject, pkg2.currentProject)) {
+    return false;
+  }
+  if (pkg1.currentFilename !== pkg2.currentFilename) {
+    return false;
+  }
+  if (pkg1.properties?.checkedOutPath !== pkg2.properties?.checkedOutPath) {
+    return false;
+  }
+
+  if (pkg1.currentPackage === undefined && pkg2.currentPackage === undefined) {
+    return true;
+  } else if (
+    (pkg1.currentPackage !== undefined && pkg2.currentPackage === undefined) ||
+    (pkg1.currentPackage === undefined && pkg2.currentPackage !== undefined)
+  ) {
+    return false;
+  }
+  assert(
+    pkg1.currentPackage !== undefined && pkg2.currentPackage !== undefined
+  );
+  if (
+    isModifiedPackage(pkg1.currentPackage) &&
+    isModifiedPackage(pkg2.currentPackage)
+  ) {
+    const {
+      files: files1,
+      filesInWorkdir: filesInWorkdir1,
+      ...rest1
+    } = pkg1.currentPackage;
+    const {
+      files: files2,
+      filesInWorkdir: filesInWorkdir2,
+      ...rest2
+    } = pkg2.currentPackage;
+    return (
+      deepEqual(rest1, rest2) &&
+      deepEqual(files1.sort(cmpFiles), files2.sort(cmpFiles)) &&
+      deepEqual(filesInWorkdir1.sort(cmpFiles), filesInWorkdir2.sort(cmpFiles))
+    );
+  } else if (
+    !isModifiedPackage(pkg1.currentPackage) &&
+    !isModifiedPackage(pkg2.currentPackage)
+  ) {
+    const { files: files1, ...rest1 } = pkg1.currentPackage;
+    const { files: files2, ...rest2 } = pkg2.currentPackage;
+    return (
+      deepEqual(rest1, rest2) &&
+      deepEqual((files1 ?? []).sort(cmpFiles), (files2 ?? []).sort(cmpFiles))
+    );
+  } else {
+    return false;
+  }
+}
+
+export const EMPTY_CURRENT_PACKAGE: CurrentPackage = Object.freeze({
   currentFilename: undefined,
   currentPackage: undefined,
   currentProject: undefined
@@ -256,22 +226,29 @@ export class CurrentPackageWatcherImpl
 
   public static async createCurrentPackageWatcher(
     accountManager: AccountManager,
-    logger: Logger
+    logger: Logger,
+    vscodeWindow: VscodeWindow = vscode.window,
+    vscodeWorkspace: VscodeWorkspace = vscode.workspace
   ): Promise<CurrentPackageWatcher> {
-    const pkgWatcher = new CurrentPackageWatcherImpl(accountManager, logger);
+    const pkgWatcher = new CurrentPackageWatcherImpl(
+      accountManager,
+      logger,
+      vscodeWindow,
+      vscodeWorkspace
+    );
 
     await Promise.all(
-      vscode.window.visibleTextEditors.map((editor) => {
+      vscodeWindow.visibleTextEditors.map((editor) => {
         return pkgWatcher.addPackageFromUri(editor.document.uri);
       })
     );
 
-    await pkgWatcher.onActiveEditorChange(vscode.window.activeTextEditor);
+    await pkgWatcher.onActiveEditorChange(vscodeWindow.activeTextEditor);
 
     return pkgWatcher;
   }
 
-  private _currentPackage: CurrentPackage = EMPTY_CUR_PKG;
+  private _currentPackage: CurrentPackage = EMPTY_CURRENT_PACKAGE;
 
   private localPackages = new Map<string, LocalPackage>();
 
@@ -286,23 +263,31 @@ export class CurrentPackageWatcherImpl
     return this._currentPackage;
   }
 
-  private onDidChangeCurrentPackageEmitter: vscode.EventEmitter<
+  private onDidChangeCurrentPackageEmitter = new vscode.EventEmitter<
     CurrentPackage
-  > = new vscode.EventEmitter<CurrentPackage>();
+  >();
 
-  private constructor(accountManager: AccountManager, logger: Logger) {
+  private constructor(
+    accountManager: AccountManager,
+    logger: Logger,
+    private readonly vscodeWindow: VscodeWindow,
+    private readonly vscodeWorkspace: VscodeWorkspace
+  ) {
     super(accountManager, logger);
     this.onDidChangeCurrentPackage = this.onDidChangeCurrentPackageEmitter.event;
     this.disposables.push(
       this.onDidChangeCurrentPackageEmitter,
-      vscode.window.onDidChangeActiveTextEditor(this.onActiveEditorChange, this)
+      this.vscodeWindow.onDidChangeActiveTextEditor(
+        this.onActiveEditorChange,
+        this
+      )
     );
   }
 
   public getAllLocalPackages(): Map<vscode.WorkspaceFolder, ModifiedPackage[]> {
     const res = new Map<vscode.WorkspaceFolder, ModifiedPackage[]>();
     for (const [path, localPkg] of this.localPackages) {
-      const wsFolder = vscode.workspace.getWorkspaceFolder(
+      const wsFolder = this.vscodeWorkspace.getWorkspaceFolder(
         vscode.Uri.file(path)
       );
       if (wsFolder === undefined) {
@@ -324,44 +309,90 @@ export class CurrentPackageWatcherImpl
     return res;
   }
 
+  /**
+   * Force a reload of the current and notify all event listeners of changes.
+   *
+   * This function should be used in cases where it is known that a package will
+   * change and where a reload is **crucial** to ensure a good UX as file system
+   * watchers don't work on large workspaces.
+   */
   public async reloadCurrentPackage(): Promise<void> {
+    this.logger.trace("Forcing reload of the current package");
+
     if (this._currentPackage.currentPackage === undefined) {
+      this.logger.trace("Current package is undefined, not reloading");
       return;
     }
-    try {
-      const {
-        currentProject,
-        currentFilename,
-        properties
-      } = this._currentPackage;
-      if (isModifiedPackage(this._currentPackage.currentPackage)) {
-        const currentPackage = await readInModifiedPackageFromDir(
+
+    const {
+      currentProject,
+      currentFilename,
+      properties
+    } = this._currentPackage;
+    if (isModifiedPackage(this._currentPackage.currentPackage)) {
+      try {
+        this.logger.trace(
+          "Reloading the package %s from %s",
+          this._currentPackage.currentPackage.name,
           this._currentPackage.currentPackage.path
         );
-        const localPkg = this.localPackages.get(currentPackage.path);
+
+        let currentPackage = await readInModifiedPackageFromDir(
+          this._currentPackage.currentPackage.path
+        );
+        const localPkg = this.localPackages.get(
+          normalizePath(currentPackage.path)
+        );
         if (localPkg === undefined) {
+          // this case shouldn't actually happen, just to be safe here
           this.logger.error(
-            "Reload of the current package %s/%s was requested, but it was not found in the map of local packages",
+            "Reload of the current package %s/%s was requested, but it was not found in the map of local packages. Adding it now.",
             this._currentPackage.currentPackage.projectName,
             this._currentPackage.currentPackage.name
           );
-          // FIXME: we should add the package now
+          // we need to add the package via addPackageFromUri as the watchers
+          // will otherwise not be created and registered properly
+          const newCurrentPackage = (
+            await this.addPackageFromUri(
+              // the uri is only used to get the packages root folder
+              vscode.Uri.file(
+                join(currentPackage.path, "actually_completely_irrelevant")
+              )
+            )
+          ).currentPackage;
+          assert(
+            newCurrentPackage !== undefined &&
+              isModifiedPackage(newCurrentPackage) &&
+              newCurrentPackage.path === currentPackage.path
+          );
+          currentPackage = newCurrentPackage;
         } else {
-          this.localPackages.set(currentPackage.path, {
+          this.localPackages.set(normalizePath(currentPackage.path), {
             project: localPkg?.project,
             pkg: currentPackage,
             projectCheckedOut: localPkg?.projectCheckedOut,
             packageWatcher: localPkg?.packageWatcher
           });
         }
-        this._currentPackage = {
+        this.fireCurrentPackageEvent({
           currentProject,
           currentPackage,
           currentFilename,
           properties
-        };
-        this.fireActivePackageEvent();
-      } else {
+        });
+      } catch (err) {
+        this.logger.error(
+          "Tried to reload the package %s, but got the error %s. Removing it now.",
+          this._currentPackage.currentPackage.name,
+          (err as Error).toString()
+        );
+        const path = normalizePath(this._currentPackage.currentPackage.path);
+        this.localPackages.get(path)?.packageWatcher.dispose();
+        this.localPackages.delete(path);
+        this.fireCurrentPackageEvent(EMPTY_CURRENT_PACKAGE);
+      }
+    } else {
+      try {
         const con = this.activeAccounts.getConfig(
           this._currentPackage.currentPackage.apiUrl
         )?.connection;
@@ -380,7 +411,7 @@ export class CurrentPackageWatcherImpl
           this._currentPackage.currentPackage.name,
           { retrieveFileContents: false }
         );
-        const uri = vscode.window.activeTextEditor?.document.uri;
+        const uri = this.vscodeWindow.activeTextEditor?.document.uri;
         if (uri !== undefined) {
           const remotePkg = this.remotePackages.get(uri);
           this.remotePackages.set(uri, {
@@ -391,13 +422,31 @@ export class CurrentPackageWatcherImpl
             pkg: currentPackage
           });
         }
+      } catch (err) {
+        this.logger.error(
+          "Tried to reload the package %s, but got the error %s. Removing it now.",
+          this._currentPackage.currentPackage.name,
+          (err as Error).toString()
+        );
+        // FIXME: remove this package now
       }
-    } catch (err) {
-      this.logger.error(
-        "Tried to reload the package %s, but got the error %s",
-        this._currentPackage.currentPackage?.name,
-        (err as Error).toString()
-      );
+    }
+  }
+
+  private async getProjectOfPackage(
+    packagePath: string
+  ): Promise<Project | undefined> {
+    const potentialProjPath = dirname(packagePath);
+    const wsFolder = this.vscodeWorkspace.getWorkspaceFolder(
+      vscode.Uri.file(potentialProjPath)
+    );
+    if (wsFolder === undefined) {
+      return undefined;
+    }
+    try {
+      return readInCheckedOutProject(potentialProjPath);
+    } catch {
+      return undefined;
     }
   }
 
@@ -442,9 +491,8 @@ export class CurrentPackageWatcherImpl
           : this._currentPackage.currentProject.apiUrl === project.apiUrl &&
             this._currentPackage.currentProject.name === project.name;
         if (isCur) {
-          const { currentProject, ...rest } = this._currentPackage;
-          this._currentPackage = { currentProject: project, ...rest };
-          this.fireActivePackageEvent();
+          const { currentProject: _ignore, ...rest } = this._currentPackage;
+          this.fireCurrentPackageEvent({ currentProject: project, ...rest });
         }
       }
     } catch (err) {
@@ -453,10 +501,15 @@ export class CurrentPackageWatcherImpl
         projKey,
         (err as Error).toString()
       );
+      this.watchedProjects.get(projKey)?.watcher.dispose();
+      this.watchedProjects.delete(projKey);
     }
   }
 
   private async pkgUpdateCallback(uri: vscode.Uri): Promise<void> {
+    const fsPath = uri.fsPath;
+    this.logger.trace("File change in %s registered", fsPath);
+
     if (uri.scheme !== "file") {
       // shouldn't happen
       this.logger.error(
@@ -465,10 +518,11 @@ export class CurrentPackageWatcherImpl
       );
       return;
     }
-    const fsPath = uri.fsPath;
+
     const dotOscIndex = fsPath.indexOf(".osc");
-    const pkgPath =
-      dotOscIndex === -1 ? dirname(fsPath) : fsPath.substring(0, dotOscIndex);
+    const pkgPath = normalizePath(
+      dotOscIndex === -1 ? dirname(fsPath) : fsPath.substring(0, dotOscIndex)
+    );
 
     const localPkg = this.localPackages.get(pkgPath);
 
@@ -479,6 +533,11 @@ export class CurrentPackageWatcherImpl
       );
       return;
     }
+
+    this.logger.trace(
+      "Found the already checked out package %s",
+      localPkg.pkg.name
+    );
 
     try {
       const pkg = await readInModifiedPackageFromDir(pkgPath);
@@ -494,15 +553,14 @@ export class CurrentPackageWatcherImpl
         isModifiedPackage(this._currentPackage.currentPackage) &&
         this._currentPackage.currentPackage.path === pkg.path
       ) {
-        this._currentPackage = {
+        this.fireCurrentPackageEvent({
           currentPackage: pkg,
           currentProject: project,
           currentFilename: this._currentPackage.currentFilename,
           properties: {
             checkedOutPath: projectCheckedOut ? dirname(pkgPath) : undefined
           }
-        };
-        this.fireActivePackageEvent();
+        });
       }
     } catch (err) {
       this.logger.error(
@@ -510,27 +568,53 @@ export class CurrentPackageWatcherImpl
         fsPath,
         (err as Error).toString()
       );
+      this.localPackages.get(pkgPath)?.packageWatcher.dispose();
+      this.localPackages.delete(pkgPath);
+      if (
+        this._currentPackage.currentPackage !== undefined &&
+        isModifiedPackage(this._currentPackage.currentPackage)
+          ? normalizePath(this._currentPackage.currentPackage.path) === pkgPath
+          : false
+      ) {
+        this.fireCurrentPackageEvent(EMPTY_CURRENT_PACKAGE);
+      }
     }
   }
 
-  @debounce(100)
+  @debounce(EDITOR_CHANGE_DELAY_MS)
   private async onActiveEditorChange(
     editor: vscode.TextEditor | undefined
   ): Promise<void> {
-    const currentFilename =
-      editor !== undefined ? basename(editor?.document.uri.fsPath) : undefined;
-    this._currentPackage = EMPTY_CUR_PKG;
+    this.logger.trace(
+      "Active editor changed to file '%s'",
+      editor?.document.fileName ?? "undefined"
+    );
 
-    if (editor !== undefined) {
-      if (!this.isTextDocumentTracked(editor.document)) {
-        this._currentPackage = await this.addPackageFromUri(
-          editor.document.uri
-        );
-      } else {
+    const currentFilename =
+      editor !== undefined ? basename(editor?.document.fileName) : undefined;
+
+    try {
+      const newCurPkg = await (async () => {
+        if (editor === undefined) {
+          this.logger.trace("No editor is active");
+          return EMPTY_CURRENT_PACKAGE;
+        }
+        if (!this.isTextDocumentTracked(editor.document)) {
+          const curPkg = await this.addPackageFromUri(editor.document.uri);
+          this.logger.trace(
+            "Document of editor was not already tracked and yielded the package '%s'",
+            curPkg.currentPackage?.name ?? "undefined"
+          );
+          return curPkg;
+        }
+
         if (editor.document.uri.scheme === OBS_PACKAGE_FILE_URI_SCHEME) {
+          this.logger.trace(
+            "Document of editor is tracked and it is a remote file on OBS"
+          );
           const remotePkg = this.remotePackages.get(editor.document.uri);
           if (remotePkg !== undefined) {
-            this._currentPackage = {
+            return {
               currentProject: remotePkg.project,
               currentPackage: remotePkg.pkg,
               currentFilename,
@@ -542,12 +626,15 @@ export class CurrentPackageWatcherImpl
             };
           }
         } else {
+          this.logger.trace(
+            "Document of editor is tracked and it is a local file"
+          );
           const pkgPath = getPkgPathFromVcsUri(editor.document.uri);
           if (pkgPath !== undefined) {
-            const localPkg = this.localPackages.get(pkgPath);
+            const localPkg = this.localPackages.get(normalizePath(pkgPath));
 
             if (localPkg !== undefined) {
-              this._currentPackage = {
+              return {
                 currentProject: localPkg.project,
                 currentPackage: localPkg.pkg,
                 currentFilename,
@@ -560,17 +647,38 @@ export class CurrentPackageWatcherImpl
             }
           }
         }
-      }
+        return EMPTY_CURRENT_PACKAGE;
+      })();
+      assert(
+        newCurPkg.currentFilename !== undefined
+          ? newCurPkg.currentFilename === currentFilename
+          : true,
+        `Expected the new packages filename (${newCurPkg.currentFilename}) to match the filename extracted from the TextEditor (${currentFilename})`
+      );
+      this.fireCurrentPackageEvent(newCurPkg);
+    } catch (err) {
+      this.logger.error(
+        "Changing the active editor to '%s' resulted in the following error: %s",
+        editor?.document.fileName ?? "undefined",
+        err.toString()
+      );
+      this.fireCurrentPackageEvent(EMPTY_CURRENT_PACKAGE);
     }
-    this.fireActivePackageEvent();
   }
 
   /**
-   * Fires the [[onDidChangeActivePackage]] event with the supplied package and
+   * Fires the [[onDidChangeCurrentPackage]] event with the supplied package and
    * sets the current active package to that value.
    */
-  private fireActivePackageEvent(): void {
-    this.onDidChangeCurrentPackageEmitter.fire(this._currentPackage);
+  private fireCurrentPackageEvent(newCurrentPkg: CurrentPackage): void {
+    if (!currentPackagesEqual(newCurrentPkg, this._currentPackage)) {
+      this.logger.trace(
+        "New current package: %s",
+        this._currentPackage.currentPackage?.name ?? "undefined"
+      );
+      this._currentPackage = newCurrentPkg;
+      this.onDidChangeCurrentPackageEmitter.fire(this._currentPackage);
+    }
   }
 
   private isTextDocumentTracked(document: vscode.TextDocument): boolean {
@@ -578,7 +686,9 @@ export class CurrentPackageWatcherImpl
       return this.remotePackages.has(document.uri);
     }
     const fsPath = getPkgPathFromVcsUri(document.uri);
-    return fsPath === undefined ? false : this.localPackages.has(fsPath);
+    return fsPath === undefined
+      ? false
+      : this.localPackages.has(normalizePath(fsPath));
   }
 
   /** */
@@ -591,6 +701,7 @@ export class CurrentPackageWatcherImpl
   //   this.modifiedPackageMap.set(pkg.path, [pkg, watcher]);
   // }
 
+  // FIXME: add this back again:
   // private removePkgFromMap(pkgOrPath: ModifiedPackage | string): void {
   //   const key = typeof pkgOrPath === "string" ? pkgOrPath : pkgOrPath.path;
   //   const pkgAndWatcher = this.modifiedPackageMap.get(key);
@@ -611,6 +722,10 @@ export class CurrentPackageWatcherImpl
    *
    */
   private async addPackageFromUri(uri: vscode.Uri): Promise<CurrentPackage> {
+    this.logger.trace(
+      "Trying to add a package from the uri %s",
+      uri.toString()
+    );
     if (uri.scheme === OBS_PACKAGE_FILE_URI_SCHEME) {
       let project: Project | undefined;
       let pkg: Package | undefined;
@@ -701,11 +816,13 @@ export class CurrentPackageWatcherImpl
         // properties: { checkedOutPath: project}
       };
     } else {
+      this.logger.trace("Uri does not belong to a remote file");
+
       const fsPath = getPkgPathFromVcsUri(uri);
 
       if (fsPath === undefined) {
         this.logger.error("Could not obtain fsPath from uri %s", uri);
-        return EMPTY_CUR_PKG;
+        return EMPTY_CURRENT_PACKAGE;
       }
 
       // const dir = dirname(fsPath);
@@ -714,24 +831,24 @@ export class CurrentPackageWatcherImpl
           "Tried to read in a package %s, but no .osc directory exists",
           fsPath
         );
-        return EMPTY_CUR_PKG;
+        return EMPTY_CURRENT_PACKAGE;
       }
 
       try {
         const pkg = await readInModifiedPackageFromDir(fsPath);
 
-        const wsFolder = vscode.workspace.getWorkspaceFolder(
+        const wsFolder = this.vscodeWorkspace.getWorkspaceFolder(
           vscode.Uri.file(fsPath)
         );
         if (wsFolder === undefined) {
           this.logger.error(
-            "Cannot get workspace folder from project in path: %s",
+            "Cannot get workspace folder from uri in path: %s",
             fsPath
           );
-          return EMPTY_CUR_PKG;
+          return EMPTY_CURRENT_PACKAGE;
         }
         const relPath = relative(wsFolder.uri.fsPath, fsPath);
-        const packageWatcher = vscode.workspace.createFileSystemWatcher(
+        const packageWatcher = this.vscodeWorkspace.createFileSystemWatcher(
           new vscode.RelativePattern(
             wsFolder,
             relPath === "" ? "**" : `${relPath}/**`
@@ -744,26 +861,36 @@ export class CurrentPackageWatcherImpl
           packageWatcher
         );
 
-        const proj = await getProjectOfPackage(fsPath);
+        this.logger.trace(
+          "Read in package in from %s and added file system watchers",
+          fsPath
+        );
+
+        const proj = await this.getProjectOfPackage(fsPath);
 
         if (proj !== undefined) {
           // the package has a parent project that needs to be watched
           const projPath = dirname(fsPath);
 
+          this.logger.trace("Found project in %s: %s", projPath, proj.name);
+
           const watchedProj = this.watchedProjects.get(projPath);
           if (watchedProj === undefined) {
-            const wsFolder = vscode.workspace.getWorkspaceFolder(
+            const wsFolder = this.vscodeWorkspace.getWorkspaceFolder(
               vscode.Uri.file(projPath)
             );
             if (wsFolder === undefined) {
+              // FIXME: should we actually bail out here?
+              // the package belonging to a workspace, but the project not could
+              // be a valid case
               this.logger.error(
                 "Cannot get workspace folder from project in path: %s",
                 projPath
               );
-              return EMPTY_CUR_PKG;
+              return EMPTY_CURRENT_PACKAGE;
             }
             const relPath = relative(wsFolder.uri.fsPath, projPath);
-            const projWatcher = vscode.workspace.createFileSystemWatcher(
+            const projWatcher = this.vscodeWorkspace.createFileSystemWatcher(
               new vscode.RelativePattern(wsFolder, `${relPath}/.osc*/*`)
             );
 
@@ -778,20 +905,36 @@ export class CurrentPackageWatcherImpl
               project: proj,
               watcher: projWatcher
             });
+
+            this.logger.trace(
+              "Successfully registered the project %s in %s",
+              proj.name,
+              projPath
+            );
           }
+        } else {
+          this.logger.trace(
+            "Could not find a parent project of %s in %s",
+            pkg.name,
+            dirname(pkg.path)
+          );
         }
 
+        const currentProject = proj ?? {
+          name: pkg.projectName,
+          apiUrl: pkg.apiUrl
+        };
         this.localPackages.set(pkg.path, {
           pkg,
-          project: proj ?? { name: pkg.projectName, apiUrl: pkg.apiUrl },
+          project: currentProject,
           projectCheckedOut: proj !== undefined,
           packageWatcher
         });
 
         return {
-          currentProject: proj,
+          currentProject,
           currentPackage: pkg,
-          currentFilename: basename(fsPath),
+          currentFilename: basename(uri.fsPath),
           properties: {
             checkedOutPath: proj !== undefined ? dirname(fsPath) : undefined
           }
@@ -802,7 +945,7 @@ export class CurrentPackageWatcherImpl
           fsPath,
           (err as Error).toString()
         );
-        return EMPTY_CUR_PKG;
+        return EMPTY_CURRENT_PACKAGE;
       }
     }
   }
