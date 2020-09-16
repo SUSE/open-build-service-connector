@@ -32,6 +32,7 @@ import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 import { ObsServerInformation } from "./instance-info";
+import { OscBuildTaskProvider, OSC_BUILD_TASK_TYPE } from "./osc-build-task";
 import { RemotePackageFileContentProvider } from "./package-file-contents";
 import { ProjectBookmarkManager } from "./project-bookmarks";
 import { RepositoryTreeProvider } from "./repository";
@@ -140,7 +141,11 @@ export async function activate(
     packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),
-    new CheckOutHandler(accountManager, logger)
+    new CheckOutHandler(accountManager, logger),
+    vscode.tasks.registerTaskProvider(
+      OSC_BUILD_TASK_TYPE,
+      new OscBuildTaskProvider(currentPackageWatcher, accountManager, logger)
+    )
   );
 
   await accountManager.promptForUninmportedAccountsInOscrc();
