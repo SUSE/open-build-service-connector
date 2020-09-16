@@ -28,7 +28,7 @@ import {
 } from "../../accounts";
 import { ActiveProject, ActiveProjectWatcher } from "../../workspace";
 
-export interface FakeEvent<T> {
+export interface FakeEventEmitter<T> {
   listeners: { callback: (e: T) => any; thisArg?: any }[];
 
   fire: (e: T) => Promise<void>;
@@ -36,7 +36,7 @@ export interface FakeEvent<T> {
   event: (listener: (e: T) => any, thisArg?: any) => vscode.Disposable;
 }
 
-export function makeFakeEvent<T>(): FakeEvent<T> {
+export function makeFakeEventEmitter<T>(): FakeEventEmitter<T> {
   const listeners: { callback: (e: T) => any; thisArg?: any }[] = [];
 
   const fire = async (e: T): Promise<void> => {
@@ -72,7 +72,7 @@ export type AccountMapInitializer =
   | [ApiUrl, ValidAccount][];
 
 class FakeActiveAccounts implements ActiveAccounts {
-  public onAccountChangeEmitter = makeFakeEvent<ApiUrl[]>();
+  public onAccountChangeEmitter = makeFakeEventEmitter<ApiUrl[]>();
   public onAccountChange: vscode.Event<ApiUrl[]> = this.onAccountChangeEmitter
     .event;
 

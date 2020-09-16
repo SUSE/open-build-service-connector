@@ -42,7 +42,7 @@ describe("fakes", () => {
 
   describe("#FakeEvent", () => {
     it("notifies all synchronous listeners", function () {
-      const emitter = makeFakeEvent<Foo>();
+      const emitter = makeFakeEventEmitter<Foo>();
 
       const listener1 = this.sandbox.spy();
       const listener2 = this.sandbox.spy();
@@ -57,7 +57,7 @@ describe("fakes", () => {
     });
 
     it("notifies asynchronous listeners", async function () {
-      const emitter = makeFakeEvent<Foo>();
+      const emitter = makeFakeEventEmitter<Foo>();
 
       const stub1 = this.sandbox.stub();
       const stub2 = this.sandbox.stub();
@@ -81,7 +81,7 @@ describe("fakes", () => {
     });
 
     it("correctly calls a callback with a thisArg if supplied", function () {
-      const emitter = makeFakeEvent<Foo>();
+      const emitter = makeFakeEventEmitter<Foo>();
 
       class CallBackOwner {
         public foo: Foo;
@@ -105,7 +105,7 @@ describe("fakes", () => {
 
     describe("#dispose", () => {
       it("unsubscribes the listener", function () {
-        const emitter = makeFakeEvent<Foo>();
+        const emitter = makeFakeEventEmitter<Foo>();
 
         const listener1 = this.sandbox.spy();
         const listener2 = this.sandbox.spy();
