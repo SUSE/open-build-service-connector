@@ -20,18 +20,22 @@
  */
 
 import * as assert from "assert";
-import * as vscode from "vscode";
 import {
-  Package,
-  Revision,
   fetchHistory,
-  ModifiedPackage
+  ModifiedPackage,
+  Package,
+  Revision
 } from "open-build-service-api";
-import { cmdPrefix } from "./constants";
-import { ConnectionListenerLoggerBase } from "./base-components";
-import { ActivePackageWatcher } from "./active-package-watcher";
-import { AccountManager } from "./accounts";
 import { Logger } from "pino";
+import * as vscode from "vscode";
+import { AccountManager } from "./accounts";
+import { ConnectionListenerLoggerBase } from "./base-components";
+import { cmdPrefix } from "./constants";
+import {
+  CurrentPackageWatcher,
+  CurrentPackage,
+  isModifiedPackage
+} from "./current-package-watcher";
 
 export class HistoryRootTreeElement extends vscode.TreeItem {
   public contextValue = "historyRoot";
@@ -90,7 +94,8 @@ export function fsPathFromObsRevisionUri(uri: vscode.Uri): string | undefined {
 
 export const OPEN_COMMIT_DOCUMENT_COMMAND = `${cmdPrefix}.${cmdId}.openCommitDocument`;
 
-export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
+export class PackageScmHistoryTree
+  extends ConnectionListenerLoggerBase
   implements
     vscode.TreeDataProvider<HistoryTreeItem>,
     vscode.TextDocumentContentProvider {
@@ -104,16 +109,16 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
   }
 
   public static async createPackageScmHistoryTree(
-    activePackageWatcher: ActivePackageWatcher,
+    currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
     logger: Logger
   ): Promise<PackageScmHistoryTree> {
     const historyTree = new PackageScmHistoryTree(
-      activePackageWatcher,
+      currentPackageWatcher,
       accountManager,
       logger
     );
-    await historyTree.setCurrentPackage(activePackageWatcher.activePackage);
+    await historyTree.setCurrentPackage(currentPackageWatcher.currentPackage);
     return historyTree;
   }
 
@@ -127,7 +132,7 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
   private currentHistory: readonly Revision[] | undefined = undefined;
 
   private constructor(
-    activePackageWatcher: ActivePackageWatcher,
+    currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
     logger: Logger
   ) {
@@ -136,7 +141,7 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
 
     this.disposables.push(
       this.onDidChangeTreeDataEmitter,
-      activePackageWatcher.onDidChangeActivePackage(
+      currentPackageWatcher.onDidChangeCurrentPackage(
         this.setCurrentPackage,
         this
       ),
@@ -161,7 +166,9 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
     if (token.isCancellationRequested || rev === undefined) {
       return undefined;
     }
-    let content = `r${rev.revision} | ${rev.userId} | ${rev.commitTime} | ${rev.revisionHash}`;
+    let content = `r${rev.revision} | ${
+      rev.userId ?? "unknown user"
+    } | ${rev.commitTime.toString()} | ${rev.revisionHash}`;
     if (rev.version !== undefined) {
       content = content.concat(" | ", rev.version);
     }
@@ -203,7 +210,9 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
   private commitFromUri(uri: vscode.Uri): Revision | undefined {
     if (uri.scheme !== OBS_REVISION_FILE_SCHEME) {
       throw new Error(
-        `cannot extract a Revision from the uri '${uri}', invalid scheme: ${uri.scheme}, expected ${OBS_REVISION_FILE_SCHEME}`
+        `cannot extract a Revision from the uri '${uri.toString()}', invalid scheme: ${
+          uri.scheme
+        }, expected ${OBS_REVISION_FILE_SCHEME}`
       );
     }
 
@@ -235,9 +244,14 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
     await vscode.window.showTextDocument(document, { preview: false });
   }
 
-  private async setCurrentPackage(pkg?: ModifiedPackage): Promise<void> {
-    if (pkg === undefined) {
-      this.logger.error("setCurrentPackage called without the pkg parameter");
+  private async setCurrentPackage(curPkg: CurrentPackage): Promise<void> {
+    const pkg = curPkg.currentPackage;
+    if (pkg === undefined || !isModifiedPackage(pkg)) {
+      this.logger.debug(
+        "setCurrentPackage called without the pkg parameter or the package %s/%s is not a ModifiedPackage (= not checked out)",
+        pkg?.projectName,
+        pkg?.name
+      );
       return;
     }
     const con = this.activeAccounts.getConfig(pkg.apiUrl)?.connection;
@@ -261,7 +275,7 @@ export class PackageScmHistoryTree extends ConnectionListenerLoggerBase
         pkg.projectName,
         pkg.name,
         pkg.apiUrl,
-        err.toString()
+        (err as Error).toString()
       );
     }
   }
