@@ -26,6 +26,7 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import { ActiveAccounts, promptUserForAccount } from "./accounts";
 import { BasePackage } from "./base-components";
+import { showComboBoxInput } from "./combo-box-input";
 import { ignoreFocusOut } from "./constants";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
 import { VscodeWindow } from "./vscode-dep";
@@ -231,10 +232,13 @@ export async function logException<RT>(
  * Ask the user to supply the name of a project belonging to the server with the
  * supplied `apiUrl`.
  *
- * The user is either presented with a
+ * The user is presented with a
  * [`QuickPick`](https://code.visualstudio.com/api/references/vscode-api#QuickPick)
- * (when a list of all projects from the OBS instance can be retrieved) or with
- * an
+ * when a list of all projects from the OBS instance can be retrieved, where
+ * they can select from all known projects or to enter the project name
+ * manually.
+ * If the list of projects cannot be retrieved or when the user selects to enter
+ * the project name manually, then they get presented with an
  * [`InputBox`](https://code.visualstudio.com/api/references/vscode-api#InputBox)
  * as a free form field.
  *
@@ -254,30 +258,49 @@ export async function promptUserForProjectName(
     GET_INSTANCE_INFO_COMMAND,
     apiUrl
   );
+  const CUSTOM_NAME = "$(record-keys) Entered project: ";
 
   if (
     instanceInfo !== undefined &&
     instanceInfo.projectList !== undefined &&
     instanceInfo.projectList.length > 0
   ) {
-    return await vscodeWindow.showQuickPick(
-      instanceInfo.projectList as string[],
-      {
-        canPickMany: false,
-        placeHolder: prompt,
-        ignoreFocusOut
-      }
+    const projName = await showComboBoxInput(
+      (instanceInfo.projectList as string[]).map((value) => ({
+        label: value,
+        alwaysShow: false,
+        value
+      })),
+      (value: string) =>
+        value === ""
+          ? []
+          : [
+              {
+                alwaysShow: true,
+                label: `$(record-keys) Entered project: ${value}`,
+                description: "Use this project directly",
+                value
+              }
+            ],
+      { placeHolder: prompt, ignoreFocusOut, insertBeforeIndex: 0 }
     );
-  } else {
-    return await vscodeWindow.showInputBox({
-      ignoreFocusOut,
-      prompt,
-      validateInput: (projName) =>
-        /\s/.test(projName) || projName === ""
-          ? "The project name must not contain any whitespace and must not be empty"
-          : undefined
-    });
+    if (
+      projName === undefined ||
+      projName.label.slice(0, CUSTOM_NAME.length) !== CUSTOM_NAME
+    ) {
+      return projName?.label;
+    } else {
+      return projName.value;
+    }
   }
+  return await vscodeWindow.showInputBox({
+    ignoreFocusOut,
+    prompt,
+    validateInput: (projName) =>
+      /\s/.test(projName) || projName === ""
+        ? "The project name must not contain any whitespace and must not be empty"
+        : undefined
+  });
 }
 
 export async function promptUserForPackage(
