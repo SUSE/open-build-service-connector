@@ -330,7 +330,7 @@ export async function promptUserForPackage(
     "Connection must not be undefined as the user selected a valid account"
   );
 
-  const proj = await fetchProject(con, projectName, { getPackageList: true });
+  const proj = await fetchProject(con, projectName, { fetchPackageList: true });
 
   if (proj.packages.length === 0) {
     await vscodeWindow.showErrorMessage(
