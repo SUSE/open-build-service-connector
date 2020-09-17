@@ -28,8 +28,8 @@ import { ActiveAccounts, promptUserForAccount } from "./accounts";
 import { BasePackage } from "./base-components";
 import { showComboBoxInput } from "./combo-box-input";
 import { ignoreFocusOut } from "./constants";
+import { VscodeWindow } from "./dependency-injection";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
-import { VscodeWindow } from "./vscode-dep";
 
 /**
  * Returns the difference `setA - setB` (all elements from A that are not in B).

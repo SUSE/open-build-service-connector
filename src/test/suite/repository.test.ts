@@ -21,15 +21,15 @@
 
 import { afterEach, beforeEach, describe } from "mocha";
 import { createSandbox } from "sinon";
+import { CurrentPackage } from "../../current-package-watcher";
+import { VscodeWindow } from "../../dependency-injection";
 import { RepositoryTreeProvider } from "../../repository";
-import { VscodeWindow } from "../../vscode-dep";
 import {
   AccountMapInitializer,
   FakeAccountManager,
   FakeCurrentPackageWatcher
 } from "./fakes";
 import { createStubbedVscodeWindow, testLogger } from "./test-utils";
-import { CurrentPackage } from "../../current-package-watcher";
 
 class RepositoryTreeProviderFixture {
   public readonly sandbox = createSandbox();

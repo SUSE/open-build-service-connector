@@ -39,6 +39,7 @@ import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { PackageBookmark, ProjectBookmark } from "./bookmarks";
 import { debounce } from "./decorators";
+import { VscodeWindow, VscodeWorkspace } from "./dependency-injection";
 import {
   OBS_PACKAGE_FILE_URI_SCHEME,
   RemotePackageFileContentProvider
@@ -49,7 +50,6 @@ import {
 } from "./project-bookmarks";
 import { deepEqual } from "./util";
 import { getPkgPathFromVcsUri } from "./vcs";
-import { VscodeWindow, VscodeWorkspace } from "./vscode-dep";
 
 export const EDITOR_CHANGE_DELAY_MS = 100;
 

@@ -38,9 +38,9 @@ import { ProjectBookmark } from "./bookmarks";
 import { cmdPrefix } from "./constants";
 import { CurrentPackageWatcher } from "./current-package-watcher";
 import { logAndReportExceptions } from "./decorators";
+import { VscodeWindow } from "./dependency-injection";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
 import { deepCopyProperties, promptUserForProjectName } from "./util";
-import { VscodeWindow } from "./vscode-dep";
 
 const cmdId = "obsRepository";
 
@@ -216,7 +216,8 @@ type RepositoryElement =
   | RepositoryArchRootTreeElement
   | RepositoryArchTreeElement;
 
-export class RepositoryTreeProvider extends ConnectionListenerLoggerBase
+export class RepositoryTreeProvider
+  extends ConnectionListenerLoggerBase
   implements vscode.TreeDataProvider<RepositoryElement> {
   public onDidChangeTreeData: vscode.Event<RepositoryElement | undefined>;
 

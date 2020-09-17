@@ -32,11 +32,11 @@ import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { debounce } from "./decorators";
+import { VscodeWindow, VscodeWorkspace } from "./dependency-injection";
 import { fsPathFromEmptyDocumentUri } from "./empty-file-provider";
 import { fsPathFromObsRevisionUri } from "./scm-history";
 import { deepEqual } from "./util";
 import { fsPathFromFileAtHeadUri } from "./vcs";
-import { VscodeWindow, VscodeWorkspace } from "./vscode-dep";
 
 export const EDITOR_CHANGE_DELAY_MS = 100;
 

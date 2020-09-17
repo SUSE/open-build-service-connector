@@ -79,6 +79,13 @@ export const createStubbedVscodeWorkspace = (sandbox: SinonSandbox) => {
     createFileSystemWatcher
   };
 };
+export const createStubbedObsFetchers = (sandbox: SinonSandbox) => ({
+  branchPackage: sandbox.stub(),
+  fetchFileContents: sandbox.stub(),
+  fetchPackage: sandbox.stub(),
+  fetchProject: sandbox.stub(),
+  readInUnifiedPackage: sandbox.stub()
+});
 
 export async function waitForEvent<T>(
   event: vscode.Event<T>

@@ -34,8 +34,8 @@ import * as vscode from "vscode";
 import { LoggingBase } from "./base-components";
 import { cmdPrefix, ignoreFocusOut } from "./constants";
 import { logAndReportExceptions } from "./decorators";
+import { VscodeWindow } from "./dependency-injection";
 import { setDifference } from "./util";
-import { VscodeWindow } from "./vscode-dep";
 
 /**
  * # Accounts management

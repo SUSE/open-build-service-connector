@@ -19,6 +19,13 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import {
+  branchPackage,
+  fetchFileContents,
+  fetchPackage,
+  fetchProject
+} from "open-build-service-api";
+import { readInUnifiedPackage } from "open-build-service-api/lib/package";
 import * as vscode from "vscode";
 
 /** Dependency injection type to be able to unit test UI elements */
@@ -49,3 +56,19 @@ export interface VscodeWorkspace {
 
   textDocuments: typeof vscode.workspace.textDocuments;
 }
+
+export interface ObsFetchers {
+  readonly fetchFileContents: typeof fetchFileContents;
+  readonly fetchPackage: typeof fetchPackage;
+  readonly fetchProject: typeof fetchProject;
+  readonly branchPackage: typeof branchPackage;
+  readonly readInUnifiedPackage: typeof readInUnifiedPackage;
+}
+
+export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
+  fetchProject,
+  fetchFileContents,
+  fetchPackage,
+  branchPackage,
+  readInUnifiedPackage
+};

@@ -41,6 +41,10 @@ import { cmdPrefix } from "./constants";
 import { logAndReportExceptions } from "./decorators";
 import {
   SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND,
+  DEFAULT_OBS_FETCHERS,
+  ObsFetchers,
+  VscodeWindow
+} from "./dependency-injection";
   OBS_PACKAGE_FILE_URI_SCHEME,
   RemotePackageFileContentProvider
 } from "./package-file-contents";
@@ -68,7 +72,6 @@ import {
   promptUserForPackage,
   isUri
 } from "./util";
-import { VscodeWindow } from "./vscode-dep";
 
 const cmdId = "obsProject";
 

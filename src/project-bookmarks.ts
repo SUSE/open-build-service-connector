@@ -23,9 +23,6 @@ import * as assert from "assert";
 import { createHash } from "crypto";
 import { promises as fsPromises } from "fs";
 import {
-  fetchFileContents,
-  fetchPackage,
-  fetchProject,
   Package,
   PackageFile,
   pathExists,
@@ -45,16 +42,11 @@ import {
 } from "./base-components";
 import { cmdPrefix } from "./constants";
 import { loadMapFromMemento, saveMapToMemento } from "./util";
+import { DEFAULT_OBS_FETCHERS, ObsFetchers } from "./dependency-injection";
 
 const projectBookmarkStorageKey: string = "vscodeObs.ProjectTree.Projects";
 
 const cmdId = "ProjectBookmarks";
-
-interface ObsFetchers {
-  readonly fetchFileContents: typeof fetchFileContents;
-  readonly fetchPackage: typeof fetchPackage;
-  readonly fetchProject: typeof fetchProject;
-}
 
 /**
  * Identifier of the command that returns an array of all projects that have
