@@ -116,8 +116,7 @@ export class RemotePackageFileContentProvider
   ): Promise<string | undefined> {
     const {
       apiUrl,
-      pkgFile,
-      revision
+      pkgFile
     } = RemotePackageFileContentProvider.uriToPackageFile(uri);
 
     const cachedFile = await vscode.commands.executeCommand<PackageFile>(
