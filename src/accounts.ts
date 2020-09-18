@@ -1120,9 +1120,8 @@ export class AccountManagerImpl extends LoggingBase {
    * triggering our [[configurationChangeListener]].
    */
   private async saveAccountsToStorage(): Promise<void> {
-    if (this.onDidChangeConfigurationDisposable !== undefined) {
-      this.onDidChangeConfigurationDisposable.dispose();
-    }
+    this.onDidChangeConfigurationDisposable?.dispose();
+
     await this.runtimeAccountConfig.saveToStorage();
     this.notifyOffAccountChange();
     this.onDidChangeConfigurationDisposable = this.vscodeWorkspace.onDidChangeConfiguration(
