@@ -57,28 +57,6 @@ export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => {
   };
 };
 
-export const createStubbedVscodeWorkspace = (sandbox: SinonSandbox) => {
-  const onDidCreateEmitter = makeFakeEventEmitter<vscode.Uri>();
-  const onDidChangeEmitter = makeFakeEventEmitter<vscode.Uri>();
-  const onDidDeleteEmitter = makeFakeEventEmitter<vscode.Uri>();
-  const watcher = {
-    onDidCreateEmitter,
-    onDidChangeEmitter,
-    onDidDeleteEmitter,
-    onDidCreate: onDidCreateEmitter.event,
-    onDidChange: onDidChangeEmitter.event,
-    onDidDelete: onDidDeleteEmitter.event,
-    dispose: sandbox.stub()
-  };
-  const createFileSystemWatcher = sandbox.stub();
-  createFileSystemWatcher.returns(watcher);
-  return {
-    watcher,
-    textDocuments: [],
-    getWorkspaceFolder: sandbox.stub(),
-    createFileSystemWatcher
-  };
-};
 export const createStubbedObsFetchers = (sandbox: SinonSandbox) => ({
   branchPackage: sandbox.stub(),
   fetchFileContents: sandbox.stub(),
