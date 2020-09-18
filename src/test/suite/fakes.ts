@@ -31,7 +31,8 @@ import {
 } from "../../accounts";
 import {
   CurrentPackage,
-  CurrentPackageWatcher
+  CurrentPackageWatcher,
+  EMPTY_CURRENT_PACKAGE
 } from "../../current-package-watcher";
 
 export interface FakeEventEmitter<T> {
@@ -256,6 +257,19 @@ export class FakeAccountManager implements AccountManager {
 export class FakeCurrentPackageWatcher implements CurrentPackageWatcher {
   public currentPackage: CurrentPackage;
 
+  private _allLocalPackages = new Map<
+    vscode.WorkspaceFolder,
+    ModifiedPackage[]
+  >();
+
+  public set allLocalPackages(
+    pkgs:
+      | Map<vscode.WorkspaceFolder, ModifiedPackage[]>
+      | [vscode.WorkspaceFolder, ModifiedPackage[]][]
+  ) {
+    this._allLocalPackages = Array.isArray(pkgs) ? new Map(pkgs) : pkgs;
+  }
+
   public readonly onDidChangeCurrentPackageEmitter = makeFakeEventEmitter<
     CurrentPackage
   >();
@@ -266,27 +280,21 @@ export class FakeCurrentPackageWatcher implements CurrentPackageWatcher {
 
   public getAllLocalPackages(): Map<vscode.WorkspaceFolder, ModifiedPackage[]> {
     // FIXME:
-    return new Map<vscode.WorkspaceFolder, ModifiedPackage[]>();
+    return this._allLocalPackages;
   }
 
   public readonly onDidChangeCurrentPackage: vscode.Event<CurrentPackage> = this
     .onDidChangeCurrentPackageEmitter.event;
 
   constructor(initialCurrentPackage?: CurrentPackage) {
-    this.currentPackage = initialCurrentPackage ?? {
-      currentPackage: undefined,
-      currentProject: undefined,
-      currentFilename: undefined
-    };
+    this.currentPackage = initialCurrentPackage ?? EMPTY_CURRENT_PACKAGE;
   }
 
   public dispose() {
     // nothing to get rid off
   }
 
-  public async setCurrentPackage(
-    currentPackage: CurrentPackage
-  ): Promise<void> {
+  public setCurrentPackage(currentPackage: CurrentPackage): Promise<void> {
     this.currentPackage = currentPackage;
     return this.onDidChangeCurrentPackageEmitter.fire(currentPackage);
   }

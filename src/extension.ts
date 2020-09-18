@@ -32,7 +32,7 @@ import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 import { ObsServerInformation } from "./instance-info";
-import { OscBuildTaskProvider, OSC_BUILD_TASK_TYPE } from "./osc-build-task";
+import { OscBuildTaskProvider } from "./osc-build-task";
 import { RemotePackageFileContentProvider } from "./package-file-contents";
 import { ProjectBookmarkManager } from "./project-bookmarks";
 import { RepositoryTreeProvider } from "./repository";
@@ -115,11 +115,22 @@ export async function activate(
     showCollapseAll,
     treeDataProvider: repoTreeProvider
   });
-  const packageScmHistoryTreeProvider = await PackageScmHistoryTree.createPackageScmHistoryTree(
-    currentPackageWatcher,
-    accountManager,
-    logger
-  );
+  const [
+    packageScmHistoryTreeProvider,
+    oscBuildTaskProvider
+  ] = await Promise.all([
+    PackageScmHistoryTree.createPackageScmHistoryTree(
+      currentPackageWatcher,
+      accountManager,
+      logger
+    ),
+    OscBuildTaskProvider.createOscBuildTaskProvider(
+      currentPackageWatcher,
+      accountManager,
+      logger
+    )
+  ]);
+
   const packageScmHistoryTree = vscode.window.createTreeView(
     "packageScmHistoryTree",
     { showCollapseAll, treeDataProvider: packageScmHistoryTreeProvider }
@@ -141,12 +152,11 @@ export async function activate(
     packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),
-    new CheckOutHandler(accountManager, logger),
-    vscode.tasks.registerTaskProvider(
-      OSC_BUILD_TASK_TYPE,
-      new OscBuildTaskProvider(currentPackageWatcher, accountManager, logger)
-    )
+    new CheckOutHandler(accountManager, logger)
   );
+  if (oscBuildTaskProvider !== undefined) {
+    context.subscriptions.push(oscBuildTaskProvider);
+  }
 
   await accountManager.promptForUninmportedAccountsInOscrc();
   await accountManager.promptForNotPresentAccountPasswords();

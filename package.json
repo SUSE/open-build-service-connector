@@ -418,7 +418,38 @@
         }
       },
       "title": "Open Build Service"
-    }
+    },
+    "taskDefinitions": [
+      {
+        "type": "osc",
+        "required": ["repository", "arch", "pkgPath"],
+        "properties": {
+          "repository": {
+            "type": "string",
+            "description": "The name of the repository to build the package for"
+          },
+          "arch": {
+            "type": "string",
+            "description": "The architecture for which the package should be build"
+          },
+          "cleanBuildRoot": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether osc should clean the buildroot before each new build (defaults to true)"
+          },
+          "extraOscArgs": {
+            "type": "array",
+            "default": [],
+            "items": { "type": "string" },
+            "description": "An array of additional command line options that can be passed to 'osc build'"
+          },
+          "oscBinaryPath": {
+            "type": "string",
+            "description": "Path to the osc binary. It will be automatically discovered by default."
+          }
+        }
+      }
+    ]
   },
   "main": "./out/extension.js",
   "activationEvents": [
