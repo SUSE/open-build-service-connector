@@ -649,12 +649,6 @@ export class CurrentPackageWatcherImpl
         }
         return EMPTY_CURRENT_PACKAGE;
       })();
-      assert(
-        newCurPkg.currentFilename !== undefined
-          ? newCurPkg.currentFilename === currentFilename
-          : true,
-        `Expected the new packages filename (${newCurPkg.currentFilename}) to match the filename extracted from the TextEditor (${currentFilename})`
-      );
       this.fireCurrentPackageEvent(newCurPkg);
     } catch (err) {
       this.logger.error(
