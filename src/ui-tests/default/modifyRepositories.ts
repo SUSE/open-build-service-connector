@@ -36,7 +36,6 @@ import {
   packageFileFromBuffer,
   Project,
   ProjectMeta,
-  rmRf,
   setFileContentsAndCommit
 } from "open-build-service-api";
 import * as path from "path";
@@ -54,8 +53,10 @@ import {
   Workbench
 } from "vscode-extension-tester";
 import { DialogHandler } from "vscode-extension-tester-native";
+import { safeRmRf } from "../../test/suite/utilities";
 import { testCon, testUser } from "../testEnv";
 import {
+  ensureExtensionOpen,
   findAndClickButtonOnTreeItem,
   focusOnSection,
   getLabelsOfTreeItems
@@ -652,9 +653,9 @@ async function cleanupAfterTests(): Promise<void> {
     // await (await DialogHandler.getOpenDialog()).cancel();
 
     await deleteProject(testCon, testProj.name);
-    // if ((await pathExists(checkOutPath)) !== undefined) {
-    //   await rmRf(checkOutPath);
-    // }
+    if ((await pathExists(checkOutPath)) !== undefined) {
+      await safeRmRf(checkOutPath);
+    }
   } catch (err) {
     console.error(err);
   }
@@ -665,7 +666,7 @@ before(() => fsPromises.mkdir(checkOutPath, { recursive: true }));
 describe("RepositoryTreeProvider", function () {
   this.timeout(30000);
 
-  after(() => rmRf(checkOutPath));
+  after(() => safeRmRf(checkOutPath));
 
   describe("locally checked out project", function () {
     before(async function () {

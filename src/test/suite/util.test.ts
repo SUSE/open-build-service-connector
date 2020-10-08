@@ -20,18 +20,24 @@
  */
 
 import { expect, should } from "chai";
+import { promises as fsPromises } from "fs";
 import { afterEach, beforeEach, Context, describe, it } from "mocha";
+import { pathExists } from "open-build-service-api";
+import { tmpdir } from "os";
+import { join } from "path";
 import { assert, SinonStub, stub } from "sinon";
+import { createTestTempDir } from "../../ui-tests/util";
 import {
+  createItemInserter,
   deepCopyProperties,
+  deepEqual,
   loadMapFromMemento,
   saveMapToMemento,
   setDifference,
-  setUnion,
-  createItemInserter,
-  deepEqual
+  setUnion
 } from "../../util";
-import { castToAsyncFunc, castToFunc } from "./test-utils";
+import { castToAsyncFunc, castToFunc, testLogger } from "./test-utils";
+import { getTmpPrefix, safeRmRf } from "./utilities";
 
 should();
 
@@ -257,6 +263,58 @@ describe("utilities", () => {
         strings.map((s) => Buffer.from(s)),
         strings.map((s) => Buffer.from(s))
       ).should.equal(true);
+    });
+  });
+
+  describe("safeRmRf", () => {
+    beforeEach(async function () {
+      this.tmpdir = await createTestTempDir();
+    });
+
+    afterEach(async function () {
+      try {
+        await safeRmRf(this.tmpdir);
+      } catch (err) {
+        testLogger.error(
+          "Cleanup of %s failed with %s",
+          this.tmpdir,
+          err.toString()
+        );
+      }
+    });
+
+    it("removes a directory inside the temporary directory", async function () {
+      const dir = join(this.tmpdir, "foo");
+      await fsPromises.mkdir(dir);
+      await safeRmRf(dir).should.be.fulfilled;
+
+      await pathExists(dir).should.eventually.equal(undefined);
+    });
+
+    it("should reject removing a directory outside of the temporary prefix", async () => {
+      await safeRmRf(
+        "/foo/bar/baz/this/should/not/exist/at/all/"
+      ).should.be.rejectedWith(Error); //.should.be.rejectedWith(Error, /will not remove anything outside of/i);
+    });
+  });
+
+  describe("getTmpPrefix", () => {
+    beforeEach(function () {
+      this.TMPDIR = process.env.TMPDIR;
+    });
+    afterEach(function () {
+      process.env.TMPDIR = this.TMPDIR;
+    });
+
+    it("honors TMPDIR", () => {
+      const tmpdir = "/opt/foo";
+      process.env.TMPDIR = tmpdir;
+      getTmpPrefix().should.include(tmpdir);
+    });
+
+    it("does uses the os' temporary directory if TMPDIR is unset", () => {
+      process.env.TMPDIR = undefined;
+      getTmpPrefix().should.include(tmpdir());
     });
   });
 });

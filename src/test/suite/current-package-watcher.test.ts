@@ -50,6 +50,7 @@ import {
   LoggingFixture,
   testLogger
 } from "./test-utils";
+import { safeRmRf } from "./utilities";
 
 class CurrentPackageWatcherFixture extends LoggingFixture {
   public fakeAccountManager?: FakeAccountManager;
@@ -182,9 +183,7 @@ describe("CurrentPackageWatcher", () => {
     const getBasePkg = () => ({ ...basePkg, path: tmpDir });
 
     beforeEach(async function () {
-      tmpDir = await fsPromises.mkdtemp(
-        `${process.env.TMPDIR ?? tmpdir()}${sep}obs-connector`
-      );
+      tmpDir = await createTestTempDir();
       const tmpDirUri = vscode.Uri.file(tmpDir);
       await fsPromises.mkdir(join(tmpDir, ".osc"));
       await Promise.all(
@@ -212,7 +211,7 @@ describe("CurrentPackageWatcher", () => {
         .returns(createFakeWorkspaceFolder(tmpDirUri));
     });
 
-    afterEach(() => rmRf(tmpDir));
+    afterEach(() => safeRmRf(tmpDir));
 
     it(
       "finds a locally checked out package",
