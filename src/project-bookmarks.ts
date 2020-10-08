@@ -31,6 +31,7 @@ import {
 } from "open-build-service-api";
 import { join } from "path";
 import { Logger } from "pino";
+import { inspect } from "util";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";
 import {
@@ -40,9 +41,23 @@ import {
   ConnectionListenerLoggerBase,
   LoggingDisposableBase
 } from "./base-components";
+import {
+  BookmarkState,
+  isProjectBookmark,
+  PackageBookmark,
+  packageBookmarkFromPackage,
+  ProjectBookmark,
+  ProjectBookmarkImpl
+} from "./bookmarks";
 import { cmdPrefix } from "./constants";
-import { loadMapFromMemento, saveMapToMemento } from "./util";
 import { DEFAULT_OBS_FETCHERS, ObsFetchers } from "./dependency-injection";
+import {
+  dropUndefined,
+  loadMapFromMemento,
+  saveMapToMemento,
+  setDifference,
+  setUnion
+} from "./util";
 
 const projectBookmarkStorageKey: string = "vscodeObs.ProjectTree.Projects";
 
@@ -63,11 +78,26 @@ export const GET_ALL_BOOKMARKED_PROJECTS_COMMAND = `${cmdPrefix}.${cmdId}.getAll
  */
 export const GET_BOOKMARKED_PROJECT_COMMAND = `${cmdPrefix}.${cmdId}.getBookmarkedProject`;
 
+/**
+ * Identifier of the command that returns the specified package by apiUrl,
+ * project name and package name.
+ *
+ * This command directly calls the function [[ProjectBookmarkManager.getBookmarkedPackage]]
+ */
+export const GET_BOOKMARKED_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.getBookmarkedPackage`;
+
 export const GET_FILE_FROM_CACHE_COMMAND = `${cmdPrefix}.${cmdId}.getPackageFile`;
 
 // export const UPDATE_AND_GET_BOOKMARKED_PROJECT_COMMAND = `${cmdPrefix}.${cmdId}.updateAndGetBookmarkedProject`;
 
-/** */
+/**
+ * Insert the package `pkg` into the package list of `proj`.
+ *
+ * @throw `Error` when the packages project does not match `proj`.
+ * @return [[ChangeType.Add]] if the package was not yet in list of packages or
+ *     [[ChangeType.Modify]] if `pkg` was already in the package list of `proj`
+ *     and got updated
+ */
 export function insertPackageIntoProject(
   pkg: Package,
   proj: Project
@@ -97,13 +127,16 @@ export function insertPackageIntoProject(
   return changeType;
 }
 
-function dropFileContents(pkg: Package): Package {
-  const { apiUrl, name, projectName, files } = pkg;
+function dropFileContents(pkg: PackageBookmark): PackageBookmark;
+function dropFileContents(pkg: Package): Package;
+
+function dropFileContents(
+  pkg: Package | PackageBookmark
+): Package | PackageBookmark {
+  const { files, ...rest } = pkg;
   return {
-    apiUrl,
     files: files?.map((f) => new BasePackageFile(f)),
-    name,
-    projectName
+    ...rest
   };
 }
 
@@ -144,7 +177,7 @@ export interface BookmarkUpdate {
   /** How was it changed? */
   readonly changeType: ChangeType;
   /** Identifier of the changed element */
-  readonly element: Package | Project;
+  readonly element: PackageBookmark | ProjectBookmark;
 }
 
 class UpdateEvent implements BookmarkUpdate {
@@ -153,10 +186,10 @@ class UpdateEvent implements BookmarkUpdate {
 
   constructor(
     public readonly changeType: ChangeType,
-    public readonly element: Project | Package
+    public readonly element: ProjectBookmark | PackageBookmark
   ) {
     this.changedObject =
-      (element as any).packageName === undefined
+      (element as any).projectName === undefined
         ? ChangedObject.Project
         : ChangedObject.Package;
   }
@@ -167,7 +200,8 @@ class MetadataCache extends ConnectionListenerLoggerBase {
     extensionContext: vscode.ExtensionContext,
     accountManager: AccountManager,
     logger: Logger,
-    obsFetchers: ObsFetchers
+    initialProjects = new Map<ApiUrl, ProjectBookmark[]>(),
+    obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ): Promise<MetadataCache> {
     const cache = new MetadataCache(
       extensionContext,
@@ -176,6 +210,12 @@ class MetadataCache extends ConnectionListenerLoggerBase {
       obsFetchers
     );
     await fsPromises.mkdir(cache.baseStoragePath, { recursive: true });
+
+    await Promise.all(
+      [...initialProjects.values()].map((bookmarks) =>
+        Promise.all(bookmarks.map((b) => cache.saveProject(b)))
+      )
+    );
     return cache;
   }
 
@@ -191,7 +231,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
   ) {
     super(accountManager, logger);
     this.baseStoragePath = join(
-      extensionContext.globalStoragePath,
+      extensionContext.globalStorageUri.fsPath,
       "projectCache"
     );
     this.logger.info(
@@ -299,22 +339,46 @@ class MetadataCache extends ConnectionListenerLoggerBase {
    *     occurs.
    */
   public async getPackage(
-    pkg: BasePackage,
-    refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
-  ): Promise<Package> {
+    pkg: Package,
+    refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing,
+    saveInProject: boolean = true
+  ): Promise<PackageBookmark> {
     const emptyProj: Project = {
       apiUrl: pkg.apiUrl,
       name: pkg.projectName
     };
 
-    const proj = await this.getProject(emptyProj, refreshBehavior);
+    // we really don't want to refresh the project's metadata here, as
+    // getPackage() gets also called from getProject() and that leads to nasty
+    // endless recursions
+    const proj = await this.getProject(emptyProj, RefreshBehavior.Never);
     const cachedPkg: Package =
       proj.packages?.find((p) => p.name === pkg.name) ?? pkg;
 
+    const uncachedFilesPresent =
+      setDifference(
+        new Set((pkg.files ?? []).map((f) => f.name)),
+        new Set((cachedPkg.files ?? []).map((f) => f.name))
+      ).size > 0;
+
     if (
       refreshBehavior === RefreshBehavior.Always ||
-      cachedPkg.files === undefined
+      (refreshBehavior === RefreshBehavior.FetchWhenMissing &&
+        (cachedPkg.files === undefined || uncachedFilesPresent))
     ) {
+      this.logger.trace(
+        "Refetching %s/%s from %s, because %s",
+        pkg.projectName,
+        pkg.name,
+        pkg.apiUrl,
+        refreshBehavior === RefreshBehavior.Always
+          ? "refresh forced"
+          : refreshBehavior === RefreshBehavior.FetchWhenMissing &&
+            (cachedPkg.files === undefined || uncachedFilesPresent)
+          ? "files need to get refetched"
+          : assert(false, "this branch must be unreachable")
+      );
+
       const account = this.activeAccounts.getConfig(pkg.apiUrl);
 
       if (account === undefined) {
@@ -323,25 +387,54 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         );
       }
 
-      const newPkg = await this.obsFetchers.fetchPackage(
-        account.connection,
-        pkg.projectName,
-        pkg.name,
-        { retrieveFileContents: false, expandLinks: true }
-      );
-      insertPackageIntoProject(newPkg, proj);
-      await this.saveProject(proj);
-      return newPkg;
+      try {
+        const newPkg = await this.obsFetchers.fetchPackage(
+          account.connection,
+          pkg.projectName,
+          pkg.name,
+          { retrieveFileContents: false, expandLinks: true }
+        );
+        assert(
+          newPkg.files !== undefined && Array.isArray(newPkg.files),
+          `fetchPackage must return a list of files for the package ${
+            pkg.projectName
+          }/${pkg.name}, but got ${inspect(newPkg.files)} instead`
+        );
+
+        if (saveInProject) {
+          insertPackageIntoProject(newPkg, proj);
+          await this.saveProject(proj);
+        }
+        return packageBookmarkFromPackage(newPkg);
+      } catch (err) {
+        this.logger.error(
+          "Could not fetch the package %s/%s from %s",
+          pkg.projectName,
+          pkg.name,
+          pkg.apiUrl
+        );
+        return {
+          state: BookmarkState.RemoteGone,
+          ...pkg,
+          files: cachedPkg.files ?? []
+        };
+      }
     } else {
-      return pkg;
+      return packageBookmarkFromPackage(pkg);
     }
   }
 
+  public async addProject(proj: ProjectBookmark): Promise<void> {
+    const projFromCache = await this.getProject(proj, RefreshBehavior.Never);
+    const mergedProject = { ...projFromCache, ...proj };
+    await this.saveProject(mergedProject);
+  }
+
   public async getProject(
-    proj: BaseProject,
+    proj: Project,
     refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
-  ): Promise<Project> {
-    let projectFromCache: Project | undefined;
+  ): Promise<ProjectBookmark> {
+    let projectFromCache: ProjectBookmark | undefined;
     let projectJsonContents: string | undefined;
     const projJson = join(
       this.getProjectBasePath(proj),
@@ -378,43 +471,165 @@ class MetadataCache extends ConnectionListenerLoggerBase {
       }
     }
 
+    // the project that was passed has packages that are not in the cache
+    // => we'll have to add those as well
+    const uncachedPackagesPresent =
+      setDifference(
+        new Set((proj.packages ?? []).map((p) => p.name)),
+        new Set((projectFromCache?.packages ?? []).map((p) => p.name))
+      ).size > 0;
+
+    const incompletePackages = (projectFromCache?.packages ?? []).filter(
+      (pkg) => pkg.files === undefined
+    );
+
+    let needFetchAll = projectFromCache === undefined;
+    let needFetchPackages =
+      uncachedPackagesPresent ||
+      incompletePackages.length > 0 ||
+      projectFromCache?.packages === undefined;
+    const pkgRefetchReason = `${
+      uncachedPackagesPresent ? "uncached packages in requested project" : ""
+    }${
+      incompletePackages.length > 0
+        ? "; packages without a file list are present"
+        : ""
+    }${
+      projectFromCache?.packages === undefined
+        ? "; cached project has never fetched any packages"
+        : ""
+    }`;
+
+    let needFetchMeta = projectFromCache?.meta === undefined;
+
+    if (refreshBehavior === RefreshBehavior.Always) {
+      needFetchAll = true;
+      needFetchMeta = true;
+      needFetchPackages = true;
+    }
+
+    // return what we have if no refresh is needed or wanted
     if (
-      (projectFromCache === undefined ||
-        refreshBehavior === RefreshBehavior.Always ||
-        (refreshBehavior === RefreshBehavior.FetchWhenMissing &&
-          projectFromCache.packages === undefined)) &&
-      refreshBehavior !== RefreshBehavior.Never
+      refreshBehavior === RefreshBehavior.Never ||
+      (refreshBehavior === RefreshBehavior.FetchWhenMissing &&
+        !needFetchMeta &&
+        !needFetchPackages &&
+        !needFetchAll)
     ) {
-      const account = this.activeAccounts.getConfig(proj.apiUrl);
-      if (account === undefined) {
-        throw new Error(
-          `Cannot fetch project ${proj.name} from ${proj.apiUrl}: no account is configured`
+      if (projectFromCache !== undefined) {
+        return projectFromCache;
+      }
+      return new ProjectBookmarkImpl(proj, BookmarkState.Unknown);
+    }
+
+    this.logger.trace(
+      "Refetching the project %s from %s, because %s",
+      proj.name,
+      proj.apiUrl,
+      refreshBehavior === RefreshBehavior.Always
+        ? "refresh forced"
+        : needFetchAll
+        ? "need to refetch packages and metadata"
+        : needFetchMeta
+        ? "need to refetch metadata"
+        : needFetchPackages
+        ? `need to refetch the packages (${pkgRefetchReason})`
+        : assert(false, "this branch must be unreachable")
+    );
+
+    const account = this.activeAccounts.getConfig(proj.apiUrl);
+    if (account === undefined) {
+      throw new Error(
+        `Cannot fetch project ${proj.name} from ${proj.apiUrl}: no account is configured`
+      );
+    }
+
+    // try to fetch the project if:
+    // - none is cached
+    // - have to refresh always
+    // - additional packages are being added
+    // - uncached packages are present and refreshBehavior is FetchWhenMissing
+    try {
+      const {
+        packages,
+        ...restOfFreshProj
+      } = await this.obsFetchers.fetchProject(account.connection, proj.name, {
+        fetchPackageList: false
+      });
+
+      assert(
+        packages === undefined,
+        `fetchProject should reply with packages = undefined if invoked with fetchPackageList: false, but got ${inspect(
+          packages
+        )} instead`
+      );
+      assert(
+        restOfFreshProj.meta !== undefined,
+        `meta of ${restOfFreshProj.name} is undefined but it must be defined`
+      );
+
+      const pkgNamesToSave = [
+        ...setUnion(
+          //setUnion(
+          new Set((proj.packages ?? []).map((pkg) => pkg.name)),
+          new Set((projectFromCache?.packages ?? []).map((pkg) => pkg.name))
+          //),
+          //new Set(incompletePackages)
+        ).values()
+      ];
+
+      // Need to save the returned packages here, as getPackage() can insert
+      // files into the packages. But that will not be returned by this
+      // function without re-reading (which we don't want to do)
+      const newPackages: PackageBookmark[] = [];
+      for (const name of pkgNamesToSave) {
+        const pkgToFetch: Package = {
+          name,
+          apiUrl: proj.apiUrl,
+          projectName: proj.name,
+          files:
+            proj.packages?.find((p) => p.name === name)?.files ??
+            projectFromCache?.packages?.find((p) => p.name === name)?.files
+        };
+        newPackages.push(
+          await this.getPackage(pkgToFetch, refreshBehavior, false)
         );
       }
 
-      const freshProj = await this.obsFetchers.fetchProject(
-        account.connection,
-        proj.name,
-        { getPackageList: true }
+      const projToSave = {
+        packages: newPackages,
+        state: BookmarkState.Ok,
+        ...restOfFreshProj
+      };
+      await this.saveProject(projToSave);
+
+      assert(newPackages.length === pkgNamesToSave.length);
+
+      return new ProjectBookmarkImpl(
+        {
+          packages: newPackages,
+          ...restOfFreshProj
+        },
+        BookmarkState.Ok
       );
-      await this.saveProject(freshProj);
-      return freshProj;
-      // } catch (err) {
-      //   this.logger.error(
-      //     "Tried to fetch the project %s from %s, but got an error: %s",
-      //     proj.name,
-      //     proj.apiUrl,
-      //     err.toString()
-      //   );
-      // }
+    } catch (err) {
+      this.logger.error(
+        "Tried to fetch the project %s from %s, but got an error: %s",
+        proj.name,
+        proj.apiUrl,
+        err.toString()
+      );
+      return {
+        ...proj,
+        state: BookmarkState.RemoteGone,
+        packages: (projectFromCache?.packages ?? []).map((pkg) =>
+          packageBookmarkFromPackage(pkg)
+        )
+      };
     }
-    if (projectFromCache !== undefined) {
-      return projectFromCache;
-    }
-    return proj;
   }
 
-  private async saveProject(proj: Project): Promise<void> {
+  private async saveProject(proj: ProjectBookmark): Promise<void> {
     const basePath = this.getProjectBasePath(proj);
     await fsPromises.mkdir(basePath, { recursive: true });
     await fsPromises.writeFile(
@@ -483,15 +698,23 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
     ctx: vscode.ExtensionContext,
     accountManager: AccountManager,
     logger: Logger,
-    obsFetchers: ObsFetchers = { fetchProject, fetchFileContents, fetchPackage }
+    obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ): Promise<ProjectBookmarkManager> {
+    const bookmarkedProjects = loadMapFromMemento<ApiUrl, ProjectBookmark[]>(
+      ctx.globalState,
+      projectBookmarkStorageKey
+    );
+
     const cache = await MetadataCache.createMetadataCache(
       ctx,
       accountManager,
       logger,
+      bookmarkedProjects,
       obsFetchers
     );
     const mngr = new ProjectBookmarkManager(cache, ctx.globalState, logger);
+    mngr.bookmarkedProjects = bookmarkedProjects;
+
     mngr.disposables.push(cache);
     return mngr;
   }
@@ -504,10 +727,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
    */
   public onBookmarkUpdate: vscode.Event<BookmarkUpdate>;
 
-  private bookmarkedProjects: Map<ApiUrl, Project[]> = new Map<
-    ApiUrl,
-    Project[]
-  >();
+  private bookmarkedProjects = new Map<ApiUrl, ProjectBookmark[]>();
 
   private onBookmarkUpdateEmitter: vscode.EventEmitter<
     BookmarkUpdate
@@ -520,11 +740,6 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
     logger: Logger
   ) {
     super(logger);
-
-    this.bookmarkedProjects = loadMapFromMemento(
-      globalState,
-      projectBookmarkStorageKey
-    );
 
     this.onBookmarkUpdate = this.onBookmarkUpdateEmitter.event;
 
@@ -545,13 +760,22 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
         this.getBookmarkedPackage,
         this
       )
-      // vscode.commands.registerCommand(
-      //   UPDATE_AND_GET_BOOKMARKED_PROJECT_COMMAND,
-      //   this.updateAndGetBookmarkedProject,
-      //   this
-      // )
     );
   }
+
+  public async dispose(): Promise<void> {
+    await this.saveBookmarkedProjects();
+    super.dispose();
+  }
+
+  /**
+   * Overload for the invocation via a command that has been called without
+   * parameters.
+   */
+  public async getAllBookmarkedProjects(): Promise<undefined>;
+  public async getAllBookmarkedProjects(
+    apiUrl: ApiUrl
+  ): Promise<ProjectBookmark[]>;
 
   /**
    * Returns the list of all projects that are bookmarked for the respective
@@ -566,7 +790,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
    */
   public async getAllBookmarkedProjects(
     apiUrl?: ApiUrl
-  ): Promise<Project[] | undefined> {
+  ): Promise<ProjectBookmark[] | undefined> {
     if (apiUrl === undefined) {
       return undefined;
     }
@@ -578,8 +802,16 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
       )
     );
 
-    return cachedProjects.filter((proj) => proj !== undefined) as Project[];
+    return dropUndefined(cachedProjects);
   }
+
+  public async getBookmarkedProject(): Promise<undefined>;
+  public async getBookmarkedProject(apiUrl: string): Promise<undefined>;
+  public async getBookmarkedProject(
+    apiUrl: ApiUrl,
+    projectName: string,
+    refreshBehavior?: RefreshBehavior
+  ): Promise<ProjectBookmark | undefined>;
 
   /**
    * Finds a specific project in the bookmarks and returns it.
@@ -600,11 +832,17 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
       );
       return undefined;
     }
-    const reducedProj = this.bookmarkedProjects
-      .get(apiUrl)
-      ?.find((proj) => proj.name === projectName);
 
-    if (reducedProj === undefined) {
+    const projsOfApi = this.bookmarkedProjects.get(apiUrl);
+    if (projsOfApi === undefined) {
+      return undefined;
+    }
+
+    const reducedProjIndex = projsOfApi.findIndex(
+      (proj) => proj.name === projectName
+    );
+
+    if (reducedProjIndex === -1) {
       this.logger.debug(
         "requested bookmarked project %s from %s not found in bookmarks",
         projectName,
@@ -613,18 +851,25 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
       return undefined;
     }
 
+    const reducedProj = projsOfApi[reducedProjIndex];
+
     const cachedProj = await this.metadataCache.getProject(
       {
         apiUrl,
-        name: projectName
+        name: projectName,
+        packages: reducedProj.packages
       },
       refreshBehavior
     );
 
-    const { packages, ...rest } = cachedProj;
+    const { packages, state, ...rest } = cachedProj;
 
-    return {
+    const projWithFilteredPkgs = {
       ...rest,
+      // in case the project was explicitly added in a broken state, then
+      // metadataCache.getProject() can set the state to BookmarkState.Unknown,
+      // but we then want to use the state from the current map
+      state: state === BookmarkState.Unknown ? reducedProj.state : state,
       packages: packages?.filter(
         (pkg) =>
           reducedProj.packages?.find(
@@ -632,6 +877,13 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
           ) !== undefined
       )
     };
+
+    projsOfApi[reducedProjIndex] = projWithFilteredPkgs;
+    this.bookmarkedProjects.set(apiUrl, projsOfApi);
+
+    await this.saveBookmarkedProjects();
+
+    return projWithFilteredPkgs;
   }
 
   /**
@@ -641,18 +893,37 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
    * the existing entry is overwritten.
    * The updated bookmarks are always saved in the [[globalState]] Memento.
    */
-  public async addProjectToBookmarks(proj: Project): Promise<void> {
+  public async addProjectToBookmarks(
+    proj: Project | ProjectBookmark
+  ): Promise<void> {
+    this.logger.trace(
+      "requested to add project %s, which is a %s",
+      proj.name,
+      isProjectBookmark(proj) ? "ProjectBookmark" : "Project"
+    );
+
     let allProjects = this.bookmarkedProjects.get(proj.apiUrl) ?? [];
     const matchingProjectIndex = allProjects.findIndex(
       (bookmarkedProj) => bookmarkedProj.name === proj.name
     );
 
-    const { name, apiUrl, packages } = proj;
-    const reducedProj: Project = {
-      apiUrl,
-      name,
-      packages: packages?.map((pkg) => dropFileContents(pkg))
-    };
+    const { name, apiUrl } = proj;
+
+    const reducedProj: ProjectBookmark = isProjectBookmark(proj)
+      ? {
+          apiUrl,
+          name,
+          state: proj.state,
+          packages: proj.packages?.map((pkg) => dropFileContents(pkg))
+        }
+      : {
+          apiUrl,
+          name,
+          packages: proj.packages?.map((pkg) =>
+            packageBookmarkFromPackage(dropFileContents(pkg))
+          ),
+          state: BookmarkState.Ok
+        };
 
     let changeType: ChangeType;
     if (matchingProjectIndex === -1) {
@@ -664,7 +935,10 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
     }
     this.bookmarkedProjects.set(proj.apiUrl, allProjects);
 
-    await this.saveBookmarkedProjects(new UpdateEvent(changeType, proj));
+    await Promise.all([
+      this.saveBookmarkedProjects(new UpdateEvent(changeType, reducedProj)),
+      this.metadataCache.addProject(reducedProj)
+    ]);
   }
 
   // FIXME: needs a better name, as this does **not** always update
@@ -701,6 +975,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
     return updatedProj;
   }*/
 
+  // FIXME: why is this not used??
   public async removeProjectFromBookmarks(proj: Project): Promise<void> {
     const projects = this.bookmarkedProjects.get(proj.apiUrl);
     if (projects === undefined) {
@@ -710,11 +985,18 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
       );
       return;
     }
-    this.bookmarkedProjects.set(
-      proj.apiUrl,
-      projects.filter((project) => project.name !== proj.name)
+    const projToDropIndex = projects.findIndex(
+      (project) => project.name === proj.name
     );
-    await this.saveBookmarkedProjects(new UpdateEvent(ChangeType.Remove, proj));
+    if (projToDropIndex === -1) {
+      return;
+    }
+    const removedProj = projects.splice(projToDropIndex, 1);
+    assert(removedProj.length === 1 && removedProj[0].name === proj.name);
+    this.bookmarkedProjects.set(proj.apiUrl, projects);
+    await this.saveBookmarkedProjects(
+      new UpdateEvent(ChangeType.Remove, removedProj[0])
+    );
   }
 
   /**
@@ -728,7 +1010,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
     projectName?: string,
     packageName?: string,
     refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
-  ): Promise<Package | undefined> {
+  ): Promise<GetBookmarkedPackageRetT> {
     if (
       apiUrl === undefined ||
       projectName === undefined ||
@@ -760,87 +1042,46 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
    * if it is not present or update the existing version.
    * The resulting bookmarks are then saved in the [[globalState]] Memento.
    *
-   * @param apiUrl  API URL of the Project to which the package belongs.
    * @param pkg  The package to be added or updated
-   * @param refreshView  Run [[refresh]] once the project bookmarks have been
-   *     updated.
    *
    * @throw Error when there is no project with the name [[pkg.project]].
    */
   public async addPackageToBookmarks(pkg: Package): Promise<void> {
-    const allProjects = this.bookmarkedProjects.get(pkg.apiUrl) ?? [];
-    const matchingProjIndex = allProjects.findIndex(
+    let allProjects = this.bookmarkedProjects.get(pkg.apiUrl) ?? [];
+    let matchingProjIndex = allProjects.findIndex(
       (proj) => proj.name === pkg.projectName
     );
+
+    const { files, ...rest } = pkg;
+    const pkgBookmark: PackageBookmark = {
+      ...rest,
+      files: files ?? [],
+      state: BookmarkState.Ok
+    };
+
     if (matchingProjIndex === -1) {
-      throw new Error(
-        `Cannot find project ${pkg.projectName} from the API ${pkg.apiUrl} in the bookmarked projects`
+      const proj = {
+        name: pkg.projectName,
+        apiUrl: pkg.apiUrl,
+        packages: [pkg]
+      };
+      await this.addProjectToBookmarks(proj);
+
+      allProjects = this.bookmarkedProjects.get(pkg.apiUrl) ?? [];
+      matchingProjIndex = allProjects.findIndex(
+        (proj) => proj.name === pkg.projectName
       );
     }
-    assert(
-      allProjects[matchingProjIndex].packages !== undefined,
-      `package list of the project ${pkg.projectName} must not be undefined`
-    );
 
     const changeType = insertPackageIntoProject(
-      pkg,
+      pkgBookmark,
       allProjects[matchingProjIndex]
     );
-    // let pkgsOfProj = allProjects[matchingProjIndex].packages!;
-
-    // const matchingPkgIndex = pkgsOfProj.findIndex(
-    //   (savedPkg) => savedPkg.name === pkg.name
-    // );
-
-    // if (matchingPkgIndex === -1) {
-    //   pkgsOfProj = pkgsOfProj.concat([pkg]);
-    // } else {
-    //   pkgsOfProj[matchingPkgIndex] = pkg;
-    // }
-
-    // allProjects[matchingProjIndex].packages = pkgsOfProj;
 
     this.bookmarkedProjects.set(pkg.apiUrl, allProjects);
 
-    await this.saveBookmarkedProjects(new UpdateEvent(changeType, pkg));
+    await this.saveBookmarkedProjects(new UpdateEvent(changeType, pkgBookmark));
   }
-
-  /*public async updateAndGetBookmarkedPackage(
-    pkg: Package,
-    forceFetchFiles: boolean = true
-  ): Promise<Package> {
-    const cachedProj = await this.getBookmarkedProject(
-      pkg.apiUrl,
-      pkg.projectName
-    );
-
-    if (cachedProj === undefined) {
-      this.logger.error(
-        "Could not retrieve the project %s/%s from the cache",
-        pkg.projectName,
-        pkg.name
-      );
-      return pkg;
-    }
-
-    const apiUrl = pkg.apiUrl;
-    const con = this.activeAccounts.getConfig(apiUrl)?.connection;
-    if (con === undefined) {
-      throw new Error(
-        `Cannot refresh package ${pkg.name}, no Connection for it exists`
-      );
-    }
-
-    if (!forceFetchFiles && cachedPkg.files !== undefined) {
-      return pkg;
-    }
-
-    const updatedPkg = await fetchPackage(con, pkg.projectName, pkg.name, {
-      retrieveFileContents: false
-    });
-    await this.addPackageToBookmarks(updatedPkg);
-    return updatedPkg;
-  }*/
 
   public async removePackageFromBookmarks(pkg: Package): Promise<void> {
     const allProjects = this.bookmarkedProjects.get(pkg.apiUrl) ?? [];
@@ -856,74 +1097,54 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
       return;
     }
 
-    // assert(
-    //   allProjects[matchingProjIndex].packages !== undefined,
-    //   `package list of the project ${pkg.project} must not be undefined`
-    // );
+    if (allProjects[matchingProjIndex].packages === undefined) {
+      return;
+    }
 
-    allProjects[matchingProjIndex].packages = allProjects[
-      matchingProjIndex
-    ].packages?.filter((savedPkg) => savedPkg.name !== pkg.name);
+    const pkgToDropIndex = allProjects[matchingProjIndex].packages?.findIndex(
+      (savedPkg) => savedPkg.name === pkg.name
+    );
+
+    if (pkgToDropIndex === -1 || pkgToDropIndex === undefined) {
+      return;
+    }
+
+    const droppedPkg = allProjects[matchingProjIndex].packages!.splice(
+      pkgToDropIndex,
+      1
+    );
+
+    assert(droppedPkg.length === 1 && droppedPkg[0].name === pkg.name);
 
     this.bookmarkedProjects.set(pkg.apiUrl, allProjects);
 
-    await this.saveBookmarkedProjects(new UpdateEvent(ChangeType.Remove, pkg));
+    await this.saveBookmarkedProjects(
+      new UpdateEvent(ChangeType.Remove, droppedPkg[0])
+    );
   }
 
-  /*public async getBookmarkedFile(
-    apiUrl?: string,
-    projectName?: string,
-    packageName?: string,
-    fileName?: string,
-    refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
-  ): Promise<PackageFile | undefined> {
-    if (
-      apiUrl === undefined ||
-      projectName === undefined ||
-      packageName === undefined ||
-      fileName === undefined
-    ) {
-      return undefined;
-    }
-    const pkg: Package = (await this.getBookmarkedPackage(
-      apiUrl,
-      projectName,
-      packageName,
-      refreshBehavior
-    )) ?? { name: packageName, projectName, apiUrl };
-
-    const pkgFile: PackageFile = pkg.files?.find(
-      (f) => f.name === fileName
-    ) ?? { name: fileName, projectName, packageName };
-
-    if (
-      refreshBehavior === RefreshBehavior.Always ||
-      (refreshBehavior === RefreshBehavior.FetchWhenMissing &&
-        pkgFile.contents === undefined)
-    ) {
-      const account = this.activeAccounts.getConfig(apiUrl);
-      if (account === undefined) {
-        this.logger.error(
-          "Cannot fetch the package %s/%s from %s, no account is configured",
-          projectName,
-          packageName,
-          apiUrl
-        );
-      } else {
-        pkgFile.contents = await fetchFileContents(account.connection, pkgFile);
-      }
-    }
-    return pkgFile;
-  }*/
-
+  /**
+   * Save the current project bookmarks in the global state and optionally fire
+   * the [[onBookmarkUpdate]] event.
+   */
   private async saveBookmarkedProjects(
-    updateEvent: BookmarkUpdate
+    updateEvent?: BookmarkUpdate
   ): Promise<void> {
+    if (updateEvent === undefined) {
+      this.logger.trace("Saving project bookmarks");
+    } else {
+      this.logger.trace(
+        "Saving project bookmarks and firing onBookmarkUpdate Event with %o",
+        updateEvent
+      );
+    }
     await saveMapToMemento(
       this.globalState,
       projectBookmarkStorageKey,
       this.bookmarkedProjects
     );
-    this.onBookmarkUpdateEmitter.fire(updateEvent);
+    if (updateEvent !== undefined) {
+      this.onBookmarkUpdateEmitter.fire(updateEvent);
+    }
   }
 }

@@ -20,9 +20,9 @@
  */
 
 import { Context } from "mocha";
-import { ProjectViewFixture } from "./project-view.test";
+import { ProjectBookmarkManagerFixture } from "./project-bookmarks.test";
 
-class CurrentProjectTreeProviderFixture extends ProjectViewFixture {
+class CurrentProjectTreeProviderFixture extends ProjectBookmarkManagerFixture {
   constructor(ctx: Context) {
     super(ctx);
   }

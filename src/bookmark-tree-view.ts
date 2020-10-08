@@ -21,11 +21,10 @@
 
 import * as assert from "assert";
 import {
-  fetchProject,
-  Package,
-  Project,
+  checkOutPackage,
   checkOutProject,
-  checkOutPackage
+  Package,
+  Project
 } from "open-build-service-api";
 import { join } from "path";
 import { Logger } from "pino";
@@ -36,17 +35,31 @@ import {
   ApiUrl,
   promptUserForAccount
 } from "./accounts";
-import { ConnectionListenerLoggerBase, BasePackage } from "./base-components";
+import {
+  BasePackage,
+  BaseProject,
+  ConnectionListenerLoggerBase
+} from "./base-components";
+import {
+  BookmarkState,
+  isPackageBookmark,
+  isProjectBookmark,
+  PackageBookmark,
+  packageBookmarkFromPackage,
+  ProjectBookmark,
+  ProjectBookmarkImpl
+} from "./bookmarks";
 import { cmdPrefix } from "./constants";
 import { logAndReportExceptions } from "./decorators";
 import {
-  SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND,
   DEFAULT_OBS_FETCHERS,
   ObsFetchers,
   VscodeWindow
 } from "./dependency-injection";
+import {
   OBS_PACKAGE_FILE_URI_SCHEME,
-  RemotePackageFileContentProvider
+  RemotePackageFileContentProvider,
+  SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND
 } from "./package-file-contents";
 import {
   ChangedObject,
@@ -56,21 +69,16 @@ import {
 } from "./project-bookmarks";
 import {
   FileTreeElement,
-  getChildrenOfProjectTreeElement,
-  getChildrenOfProjectTreeItem,
   isFileTreeElement,
-  isPackageTreeElement,
   isProjectTreeElement,
-  isProjectTreeItem,
-  PackageTreeElement,
-  ProjectTreeElement,
-  ProjectTreeItem
+  isProjectTreeItem
 } from "./project-view";
 import {
+  dropUndefined,
+  isUri,
   logException,
-  promptUserForProjectName,
   promptUserForPackage,
-  isUri
+  promptUserForProjectName
 } from "./util";
 
 const cmdId = "obsProject";
@@ -106,10 +114,64 @@ export const CHECK_OUT_PROJECT_COMMAND = `${cmdPrefix}.${cmdId}.checkOutProject`
 export const BRANCH_AND_BOOKMARK_AND_CHECKOUT_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.branchAndBookmarkAndCheckoutPackage`;
 
 type BookmarkTreeItem =
-  | ProjectTreeItem
+  | BookmarkedProjectTreeElement
+  | BookmarkedPackageTreeElement
+  | FileTreeElement
   | ObsServerTreeElement
   | MyBookmarksElement
   | AddBookmarkElement;
+
+export class BookmarkedProjectTreeElement extends vscode.TreeItem {
+  public readonly project: ProjectBookmark;
+
+  constructor(project: ProjectBookmark) {
+    super(
+      project.name,
+      project.state === BookmarkState.Ok
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None
+    );
+    const { name, apiUrl, state } = project;
+    this.project = new ProjectBookmarkImpl({ name, apiUrl }, project.state);
+    this.contextValue = "project";
+    this.iconPath =
+      state === BookmarkState.Ok ? BOOKMARK_ICON : BROKEN_BOOKMARK_ICON;
+  }
+}
+
+export function isBookmarkedProjectTreeElement(
+  elem: vscode.TreeItem
+): elem is BookmarkedProjectTreeElement {
+  return (
+    (elem as any).project !== undefined &&
+    isProjectBookmark((elem as any).project)
+  );
+}
+
+export class BookmarkedPackageTreeElement extends vscode.TreeItem {
+  public readonly parentProject: BaseProject;
+
+  public readonly contextValue = "package";
+
+  public readonly iconPath = new vscode.ThemeIcon("package");
+
+  constructor(public readonly pkg: PackageBookmark) {
+    super(pkg.name, vscode.TreeItemCollapsibleState.Collapsed);
+    this.parentProject = new BaseProject(pkg.apiUrl, pkg.projectName);
+    this.iconPath =
+      pkg.state === BookmarkState.Ok
+        ? new vscode.ThemeIcon("package")
+        : BROKEN_BOOKMARK_ICON;
+  }
+}
+
+function isBookmarkedPackageTreeElement(
+  elem: vscode.TreeItem
+): elem is BookmarkedPackageTreeElement {
+  return (
+    (elem as any).pkg !== undefined && isPackageBookmark((elem as any).pkg)
+  );
+}
 
 export class ObsServerTreeElement extends vscode.TreeItem {
   public readonly contextValue = "ObsServer";
@@ -164,6 +226,45 @@ function isMyBookmarksElement(
 }
 
 const BOOKMARK_ICON = new vscode.ThemeIcon("bookmark");
+
+const BROKEN_BOOKMARK_ICON = {
+  dark: join(__dirname, "..", "media", "dark", "broken_image.svg"),
+  light: join(__dirname, "..", "media", "light", "broken_image.svg")
+};
+
+function getChildrenOfBookmaredProjectTreeItem(
+  rootProject: ProjectBookmark,
+  element?:
+    | BookmarkedProjectTreeElement
+    | BookmarkedPackageTreeElement
+    | FileTreeElement
+): BookmarkTreeItem[] {
+  // root element
+  if (element === undefined) {
+    return [new BookmarkedProjectTreeElement(rootProject)];
+  }
+
+  if (isBookmarkedProjectTreeElement(element)) {
+    return (
+      rootProject.packages?.map(
+        (pkg) => new BookmarkedPackageTreeElement(pkg)
+      ) ?? []
+    );
+  }
+
+  if (isBookmarkedPackageTreeElement(element)) {
+    return (
+      rootProject.packages
+        ?.find((pkg) => pkg.name === element.pkg.name)
+        ?.files?.map((f) => new FileTreeElement(element.pkg.apiUrl, f)) ?? []
+    );
+  }
+
+  assert(
+    false,
+    `This code must be unreachable, but reached it via a ${element.contextValue} Element`
+  );
+}
 
 export class CheckOutHandler extends ConnectionListenerLoggerBase {
   constructor(
@@ -281,15 +382,7 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
   ): Promise<void> {
     let pkg: BasePackage | undefined;
 
-    if (elemOrEditor === undefined) {
-      pkg = await promptUserForPackage(this.activeAccounts, this.vscodeWindow);
-    } else if (isPackageTreeElement(elemOrEditor)) {
-      pkg = new BasePackage(
-        elemOrEditor.parentProject.apiUrl,
-        elemOrEditor.parentProject.name,
-        elemOrEditor.packageName
-      );
-    } else if (
+    if (
       isUri(elemOrEditor) &&
       elemOrEditor.scheme === OBS_PACKAGE_FILE_URI_SCHEME
     ) {
@@ -301,9 +394,24 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
         pkgFileInfo.pkgFile.projectName,
         pkgFileInfo.pkgFile.packageName
       );
+    } else if (
+      !isUri(elemOrEditor) &&
+      elemOrEditor !== undefined &&
+      isBookmarkedPackageTreeElement(elemOrEditor)
+    ) {
+      pkg = new BasePackage(
+        elemOrEditor.parentProject.apiUrl,
+        elemOrEditor.parentProject.name,
+        elemOrEditor.pkg.name
+      );
+    } else {
+      pkg = await promptUserForPackage(this.activeAccounts, this.vscodeWindow);
     }
 
     if (pkg === undefined) {
+      this.logger.debug(
+        "Could not get a package to check out, will do nothing"
+      );
       return undefined;
     }
 
@@ -321,7 +429,8 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     });
     if (dest === undefined || dest.length > 1) {
       this.logger.error(
-        "User either did not select a destination or somehow selected multiple folders"
+        "User either did not select a destination or somehow selected multiple folders, got the following folders: %o",
+        dest
       );
       return;
     }
@@ -348,7 +457,8 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
   }
 }
 
-export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
+export class BookmarkedProjectsTreeProvider
+  extends ConnectionListenerLoggerBase
   implements vscode.TreeDataProvider<BookmarkTreeItem> {
   public onDidChangeTreeData: vscode.Event<BookmarkTreeItem | undefined>;
 
@@ -361,7 +471,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     private readonly bookmarkMngr: ProjectBookmarkManager,
     logger: Logger,
     private vscodeWindow: VscodeWindow = vscode.window,
-    private readonly obsFetchProject: typeof fetchProject = fetchProject
+    private readonly obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ) {
     super(accountManager, logger);
 
@@ -396,35 +506,39 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
 
       bookmarkMngr.onBookmarkUpdate(
         ({ changeType, changedObject, element }) => {
-          let treeItem: ProjectTreeItem;
+          // FIXME: this does not work reliably
+          let treeItem: BookmarkTreeItem;
           if (changedObject === ChangedObject.Project) {
             assert(
-              (element as any).projectName === undefined,
+              isProjectBookmark(element),
               `Must receive a Project via the onBookmarkUpdate event when a project is modified, but got something else instead: ${element}`
             );
-            treeItem = new ProjectTreeElement(element as Project);
+            treeItem = new BookmarkedProjectTreeElement(element);
           } else {
             assert(
               changedObject === ChangedObject.Package,
               `changeObject must be a package, but got ${changedObject} instead`
             );
-            assert((element as any).projectName !== undefined);
-            treeItem = new PackageTreeElement(element as Package);
+            assert(
+              isPackageBookmark(element),
+              `Must receive a PackageBookmark via the onBookmarkUpdate event when a Package is modified, but got something else instead: ${element}`
+            );
+            treeItem = new BookmarkedPackageTreeElement(element);
           }
 
           if (changeType === ChangeType.Modify) {
-            this.onDidChangeTreeDataEmitter.fire(treeItem);
+            this.onDidChangeTreeDataEmitter.fire(undefined);
           } else {
-            this.onDidChangeTreeDataEmitter.fire(this.getParent(treeItem));
+            // this.onDidChangeTreeDataEmitter.fire(this.getParent(treeItem));
+            this.onDidChangeTreeDataEmitter.fire(undefined);
           }
         },
         this
       ),
       this.onDidChangeTreeDataEmitter,
-      // tslint:disable-next-line: variable-name
       this.onAccountChange((_apiUrls) => {
         this.refresh();
-      })
+      }, this)
     );
   }
 
@@ -436,9 +550,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     if (!isProjectTreeItem(element)) {
       return element;
     }
-    if (isProjectTreeElement(element)) {
-      element.iconPath = BOOKMARK_ICON;
-    } else if (isFileTreeElement(element)) {
+    if (isFileTreeElement(element)) {
       element.command = {
         arguments: [element],
         command: SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND,
@@ -473,14 +585,19 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
       isMyBookmarksElement(element) &&
       this.activeAccounts.getAllApis().length > 1
     ) {
-      return this.activeAccounts
-        .getAllApis()
-        .map(
-          (apiUrl) =>
-            new ObsServerTreeElement(
-              this.activeAccounts.getConfig(apiUrl)!.account
-            )
-        );
+      return dropUndefined(
+        this.activeAccounts.getAllApis().map((apiUrl) => {
+          const acc = this.activeAccounts.getConfig(apiUrl)?.account;
+          if (acc === undefined) {
+            this.logger.error(
+              "Tried to get the account of the API '%s' but got undefined",
+              apiUrl
+            );
+            return undefined;
+          }
+          return new ObsServerTreeElement(acc);
+        })
+      );
     } else if (
       (isMyBookmarksElement(element) &&
         this.activeAccounts.getAllApis().length === 1) ||
@@ -492,13 +609,11 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
           : (element as ObsServerTreeElement).account.apiUrl;
 
       const projects = await this.bookmarkMngr.getAllBookmarkedProjects(apiUrl);
-      return projects === undefined
-        ? []
-        : ([] as ProjectTreeItem[]).concat(
-            ...projects.map((bookmark) =>
-              getChildrenOfProjectTreeItem(bookmark, undefined)
-            )
-          );
+      return ([] as BookmarkTreeItem[]).concat(
+        ...projects.map((bookmark) =>
+          getChildrenOfBookmaredProjectTreeItem(bookmark, undefined)
+        )
+      );
     } else if (isMyBookmarksElement(element)) {
       const accountCount = this.activeAccounts.getAllApis().length;
       assert(
@@ -515,7 +630,10 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
       `Invalid element: ${element.contextValue}. Must not be a MyBookmarksElement, ObsServerTreeElement or a AddBookmarkElement`
     );
 
-    const projTreeItem: ProjectTreeItem = element;
+    const projTreeItem:
+      | BookmarkedProjectTreeElement
+      | BookmarkedPackageTreeElement
+      | FileTreeElement = element;
 
     if (isProjectTreeElement(projTreeItem)) {
       const projFromBookmark = await logException(
@@ -531,10 +649,10 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
 
       return projFromBookmark === undefined
         ? []
-        : getChildrenOfProjectTreeElement(projFromBookmark, projTreeItem);
+        : getChildrenOfBookmaredProjectTreeItem(projFromBookmark, projTreeItem);
     }
 
-    if (isPackageTreeElement(projTreeItem)) {
+    if (isBookmarkedPackageTreeElement(projTreeItem)) {
       const apiUrl = projTreeItem.parentProject.apiUrl;
       const pkg = await logException(
         this.logger,
@@ -542,10 +660,10 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
           this.bookmarkMngr.getBookmarkedPackage(
             apiUrl,
             projTreeItem.parentProject.name,
-            projTreeItem.packageName,
+            projTreeItem.pkg.name,
             RefreshBehavior.FetchWhenMissing
           ),
-        `Retrieving the bookmarked package ${projTreeItem.packageName}`
+        `Retrieving the bookmarked package ${projTreeItem.pkg.name}`
       );
       return pkg === undefined
         ? []
@@ -555,13 +673,15 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     assert(false, "This code must be unreachable");
   }
 
-  public getParent(element: BookmarkTreeItem): BookmarkTreeItem | undefined {
+  // FIXME: re-enable this
+  /* public getParent(element: BookmarkTreeItem): BookmarkTreeItem | undefined {
     if (isProjectTreeItem(element)) {
       if (isPackageTreeElement(element)) {
         return new ProjectTreeElement(element.parentProject);
       }
       if (isFileTreeElement(element)) {
-        return new PackageTreeElement({
+        // this.bookmarkMngr.getBookmarkedProject
+        return new BookmarkedPackageTreeElement({
           apiUrl: element.parentProject.apiUrl,
           name: element.packageName,
           projectName: element.parentProject.name
@@ -590,6 +710,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     }
 
     assert(false, "This part of the code must be unreachable");
+    }*/
 
   @logAndReportExceptions()
   public async branchAndBookmarkAndCheckoutPackage(
@@ -636,7 +757,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
    */
   @logAndReportExceptions()
   public async updatePackage(element?: BookmarkTreeItem): Promise<void> {
-    if (element === undefined || !isPackageTreeElement(element)) {
+    if (element === undefined || !isBookmarkedPackageTreeElement(element)) {
       this.logger.error(
         "updatePackage called on undefined or on a wrong element: %s",
         element?.contextValue
@@ -647,7 +768,7 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     await this.bookmarkMngr.getBookmarkedPackage(
       element.parentProject.apiUrl,
       element.parentProject.name,
-      element.packageName,
+      element.pkg.name,
       RefreshBehavior.Always
     );
     this.onDidChangeTreeDataEmitter.fire(element);
@@ -740,10 +861,20 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
 
     let proj: Project | undefined;
     try {
-      proj = await this.obsFetchProject(accountConfig.connection, projectName, {
-        getPackageList: true
-      });
+      proj = await this.obsFetchers.fetchProject(
+        accountConfig.connection,
+        projectName,
+        {
+          fetchPackageList: true
+        }
+      );
     } catch (err) {
+      this.logger.trace(
+        "Tried fetching %s from %s, but got %s, prompting the user whether to add anyway",
+        projectName,
+        apiUrl,
+        err.toString()
+      );
       const selected = await this.vscodeWindow.showErrorMessage(
         `Adding a bookmark for the project ${projectName} using the account ${accountConfig.account.accountName} failed with: ${err}.`,
         "Add anyway",
@@ -755,7 +886,24 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
       assert(selected === "Add anyway");
     }
 
-    const bookmark: Project = { apiUrl, name: projectName };
+    const {
+      apiUrl: _ignore,
+      name: _ignore2,
+      state: _ignore3,
+      ...restOfBookmark
+    } =
+      (await this.bookmarkMngr.getBookmarkedProject(
+        apiUrl,
+        projectName,
+        RefreshBehavior.Never
+      )) ?? {};
+
+    const bookmark: ProjectBookmark = {
+      apiUrl,
+      name: projectName,
+      state: proj !== undefined ? BookmarkState.Ok : BookmarkState.RemoteGone,
+      ...restOfBookmark
+    };
 
     if (proj !== undefined) {
       assert(
@@ -763,48 +911,32 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
         `received Project is invalid: packages are undefined (${proj.packages}) or the apiUrl does not match the provided value (${proj.apiUrl} vs ${apiUrl})`
       );
 
-      const addAll =
-        // FIXME: make this number configurable?
-        proj.packages.length < 10
-          ? "Yes"
-          : await this.vscodeWindow.showInformationMessage(
-              `This project has ${proj.packages?.length} packages, add them all?`,
-              "Yes",
-              "No"
-            );
-      if (addAll === undefined) {
+      const pkgs = await this.vscodeWindow.showQuickPick(
+        proj.packages.map((pkg) => pkg.name),
+        {
+          canPickMany: true,
+          placeHolder: "Select packages to be bookmarked"
+        }
+      );
+      if (pkgs === undefined) {
         return;
       }
-      if (addAll === "No") {
-        const pkgs = await this.vscodeWindow.showQuickPick(
-          proj.packages.map((pkg) => pkg.name),
-          {
-            canPickMany: true,
-            placeHolder: "Select packages to be bookmarked"
-          }
-        );
-        if (pkgs === undefined) {
-          return;
-        }
-        bookmark.packages = pkgs.map((pkgName) => ({
+
+      bookmark.packages = pkgs
+        .map((pkgName) => ({
           apiUrl,
           name: pkgName,
-          projectName
-        }));
-      } else {
-        assert(
-          addAll === "Yes",
-          `variable addAll must equal 'Yes' but got ${addAll} instead`
-        );
-        bookmark.packages = proj.packages;
-      }
+          projectName,
+          state: BookmarkState.Ok
+        }))
+        .concat(bookmark.packages ?? []);
     }
 
     await this.bookmarkMngr.addProjectToBookmarks(bookmark);
     // FIXME: this should fire with the ObsServerTreeElement or the MyBookmarksElement
     // NOTE: this must not fire with the ProjectTreeElement, as that one doesn't
     // exist yet and thus will result in nothing happening
-    this.onDidChangeTreeDataEmitter.fire(undefined);
+    // this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
   public async removeBookmark(element?: BookmarkTreeItem): Promise<void> {

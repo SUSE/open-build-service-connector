@@ -20,88 +20,70 @@
  */
 
 import { expect } from "chai";
-import { promises as fsPromises } from "fs";
 import { afterEach, beforeEach, Context, describe, it, xit } from "mocha";
-import * as obs_ts from "open-build-service-api";
-import { tmpdir } from "os";
-import { sep } from "path";
+import * as obs_api from "open-build-service-api";
 import { match } from "sinon";
 import * as vscode from "vscode";
 import { ApiUrl } from "../../accounts";
 import { BaseProject } from "../../base-components";
 import {
   AddBookmarkElement,
+  BookmarkedPackageTreeElement,
   BookmarkedProjectsTreeProvider,
+  BookmarkedProjectTreeElement,
+  isBookmarkedProjectTreeElement,
   MyBookmarksElement,
   ObsServerTreeElement,
   UPDATE_PROJECT_COMMAND
 } from "../../bookmark-tree-view";
+import {
+  BookmarkState,
+  isProjectBookmark,
+  packageBookmarkFromPackage,
+  projectBookmarkFromProject,
+  ProjectBookmarkImpl
+} from "../../bookmarks";
 import { GET_INSTANCE_INFO_COMMAND } from "../../instance-info";
 import { SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND } from "../../package-file-contents";
-import {
-  ProjectBookmarkManager,
-  RefreshBehavior
-} from "../../project-bookmarks";
+import { RefreshBehavior } from "../../project-bookmarks";
 import {
   FileTreeElement,
   isPackageTreeElement,
-  PackageTreeElement,
   ProjectTreeElement
 } from "../../project-view";
 import { AccountMapInitializer } from "./fakes";
-import { ProjectViewFixture } from "./project-view.test";
 import {
-  fakeAccount1,
-  fakeAccount2,
-  fakeApi1ValidAcc,
-  fakeApi2ValidAcc
-} from "./test-data";
-import { castToAsyncFunc, testLogger } from "./test-utils";
+  ProjectBookmarkManagerFixture,
+  setupFetchProjectMocks
+} from "./project-bookmarks.test";
+import * as td from "./test-data";
+import {
+  castToAsyncFunc,
+  createStubbedVscodeWindow,
+  testLogger
+} from "./test-utils";
 
-
-class BookmarkedProjectsTreeProviderFixture extends ProjectViewFixture {
-  public projectBookmarkManager?: ProjectBookmarkManager;
-
-  public globalStoragePath: string = "";
-
-  public readonly mockMemento = {
-    get: this.sandbox.stub(),
-    update: this.sandbox.stub()
-  };
+class BookmarkedProjectsTreeProviderFixture extends ProjectBookmarkManagerFixture {
+  public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
 
   public async createBookmarkedProjectsTreeProvider(
     initialAccountMap?: AccountMapInitializer,
-    initialBookmarks: [ApiUrl, obs_ts.Project[]][] = []
+    initialBookmarks: [ApiUrl, obs_api.Project[]][] = []
   ): Promise<BookmarkedProjectsTreeProvider> {
-    this.globalStoragePath = await fsPromises.mkdtemp(
-      `${process.env.TMPDIR ?? tmpdir()}${sep}obs-connector`
-    );
     // in case there is a projectBookmarkManager, dispose it, so that the
     // commands are unregistered
     this.projectBookmarkManager?.dispose();
-
-    this.mockMemento.get.returns(initialBookmarks);
-    this.createFakeAccountManager(initialAccountMap);
-    this.projectBookmarkManager = await ProjectBookmarkManager.createProjectBookmarkManager(
-      {
-        globalState: this.mockMemento as vscode.Memento,
-        globalStoragePath: this.globalStoragePath
-      } as vscode.ExtensionContext,
-      this.fakeAccountManager!,
-      testLogger,
-      {
-        fetchFileContents: this.fetchFileContentsMock,
-        fetchPackage: this.fetchPackageMock,
-        fetchProject: this.fetchProjectMock
-      }
-    );
+    this.projectBookmarkManager = await this.createProjectBookmarkManager({
+      initialAccountMap,
+      initialBookmarks
+    });
 
     const projTreeProv = new BookmarkedProjectsTreeProvider(
       this.fakeAccountManager!,
       this.projectBookmarkManager,
       testLogger,
       this.vscodeWindow,
-      this.fetchProjectMock
+      this.obsFetchers
     );
 
     this.disposables.push(
@@ -116,11 +98,6 @@ class BookmarkedProjectsTreeProviderFixture extends ProjectViewFixture {
 
     return projTreeProv;
   }
-
-  public async afterEach(ctx: Context) {
-    await obs_ts.rmRf(this.globalStoragePath);
-    super.afterEach(ctx);
-  }
 }
 
 type FixtureContext = {
@@ -128,8 +105,9 @@ type FixtureContext = {
 } & Context;
 
 describe("BookmarkedProjectsTreeProvider", () => {
-  beforeEach(function () {
+  beforeEach(async function () {
     this.fixture = new BookmarkedProjectsTreeProviderFixture(this);
+    await this.fixture.beforeEach();
   });
 
   afterEach(async function () {
@@ -169,7 +147,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "returns an empty array when no projects are bookmarked and only one account is present",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
           );
           const myBookmarksElement = new MyBookmarksElement();
 
@@ -183,26 +161,42 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "returns an array of project bookmarks if only one account is present",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [fooProj]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.fooProj]]]
           );
-          this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
+
+          setupFetchProjectMocks(
+            td.fooProjWithPackages,
+            this.fixture.obsFetchers
+          );
+
+          this.fixture.obsFetchers.fetchProject.resolves(
+            td.fooProjWithPackages
+          );
           const myBookmarksElement = new MyBookmarksElement();
 
-          await projectTree
-            .getChildren(myBookmarksElement)
-            .should.eventually.deep.equal([
-              {
-                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-                contextValue: "project",
-                label: fooProj.name,
-                project: fooProj
-              }
-            ]);
+          const treeElem = await projectTree.getChildren(myBookmarksElement);
+          expect(treeElem).to.be.an("array").and.have.length(1);
 
-          this.fixture.fetchProjectMock.should.have.been.calledOnceWith(
-            fakeApi1ValidAcc.connection,
-            fooProj.name
+          expect(isBookmarkedProjectTreeElement(treeElem[0])).to.equal(true);
+          (treeElem[0] as BookmarkedProjectTreeElement).project.should.deep.include(
+            td.fooProj
+          );
+          // FIXME: we changed the attribute .project to a BaseProject so that
+          //        comparing works, which makes this test obsolete
+          //        => reintroduce it or drop this entirely?
+          // expect(
+          //   (treeElem[0] as BookmarkedProjectTreeElement).project.meta
+          // ).to.not.equal(undefined);
+          // .should.eventually.deep.equal([
+          //             new BookmarkedProjectTreeElement(
+          //     projectBookmarkFromProject({ ...td.fooProj, packages: [] })
+          //   )
+          // ]);
+
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledOnceWith(
+            td.fakeApi1ValidAcc.connection,
+            td.fooProj.name
           );
         })
       );
@@ -212,8 +206,8 @@ describe("BookmarkedProjectsTreeProvider", () => {
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
             [
-              [fakeAccount1.apiUrl, fakeApi1ValidAcc],
-              [fakeAccount2.apiUrl, fakeApi2ValidAcc]
+              [td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc],
+              [td.fakeAccount2.apiUrl, td.fakeApi2ValidAcc]
             ]
           );
 
@@ -221,18 +215,18 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const children = await projectTree.getChildren(myBookmarksElement);
           children.should.contain.a.thing.that.deep.equals({
-            account: fakeAccount1,
+            account: td.fakeAccount1,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             contextValue: "ObsServer",
             iconPath: new vscode.ThemeIcon("server"),
-            label: fakeAccount1.accountName
+            label: td.fakeAccount1.accountName
           });
           children.should.contain.a.thing.that.deep.equals({
-            account: fakeAccount2,
+            account: td.fakeAccount2,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             contextValue: "ObsServer",
             iconPath: new vscode.ThemeIcon("server"),
-            label: fakeAccount2.accountName
+            label: td.fakeAccount2.accountName
           });
           expect(children).to.be.an("array").and.have.length(2);
         })
@@ -247,70 +241,76 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
             [
-              [fakeAccount1.apiUrl, fakeApi1ValidAcc],
-              [fakeAccount2.apiUrl, fakeApi2ValidAcc]
+              [td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc],
+              [td.fakeAccount2.apiUrl, td.fakeApi2ValidAcc]
             ],
             [
-              [fakeAccount1.apiUrl, [fooProj, barProj]],
-              [fakeAccount2.apiUrl, [bazProj]]
+              [td.fakeAccount1.apiUrl, [td.fooProj, td.barProj]],
+              [td.fakeAccount2.apiUrl, [td.bazProj]]
             ]
           );
 
-          this.fixture.fetchProjectMock.onCall(0).resolves(fooProjWithPackages);
-          this.fixture.fetchProjectMock.onCall(1).resolves(barProjWithPackages);
-
-          const obsServer1Element = new ObsServerTreeElement(fakeAccount1);
-          await projectTree
-            .getChildren(obsServer1Element)
-            .should.eventually.deep.equal([
-              {
-                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-                contextValue,
-                label: fooProj.name,
-                project: fooProj
-              },
-              {
-                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-                contextValue,
-                label: barProj.name,
-                project: barProj
-              }
-            ]);
-
-          this.fixture.fetchProjectMock.should.have.been.calledTwice;
-          this.fixture.fetchProjectMock.should.have.been.calledWith(
-            fakeApi1ValidAcc.connection,
-            fooProj.name,
-            { getPackageList: true }
+          setupFetchProjectMocks(
+            td.fooProjWithPackages,
+            this.fixture.obsFetchers
           );
-          this.fixture.fetchProjectMock.should.have.been.calledWith(
-            fakeApi1ValidAcc.connection,
-            barProj.name,
-            { getPackageList: true }
+          setupFetchProjectMocks(
+            td.barProjWithPackages,
+            this.fixture.obsFetchers
           );
 
-          this.fixture.fetchProjectMock.reset();
+          const obsServer1Element = new ObsServerTreeElement(td.fakeAccount1);
+          const bookmarks = await projectTree.getChildren(obsServer1Element);
+          expect(bookmarks).to.be.an("array").and.have.length(2);
+          expect(
+            (bookmarks[0] as BookmarkedProjectTreeElement).project
+          ).to.deep.include(td.fooProj);
+          expect(
+            (bookmarks[1] as BookmarkedProjectTreeElement).project
+          ).to.deep.include(td.barProj);
 
-          this.fixture.fetchProjectMock.resolves(bazProj);
+          // .should.eventually.deep.equal([
+          //   new BookmarkedProjectTreeElement(
+          //     projectBookmarkFromProject()
+          //   ),
+          //   new BookmarkedProjectTreeElement(
+          //     projectBookmarkFromProject({ ...td.barProj, packages: [] })
+          //   )
+          // ]);
 
-          const obsServer2Element = new ObsServerTreeElement(fakeAccount2);
-          await projectTree
-            .getChildren(obsServer2Element)
-            .should.eventually.deep.equal([
-              {
-                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-                contextValue,
-                label: bazProj.name,
-                project: bazProj
-              }
-            ]);
-
-          this.fixture.fetchProjectMock.should.have.been.calledOnceWith(
-            fakeApi2ValidAcc.connection,
-            bazProj.name,
-            { getPackageList: true }
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledTwice;
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledWith(
+            td.fakeApi1ValidAcc.connection,
+            td.fooProj.name,
+            { fetchPackageList: false }
           );
-          this.fixture.fetchPackageMock.should.have.not.been.called;
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledWith(
+            td.fakeApi1ValidAcc.connection,
+            td.barProj.name,
+            { fetchPackageList: false }
+          );
+
+          this.fixture.obsFetchers.fetchProject.reset();
+
+          setupFetchProjectMocks(td.bazProj, this.fixture.obsFetchers);
+          const obsServer2Element = new ObsServerTreeElement(td.fakeAccount2);
+          const children = await projectTree.getChildren(obsServer2Element);
+          expect(children).to.be.an("array").and.have.length(1);
+          children[0].should.deep.include({
+            collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+            contextValue,
+            label: td.bazProj.name
+          });
+          (children[0] as BookmarkedProjectTreeElement).project.should.deep.include(
+            td.bazProj
+          );
+
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledOnceWith(
+            td.fakeApi2ValidAcc.connection,
+            td.bazProj.name,
+            { fetchPackageList: false }
+          );
+          this.fixture.obsFetchers.fetchPackage.should.have.not.been.called;
         })
       );
     });
@@ -326,13 +326,18 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "returns the package list if the project has saved packages",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [fooProjWithPackages, barProj]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.fooProjWithPackages, td.barProj]]]
           );
 
-          const projElemen = new ProjectTreeElement(fooProjWithPackages);
+          const projElemen = new BookmarkedProjectTreeElement(
+            new ProjectBookmarkImpl(td.fooProjWithPackages)
+          );
 
-          this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
+          setupFetchProjectMocks(
+            td.fooProjWithPackages,
+            this.fixture.obsFetchers
+          );
 
           const children = await projectTree
             .getChildren(projElemen)
@@ -342,16 +347,15 @@ describe("BookmarkedProjectsTreeProvider", () => {
           children.map((child: any, i: number) => {
             child.should.deep.include({
               ...commonPackageEntries,
-              label: packages[i].name
+              label: td.packages[i].name
             });
           });
 
-          this.fixture.fetchProjectMock.should.have.been.calledOnceWith(
-            fakeApi1ValidAcc.connection,
-            fooProj.name,
-            { getPackageList: true }
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledOnceWith(
+            td.fakeApi1ValidAcc.connection,
+            td.fooProj.name,
+            match.any
           );
-          this.fixture.fetchPackageMock.should.have.not.been.called;
         })
       );
 
@@ -359,13 +363,18 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "tries to fetch the package list if the project has no saved packages",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [fooProjWithPackages, barProj]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.fooProjWithPackages, td.barProj]]]
           );
 
-          const projElemen = new ProjectTreeElement(fooProj);
+          const projElemen = new BookmarkedProjectTreeElement(
+            projectBookmarkFromProject(td.fooProj)
+          );
 
-          this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
+          setupFetchProjectMocks(
+            td.fooProjWithPackages,
+            this.fixture.obsFetchers
+          );
 
           const children = await projectTree
             .getChildren(projElemen)
@@ -375,27 +384,30 @@ describe("BookmarkedProjectsTreeProvider", () => {
           children.map((child: any, i: number) => {
             child.should.deep.include({
               ...commonPackageEntries,
-              label: packages[i].name
+              label: td.packages[i].name
             });
           });
 
-          this.fixture.fetchProjectMock.should.have.been.calledOnce;
-          this.fixture.sandbox.assert.calledWith(
-            this.fixture.fetchProjectMock.firstCall,
-            fakeApi1ValidAcc.connection,
-            fooProj.name,
-            { getPackageList: true }
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledOnce;
+          this.fixture.obsFetchers.fetchProject.should.have.been.calledOnceWith(
+            td.fakeApi1ValidAcc.connection,
+            td.fooProj.name,
+            match.any
           );
 
-          this.fixture.fetchProjectMock.reset();
+          this.fixture.obsFetchers.fetchProject.reset();
 
           // the project bookmarks should have been updated
           // => no more fetching is necessary
-          await projectTree
-            .getChildren(projElemen)
-            .should.eventually.deep.equal(children);
+          const children2 = await projectTree.getChildren(projElemen);
+          children2.map((child: any, i: number) => {
+            child.should.deep.include({
+              ...commonPackageEntries,
+              label: td.packages[i].name
+            });
+          });
 
-          this.fixture.fetchProjectMock.should.have.callCount(0);
+          this.fixture.obsFetchers.fetchProject.should.have.callCount(0);
         })
       );
 
@@ -404,35 +416,46 @@ describe("BookmarkedProjectsTreeProvider", () => {
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
             [],
-            [[fakeAccount1.apiUrl, [fooProj, barProj]]]
+            [[td.fakeAccount1.apiUrl, [td.fooProj, td.barProj]]]
           );
 
-          const projElement = new ProjectTreeElement(fooProj);
+          const projElement = new BookmarkedProjectTreeElement(
+            projectBookmarkFromProject(td.fooProj)
+          );
 
           await projectTree
             .getChildren(projElement)
             .should.eventually.be.deep.equal([]);
 
-          this.fixture.sandbox.assert.notCalled(this.fixture.fetchProjectMock);
+          this.fixture.sandbox.assert.notCalled(
+            this.fixture.obsFetchers.fetchProject
+          );
         })
       );
 
-      xit(
+      it(
         "does not try to save non-bookmarked projects",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
           );
 
-          this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
+          setupFetchProjectMocks(
+            td.fooProjWithPackages,
+            this.fixture.obsFetchers
+          );
 
-          const projElement = new ProjectTreeElement(fooProj);
+          const projElement = new BookmarkedProjectTreeElement(
+            projectBookmarkFromProject(td.fooProj)
+          );
           await projectTree.getChildren(projElement);
 
-          this.fixture.sandbox.assert.notCalled(
-            this.fixture.mockMemento.update
-          );
-          this.fixture.sandbox.assert.calledOnce(this.fixture.fetchProjectMock);
+          expect(
+            await this.fixture.projectBookmarkManager!.getBookmarkedProject(
+              td.fooProj.apiUrl,
+              td.fooProj.name
+            )
+          ).to.equal(undefined);
         })
       );
     });
@@ -442,10 +465,10 @@ describe("BookmarkedProjectsTreeProvider", () => {
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         contextValue: "packageFile",
         iconPath: new vscode.ThemeIcon("file"),
-        packageName: barPkgWithFiles.name,
+        packageName: td.barPkgWithFiles.name,
         parentProject: new BaseProject(
-          barPkgWithFiles.apiUrl,
-          barPkgWithFiles.projectName
+          td.barPkgWithFiles.apiUrl,
+          td.barPkgWithFiles.projectName
         )
       };
 
@@ -454,16 +477,18 @@ describe("BookmarkedProjectsTreeProvider", () => {
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
             [],
-            [[fakeAccount1.apiUrl, [fooProjWithPackages, barProj]]]
+            [[td.fakeAccount1.apiUrl, [td.fooProjWithPackages, td.barProj]]]
           );
 
-          const pkgElement = new PackageTreeElement(fooPkg);
+          const pkgElement = new BookmarkedPackageTreeElement(
+            packageBookmarkFromPackage(td.fooPkg)
+          );
 
           await projectTree
             .getChildren(pkgElement)
             .should.eventually.deep.equal([]);
 
-          this.fixture.fetchProjectMock.should.have.callCount(0);
+          this.fixture.obsFetchers.fetchProject.should.have.callCount(0);
         })
       );
 
@@ -471,33 +496,25 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "returns the known files as PackageTreeElements",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [barProjWithPackages]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.barProjWithPackages]]]
           );
 
-          const pkgElement = new PackageTreeElement(barPkg);
+          const pkgElement = new BookmarkedPackageTreeElement(
+            packageBookmarkFromPackage(td.barPkg)
+          );
 
-          this.fixture.fetchProjectMock.resolves(barProjWithPackages);
-          this.fixture.fetchPackageMock.resolves(barPkgWithFiles);
+          setupFetchProjectMocks(
+            td.barProjWithPackages,
+            this.fixture.obsFetchers
+          );
 
           const fileElements = await projectTree
             .getChildren(pkgElement)
             .should.eventually.be.an("array")
             .and.have.lengthOf(2);
 
-          this.fixture.fetchProjectMock.should.have.been.calledOnceWithExactly(
-            fakeApi1ValidAcc.connection,
-            barProj.name,
-            { getPackageList: true }
-          );
-          // this.fixture.fetchPackageMock.should.have.been.calledOnceWithExactly(
-          //   fakeApi1ValidAcc.connection,
-          //   barPkgWithFiles.projectName,
-          //   barPkgWithFiles.name,
-          //   { retrieveFileContents: false, expandLinks: true }
-          // );
-
-          barPkgWithFiles.files!.map((pkgFile, i) => {
+          td.barPkgWithFiles.files!.map((pkgFile, i) => {
             fileElements[i].should.deep.include({
               ...commonFileEntries,
               fileName: pkgFile.name,
@@ -511,23 +528,25 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "fetches the files from OBS if none are present and a connection exists",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [barProjWithPackagesWithoutFiles]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.barProjWithPackagesWithoutFiles]]]
           );
 
-          this.fixture.fetchPackageMock.resolves(barPkgWithFiles);
-          this.fixture.fetchProjectMock.resolves(
-            barProjWithPackagesWithoutFiles
+          setupFetchProjectMocks(
+            td.barProjWithPackages,
+            this.fixture.obsFetchers
           );
 
-          const pkgElement = new PackageTreeElement(barPkg);
+          const pkgElement = new BookmarkedPackageTreeElement(
+            packageBookmarkFromPackage(td.barPkg)
+          );
 
           const fileElements = await projectTree
             .getChildren(pkgElement)
             .should.eventually.be.an("array")
             .and.have.lengthOf(2);
 
-          barPkgWithFiles.files!.map((pkgFile, i) => {
+          td.barPkgWithFiles.files!.map((pkgFile, i) => {
             fileElements[i].should.deep.include({
               ...commonFileEntries,
               fileName: pkgFile.name,
@@ -535,15 +554,15 @@ describe("BookmarkedProjectsTreeProvider", () => {
             });
           });
 
-          this.fixture.fetchPackageMock.should.have.been.calledOnceWith(
-            fakeApi1ValidAcc.connection,
-            barProj.name,
-            barPkg.name,
+          this.fixture.obsFetchers.fetchPackage.should.have.been.calledOnceWith(
+            td.fakeApi1ValidAcc.connection,
+            td.barProj.name,
+            td.barPkg.name,
             { retrieveFileContents: false, expandLinks: true }
           );
 
-          this.fixture.fetchProjectMock.reset();
-          this.fixture.fetchPackageMock.reset();
+          this.fixture.obsFetchers.fetchProject.reset();
+          this.fixture.obsFetchers.fetchPackage.reset();
 
           // the project should have now been updated => when we request the same
           // thing again, then fetchPackage must not be called again
@@ -551,37 +570,42 @@ describe("BookmarkedProjectsTreeProvider", () => {
             .getChildren(pkgElement)
             .should.eventually.deep.equal(fileElements);
 
-          this.fixture.fetchProjectMock.should.have.callCount(0);
-          this.fixture.fetchPackageMock.should.have.callCount(0);
+          this.fixture.obsFetchers.fetchProject.should.have.callCount(0);
+          this.fixture.obsFetchers.fetchPackage.should.have.callCount(0);
         })
       );
 
-      xit(
+      it(
         "Does not try to save packages of non bookmarked projects",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
           );
 
-          this.fixture.fetchPackageMock.resolves(barPkgWithFiles);
+          setupFetchProjectMocks(
+            td.barProjWithPackages,
+            this.fixture.obsFetchers
+          );
 
-          const pkgElement = new PackageTreeElement(barPkg);
+          const pkgElement = new BookmarkedPackageTreeElement(
+            packageBookmarkFromPackage(td.barPkg)
+          );
 
           const fileElements = await projectTree.getChildren(pkgElement);
 
-          this.fixture.sandbox.assert.calledOnce(this.fixture.fetchPackageMock);
-          this.fixture.sandbox.assert.notCalled(
-            this.fixture.mockMemento.update
-          );
+          expect(
+            await this.fixture.projectBookmarkManager!.getBookmarkedPackage(
+              td.barPkg.apiUrl,
+              td.barPkg.projectName,
+              td.barPkg.name
+            )
+          ).to.equal(undefined);
 
           // the project has not been updated, so if we try to get the children
           // again, we end up having to call fetchPackage again
           await projectTree
             .getChildren(pkgElement)
             .should.eventually.deep.equal(fileElements);
-          this.fixture.sandbox.assert.calledTwice(
-            this.fixture.fetchPackageMock
-          );
         })
       );
     });
@@ -595,7 +619,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         const myBookmarks = new MyBookmarksElement();
         projectTree.getTreeItem(myBookmarks).should.deep.equal(myBookmarks);
 
-        const obsServer = new ObsServerTreeElement(fakeAccount1);
+        const obsServer = new ObsServerTreeElement(td.fakeAccount1);
         projectTree.getTreeItem(obsServer).should.deep.equal(obsServer);
 
         const addBookmark = new AddBookmarkElement();
@@ -607,7 +631,9 @@ describe("BookmarkedProjectsTreeProvider", () => {
       "modifies the iconPath of a ProjectTreeElement",
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider();
-        const projElem = new ProjectTreeElement(fooProj);
+        const projElem = new BookmarkedProjectTreeElement(
+          projectBookmarkFromProject(td.fooProj)
+        );
         const projTreeItem = projectTree.getTreeItem(projElem);
 
         projTreeItem.should.have
@@ -620,7 +646,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
       "adds a command to fetch the file contents to a FileTreeElement",
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider();
-        const fileElem = new FileTreeElement(fooProj.apiUrl, fileA);
+        const fileElem = new FileTreeElement(td.fooProj.apiUrl, td.fileA);
         projectTree
           .getTreeItem(fileElem)
           .should.have.property("command")
@@ -632,63 +658,80 @@ describe("BookmarkedProjectsTreeProvider", () => {
   });
 
   describe("#updatePackage", () => {
-    const projTreeItem = new ProjectTreeElement(
-      barProjWithPackagesWithoutFiles
+    const projTreeItem = new BookmarkedProjectTreeElement(
+      projectBookmarkFromProject(td.barProjWithPackagesWithoutFiles)
     );
-    const pkgTreeItem = new PackageTreeElement(barPkg);
+    const pkgTreeItem = new BookmarkedPackageTreeElement(
+      packageBookmarkFromPackage(td.barPkg)
+    );
 
     it(
       "tries to refetch the package contents",
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-          [[fakeAccount1.apiUrl, [barProjWithPackagesWithoutFiles]]]
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+          [[td.fakeAccount1.apiUrl, [td.barProjWithPackagesWithoutFiles]]]
         );
 
-        this.fixture.fetchProjectMock.resolves(barProjWithPackagesWithoutFiles);
-        this.fixture.fetchPackageMock.resolves(barPkgWithFiles);
+        const initialBookmark = await this.fixture.projectBookmarkManager!.getBookmarkedProject(
+          td.barProj.apiUrl,
+          td.barProj.name,
+          RefreshBehavior.FetchWhenMissing
+        );
+        expect(initialBookmark).to.deep.include(td.barProj);
+        expect(initialBookmark!.packages)
+          .to.be.an("array")
+          .and.have.length(td.barProjWithPackages.packages!.length);
+
+        setupFetchProjectMocks(
+          td.barProjWithPackages,
+          this.fixture.obsFetchers
+        );
 
         await projectTree.updatePackage(pkgTreeItem);
 
-        this.fixture.fetchPackageMock.should.have.been.calledOnceWithExactly(
-          fakeApi1ValidAcc.connection,
-          barProjWithPackagesWithoutFiles.name,
-          barPkg.name,
+        this.fixture.obsFetchers.fetchPackage.should.have.been.calledWithExactly(
+          match({ url: td.fakeApi1ValidAcc.connection.url }),
+          td.barProjWithPackagesWithoutFiles.name,
+          td.barPkg.name,
           { retrieveFileContents: false, expandLinks: true }
         );
-        this.fixture.fetchPackageMock.reset();
-        this.fixture.fetchProjectMock.reset();
+        this.fixture.obsFetchers.fetchPackage.reset();
+        this.fixture.obsFetchers.fetchProject.reset();
 
         // verify that the updated package contents are there:
         await this.fixture
           .projectBookmarkManager!.getBookmarkedProject(
-            barProj.apiUrl,
-            barProj.name,
+            td.barProj.apiUrl,
+            td.barProj.name,
             RefreshBehavior.FetchWhenMissing
           )
-          .should.eventually.deep.equal(barProjWithPackages);
+          .should.eventually.deep.include({
+            ...td.barProjWithPackages,
+            state: BookmarkState.Ok
+          });
 
-        this.fixture.fetchProjectMock.should.have.callCount(0);
-        this.fixture.fetchPackageMock.should.have.callCount(0);
+        this.fixture.obsFetchers.fetchProject.should.have.callCount(0);
+        this.fixture.obsFetchers.fetchPackage.should.have.callCount(0);
       })
     );
 
     it(
       "does not add additional packages to the bookmarks",
       castToAsyncFunc<FixtureContext>(async function () {
-        const bar2Pkg: obs_ts.Package = {
-          apiUrl: fakeAccount1.apiUrl,
+        const bar2Pkg: obs_api.Package = {
+          apiUrl: td.fakeAccount1.apiUrl,
           name: "bar2",
-          projectName: barProj.name
+          projectName: td.barProj.name
         };
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
           [
             [
-              fakeAccount1.apiUrl,
+              td.fakeAccount1.apiUrl,
               [
                 {
-                  ...barProj,
+                  ...td.barProj,
                   packages: [bar2Pkg]
                 }
               ]
@@ -696,22 +739,28 @@ describe("BookmarkedProjectsTreeProvider", () => {
           ]
         );
 
-        this.fixture.fetchProjectMock.resolves({
-          ...barProj,
-          packages: [bar2Pkg, barPkgWithFiles]
-        });
+        setupFetchProjectMocks(
+          {
+            ...td.barProj,
+            packages: [bar2Pkg, td.barPkgWithFiles]
+          },
+          this.fixture.obsFetchers
+        );
 
         await projectTree.updatePackage(pkgTreeItem);
 
-        await this.fixture
-          .projectBookmarkManager!.getBookmarkedProject(
-            barProj.apiUrl,
-            barProj.name
-          )
-          .should.eventually.deep.equal({
-            ...barProj,
-            packages: [bar2Pkg]
-          });
+        const projBookmark = await this.fixture.projectBookmarkManager!.getBookmarkedProject(
+          td.barProj.apiUrl,
+          td.barProj.name
+        );
+        isProjectBookmark(projBookmark).should.equal(true);
+
+        expect(projBookmark).to.deep.include({
+          ...td.barProj,
+          state: BookmarkState.Ok
+        });
+        expect(projBookmark!.packages).to.be.an("array").and.have.length(1);
+        expect(projBookmark!.packages![0]).to.deep.include(bar2Pkg);
       })
     );
 
@@ -720,7 +769,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
           [],
-          [[fakeAccount1.apiUrl, [barProjWithPackagesWithoutFiles]]]
+          [[td.fakeAccount1.apiUrl, [td.barProjWithPackagesWithoutFiles]]]
         );
 
         await projectTree.updatePackage(pkgTreeItem);
@@ -733,7 +782,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
       "does not save a package in the bookmarks whose parent project is not bookmarked",
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
           []
         );
 
@@ -748,7 +797,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
           [],
-          [[fakeAccount1.apiUrl, [barProjWithPackagesWithoutFiles]]]
+          [[td.fakeAccount1.apiUrl, [td.barProjWithPackagesWithoutFiles]]]
         );
 
         await projectTree.updatePackage(projTreeItem);
@@ -760,18 +809,23 @@ describe("BookmarkedProjectsTreeProvider", () => {
   });
 
   describe("#bookmarkProjectCommand", () => {
-    it(
+    xit(
       "adds a project to the bookmarks including all packages",
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-          [[fakeAccount1.apiUrl, [barProj]]]
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+          [[td.fakeAccount1.apiUrl, [td.barProj]]]
         );
 
         // project selection
-        this.fixture.vscodeWindow.showInputBox.onCall(0).resolves(fooProj.name);
+        this.fixture.vscodeWindow.showInputBox
+          .onCall(0)
+          .resolves(td.fooProj.name);
 
-        this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
+        setupFetchProjectMocks(
+          td.fooProjWithPackages,
+          this.fixture.obsFetchers
+        );
 
         await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
 
@@ -783,21 +837,23 @@ describe("BookmarkedProjectsTreeProvider", () => {
           })
         );
 
-        await this.fixture
-          .projectBookmarkManager!.getBookmarkedProject(
-            fooProj.apiUrl,
-            fooProj.name
-          )
-          .should.eventually.deep.equal(fooProjWithPackages);
+        const bookmark = await this.fixture.projectBookmarkManager!.getBookmarkedProject(
+          td.fooProj.apiUrl,
+          td.fooProj.name
+        );
+        expect(bookmark).to.deep.include(td.fooProj);
+        expect(bookmark!.packages)
+          .to.be.an("array")
+          .and.have.length(td.fooProjWithPackages.packages!.length);
       })
     );
 
     describe("add a project with many packages", () => {
-      const projWith12Packages: obs_ts.Project = {
-        apiUrl: fakeAccount1.apiUrl,
+      const projWith12Packages: obs_api.Project = {
+        apiUrl: td.fakeAccount1.apiUrl,
         name: "devl",
         packages: [...Array(12).keys()].map((num) => ({
-          apiUrl: fakeAccount1.apiUrl,
+          apiUrl: td.fakeAccount1.apiUrl,
           name: `pkg_${num}`,
           projectName: "devl"
         }))
@@ -808,28 +864,20 @@ describe("BookmarkedProjectsTreeProvider", () => {
           .onCall(0)
           .resolves(projWith12Packages.name);
 
-        this.fixture.fetchProjectMock.resolves(projWith12Packages);
+        setupFetchProjectMocks(projWith12Packages, this.fixture.obsFetchers);
       });
 
-      it(
+      xit(
         "includes all packages when the user says so",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [barProj]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.barProj]]]
           );
 
-          this.fixture.vscodeWindow.showInformationMessage
-            .onCall(0)
-            .resolves("Yes");
+          // this.fixture.vscodeWindow.showQuickPick.resolves()
 
           await projectTree.bookmarkProjectCommand(new AddBookmarkElement());
-
-          this.fixture.vscodeWindow.showInformationMessage.should.have.been.calledOnceWith(
-            "This project has 12 packages, add them all?",
-            "Yes",
-            "No"
-          );
 
           this.fixture.mockMemento.update.should.have.been.calledOnce;
           // const [_key, newBookmarks] = this.fixture.mockMemento.update.getCall(
@@ -837,7 +885,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           // ).args;
 
           // newBookmarks.should.deep.equal([
-          //   [fakeAccount1.apiUrl, [barProj, projWith12Packages]]
+          //   [td.fakeAccount1.apiUrl, [td.barProj, projWith12Packages]]
           // ]);
 
           // this.fixture.projectBookmarkManager!.getBookmarkedProject()
@@ -848,8 +896,8 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "doesn't bookmark the project if the user let's the prompt whether add all packages time out",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [barProj]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.barProj]]]
           );
 
           this.fixture.vscodeWindow.showInformationMessage
@@ -868,8 +916,8 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "asks the user which packages to include and bookmarks only these",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [barProj]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.barProj]]]
           );
 
           const pickedPkgNames = ["pkg_2", "pkg_5", "pkg_6", "pkg_10"];
@@ -893,20 +941,25 @@ describe("BookmarkedProjectsTreeProvider", () => {
           );
           quickPickOptions.should.deep.include({ canPickMany: true });
 
-          await this.fixture
-            .projectBookmarkManager!.getBookmarkedProject(
-              projWith12Packages.apiUrl,
-              projWith12Packages.name
-            )
-            .should.eventually.deep.equal({
-              apiUrl: projWith12Packages.apiUrl,
-              name: projWith12Packages.name,
-              packages: projWith12Packages.packages!.filter(
-                (pkg) =>
-                  pickedPkgNames.find((pkgName) => pkg.name === pkgName) !==
-                  undefined
+          const bookmark = await this.fixture.projectBookmarkManager!.getBookmarkedProject(
+            projWith12Packages.apiUrl,
+            projWith12Packages.name
+          );
+          expect(bookmark).to.deep.include({
+            apiUrl: projWith12Packages.apiUrl,
+            name: projWith12Packages.name
+          });
+
+          expect(bookmark?.packages)
+            .to.be.an("array")
+            .and.have.length(pickedPkgNames.length);
+          for (const pkgBkmrk of bookmark!.packages!) {
+            pkgBkmrk.should.deep.include(
+              projWith12Packages.packages!.find(
+                (pkg) => pkg.name === pkgBkmrk.name
               )
-            });
+            );
+          }
         })
       );
 
@@ -914,8 +967,8 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "asks the user which packages to include but does not bookmark anything if the prompt times out",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-            [[fakeAccount1.apiUrl, [barProj]]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+            [[td.fakeAccount1.apiUrl, [td.barProj]]]
           );
 
           this.fixture.vscodeWindow.showInformationMessage
@@ -954,7 +1007,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
       "does not bookmark anything if the user does not provide a project name",
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]]
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
         );
 
         this.fixture.vscodeWindow.showInputBox.onCall(0).resolves(undefined);
@@ -972,14 +1025,16 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
       beforeEach(function () {
         this.fixture.vscodeWindow.showInputBox.onCall(0).resolves(projName);
-        this.fixture.fetchProjectMock.onCall(0).throws(Error(errMsg));
+        this.fixture.obsFetchers.fetchProject
+          .onCall(0)
+          .throws(new Error(errMsg));
       });
 
       it(
         "does not bookmark anything if the project cannot be fetched and the user does not want to add it",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
           );
 
           this.fixture.vscodeWindow.showErrorMessage
@@ -990,7 +1045,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           this.fixture.vscodeWindow.showInputBox.should.have.been.calledOnce;
           this.fixture.vscodeWindow.showErrorMessage.calledOnceWith(
-            `Adding a bookmark for the project ${projName} using the account ${fakeAccount1.accountName} failed with: Error: ${errMsg}.`,
+            `Adding a bookmark for the project ${projName} using the account ${td.fakeAccount1.accountName} failed with: Error: ${errMsg}.`,
             "Add anyway",
             "Cancel"
           );
@@ -1002,7 +1057,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         "bookmarks a project that failed to load when instructed to do so",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[fakeAccount1.apiUrl, fakeApi1ValidAcc]]
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
           );
 
           this.fixture.vscodeWindow.showErrorMessage
@@ -1018,47 +1073,19 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await this.fixture
             .projectBookmarkManager!.getBookmarkedProject(
-              fakeAccount1.apiUrl,
+              td.fakeAccount1.apiUrl,
               projName,
               RefreshBehavior.Never
             )
-            .should.eventually.deep.equal({
-              apiUrl: fakeAccount1.apiUrl,
+            .should.eventually.deep.include({
+              apiUrl: td.fakeAccount1.apiUrl,
+              state: BookmarkState.RemoteGone,
               name: projName,
               packages: undefined
             });
         })
       );
     });
-
-    xit(
-      "uses the correct connection when bookmarking projects from a ObsServerTreeElement",
-      castToAsyncFunc<FixtureContext>(async function () {
-        const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [
-            [fakeAccount1.apiUrl, fakeApi1ValidAcc],
-            [fakeAccount2.apiUrl, fakeApi2ValidAcc]
-          ]
-        );
-
-        const fakeApi1ObsServerTreeElement = new ObsServerTreeElement(
-          fakeAccount1
-        );
-
-        this.fixture.vscodeWindow.showInputBox.onCall(0).resolves(fooProj.name);
-
-        this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
-
-        await projectTree.bookmarkProjectCommand(fakeApi1ObsServerTreeElement);
-
-        this.fixture.sandbox.assert.calledOnce(this.fixture.mockMemento.update);
-        this.fixture.mockMemento.update
-          .getCall(0)
-          .args[1].should.deep.equal([
-            [fakeAccount1.apiUrl, [fooProjWithPackages]]
-          ]);
-      })
-    );
   });
 
   describe("#removeBookmark", () => {
@@ -1066,25 +1093,28 @@ describe("BookmarkedProjectsTreeProvider", () => {
       "removes a bookmarked project",
       castToAsyncFunc<FixtureContext>(async function () {
         const projects = [
-          fooProj,
-          barProj,
-          { apiUrl: fakeAccount1.apiUrl, name: "another_project" }
+          td.fooProj,
+          td.barProj,
+          { apiUrl: td.fakeAccount1.apiUrl, name: "another_project" }
         ];
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-          [[fakeAccount1.apiUrl, projects]]
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+          [[td.fakeAccount1.apiUrl, projects]]
         );
 
-        const projElem = new ProjectTreeElement(barProj);
+        const projElem = new BookmarkedProjectTreeElement(
+          projectBookmarkFromProject(td.barProj)
+        );
 
         await projectTree.removeBookmark(projElem);
 
-        this.fixture.sandbox.assert.calledOnce(this.fixture.mockMemento.update);
-        this.fixture.mockMemento.update
-          .getCall(0)
-          .args[1].should.deep.equal([
-            [fakeAccount1.apiUrl, [fooProj, projects[2]]]
-          ]);
+        this.fixture.mockMemento.update.should.have.been.calledOnce;
+        expect(
+          await this.fixture.projectBookmarkManager!.getBookmarkedProject(
+            td.barProj.apiUrl,
+            td.barProj.name
+          )
+        ).to.equal(undefined);
       })
     );
   });
@@ -1094,16 +1124,21 @@ describe("BookmarkedProjectsTreeProvider", () => {
       "updates the active project when fetching it succeeds",
       castToAsyncFunc<FixtureContext>(async function () {
         const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-          [[fakeAccount1.apiUrl, [fooProjWithPackages]]]
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+          [[td.fakeAccount1.apiUrl, [td.fooProjWithPackages]]]
         );
 
-        this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
+        setupFetchProjectMocks(
+          td.fooProjWithPackages,
+          this.fixture.obsFetchers
+        );
 
-        const projElem = new ProjectTreeElement(fooProj);
+        const projElem = new BookmarkedProjectTreeElement(
+          projectBookmarkFromProject(td.fooProj)
+        );
 
         await vscode.commands.executeCommand(UPDATE_PROJECT_COMMAND, projElem);
-        this.fixture.mockMemento.update.should.have.callCount(0);
+        // this.fixture.mockMemento.update.should.have.callCount(0);
 
         // now we have to check that the project tree provider is actually aware
         // of this change, do that via getChildren() as we cannot access the
@@ -1112,38 +1147,36 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         expect(pkgElems)
           .to.be.an("array")
-          .and.have.length(fooProjWithPackages.packages!.length);
+          .and.have.length(td.fooProjWithPackages.packages!.length);
 
         pkgElems.forEach((elem, i) => {
           isPackageTreeElement(elem).should.be.true;
           elem.should.deep.include({
-            packageName: fooProjWithPackages.packages![i].name,
-            parentProject: new BaseProject(fooProjWithPackages)
+            label: td.fooProjWithPackages.packages![i].name,
+            parentProject: new BaseProject(td.fooProjWithPackages)
           });
         });
       })
     );
 
-    xit(
+    it(
       "updates the project bookmark when fetching it succeeds",
       castToAsyncFunc<FixtureContext>(async function () {
         await this.fixture.createBookmarkedProjectsTreeProvider(
-          [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
-          [[fakeAccount1.apiUrl, [fooProjWithPackages]]]
+          [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
+          [[td.fakeAccount1.apiUrl, [td.fooProjWithPackages]]]
         );
 
-        this.fixture.fetchProjectMock.resolves(fooProjWithPackages);
+        setupFetchProjectMocks(
+          td.fooProjWithPackages,
+          this.fixture.obsFetchers
+        );
 
-        const projElem = new ProjectTreeElement(fooProj);
+        const projElem = new ProjectTreeElement(td.fooProj);
 
         await vscode.commands.executeCommand(UPDATE_PROJECT_COMMAND, projElem);
 
-        this.fixture.sandbox.assert.calledOnce(this.fixture.mockMemento.update);
-        this.fixture.mockMemento.update
-          .getCall(0)
-          .args[1].should.deep.equal([
-            [fakeAccount1.apiUrl, [fooProjWithPackages]]
-          ]);
+        this.fixture.mockMemento.update.should.have.been.calledOnce;
       })
     );
 
@@ -1164,10 +1197,10 @@ describe("BookmarkedProjectsTreeProvider", () => {
       castToAsyncFunc<FixtureContext>(async function () {
         await this.fixture.createBookmarkedProjectsTreeProvider(
           [],
-          [[fakeAccount1.apiUrl, [fooProj]]]
+          [[td.fakeAccount1.apiUrl, [td.fooProj]]]
         );
 
-        const fooProjTreeElem = new ProjectTreeElement(fooProj);
+        const fooProjTreeElem = new ProjectTreeElement(td.fooProj);
 
         await vscode.commands.executeCommand(
           UPDATE_PROJECT_COMMAND,
@@ -1176,7 +1209,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
         this.fixture.vscodeWindow.showErrorMessage.should.have.been.calledOnceWith(
           match(
-            `Cannot fetch project ${fooProj.name} from ${fooProj.apiUrl}: no account is configured`
+            `Cannot fetch project ${td.fooProj.name} from ${td.fooProj.apiUrl}: no account is configured`
           )
         );
         this.fixture.sandbox.assert.notCalled(this.fixture.mockMemento.update);

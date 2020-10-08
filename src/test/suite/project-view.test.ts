@@ -19,31 +19,27 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import * as vscode from "vscode";
+import { promises as fsPromises } from "fs";
 import { Context } from "mocha";
+import { rmRf, Project } from "open-build-service-api";
+import { tmpdir } from "os";
+import { sep } from "path";
 import { createSandbox } from "sinon";
 import { AccountMapInitializer, FakeAccountManager } from "./fakes";
-import { createStubbedVscodeWindow, LoggingFixture } from "./test-utils";
+import {
+  createStubbedVscodeWindow,
+  LoggingFixture,
+  testLogger
+} from "./test-utils";
+import { ProjectBookmarkManager } from "../../project-bookmarks";
+import { ApiUrl } from "../../accounts";
 
-export class ProjectViewFixture extends LoggingFixture {
-  public fakeAccountManager?: FakeAccountManager;
+// export class ProjectViewFixture extends LoggingFixture {
+//   public readonly sandbox = createSandbox();
+//   public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
 
-  public readonly sandbox = createSandbox();
-  public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
-
-  public readonly fetchProjectMock = this.sandbox.stub();
-  public readonly fetchPackageMock = this.sandbox.stub();
-  public readonly fetchFileContentsMock = this.sandbox.stub();
-
-  public createFakeAccountManager(
-    initialAccountMap?: AccountMapInitializer
-  ): void {
-    this.fakeAccountManager = new FakeAccountManager(initialAccountMap);
-  }
-
-  public afterEach(ctx: Context) {
-    this.sandbox.restore();
-
-    super.afterEach(ctx);
-    this.dispose();
-  }
-}
+//   public readonly fetchProjectMock = this.sandbox.stub();
+//   public readonly fetchPackageMock = this.sandbox.stub();
+//   public readonly fetchFileContentsMock = this.sandbox.stub();
+// }
