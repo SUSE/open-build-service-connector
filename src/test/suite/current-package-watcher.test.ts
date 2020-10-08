@@ -23,9 +23,8 @@ import { expect } from "chai";
 import { promises as fsPromises } from "fs";
 import { afterEach, beforeEach, Context, describe, it, xit } from "mocha";
 import { ModifiedPackage } from "open-build-service-api";
-import { rmRf, sleep } from "open-build-service-api/lib/util";
-import { tmpdir } from "os";
-import { join, sep } from "path";
+import { sleep } from "open-build-service-api/lib/util";
+import { join } from "path";
 import { createSandbox, match } from "sinon";
 import * as vscode from "vscode";
 import {
@@ -112,8 +111,8 @@ describe("CurrentPackageWatcher", () => {
     this.fixture = fixture;
   });
 
-  afterEach(function () {
-    this.fixture.afterEach(this);
+  afterEach(async function () {
+    await this.fixture.afterEach(this);
   });
 
   describe("no package open", () => {
