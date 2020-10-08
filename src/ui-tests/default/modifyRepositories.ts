@@ -34,6 +34,7 @@ import {
   modifyProjectMeta,
   Package,
   packageFileFromBuffer,
+  pathExists,
   Project,
   ProjectMeta,
   setFileContentsAndCommit
@@ -42,7 +43,6 @@ import * as path from "path";
 import { join } from "path";
 import { Context } from "vm";
 import {
-  ActivityBar,
   EditorView,
   InputBox,
   QuickPickItem,
@@ -613,14 +613,6 @@ async function createTestProject(): Promise<void> {
     "This is really just for testing"
   );
   await setFileContentsAndCommit(testCon, fooSpec, "Add foo.spec");
-}
-
-async function ensureExtensionOpen() {
-  // open the extension beforehands and wait for a bit so that everything can
-  // initialize in the background
-  const activityBar = new ActivityBar();
-  await activityBar.getViewControl("Open Build Service").openView();
-  return activityBar;
 }
 
 async function openSpecFile(this: TestCtx): Promise<void> {

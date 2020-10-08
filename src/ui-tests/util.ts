@@ -19,14 +19,37 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import * as assert from "assert";
 import { expect } from "chai";
+import { promises as fsPromises } from "fs";
 import {
+  Arch,
+  Connection,
+  createPackage,
+  createProject,
+  Package,
+  PackageFile,
+  Project,
+  ProjectMeta
+} from "open-build-service-api";
+import {
+  ActivityBar,
+  EditorView,
+  InputBox,
   Notification,
+  NotificationType,
   SideBarView,
   TreeItem,
+  ViewItem,
   ViewItemAction,
-  ViewSection
+  ViewSection,
+  Workbench
 } from "vscode-extension-tester";
+import { getTmpPrefix } from "../test/suite/utilities";
+import { testUser } from "./testEnv";
+import path = require("path");
+
+export const BOOKMARKED_PROJECTS_SECTION_NAME = "Bookmarked Projects";
 
 /**
  * Dismisses the MS telemetry notification and returns a new array which
@@ -34,14 +57,61 @@ import {
  */
 export async function dismissMsTelemetryNotification(
   notifications: Notification[]
-): Promise<void> {
+): Promise<Notification[]> {
+  const nonTelemetryNotifications = [];
   for (const notif of notifications) {
     const msg = await notif.getMessage();
     if (msg.match(/collect.*usage.*data/i) !== null) {
       await notif.dismiss();
       await notif.getDriver().sleep(100);
+    } else {
+      nonTelemetryNotifications.push(notif);
     }
   }
+  return nonTelemetryNotifications;
+}
+
+/**
+ * Dismiss either the passed notifications or all currently existing ones in
+ * the notification center.
+ *
+ * @return The notifications that were dismissed.
+ */
+export async function dismissAllNotifications(
+  notifications?: Notification[]
+): Promise<Notification[]> {
+  const notif =
+    notifications ??
+    (await (await new Workbench().openNotificationsCenter()).getNotifications(
+      NotificationType.Any
+    ));
+  await Promise.all(notif.map((n) => n.dismiss()));
+  return notif;
+}
+
+export async function waitForNotifications({
+  notificationType = NotificationType.Any,
+  timeoutMs = 10000
+}: { notificationType?: NotificationType; timeoutMs?: number } = {}): Promise<
+  Notification[]
+> {
+  return promiseWithTimeout(
+    async () => {
+      const center = await new Workbench().openNotificationsCenter();
+      let notifications: Notification[] = [];
+
+      while (notifications.length === 0) {
+        await center.getDriver().sleep(500);
+        notifications = await center.getNotifications(notificationType);
+      }
+
+      return notifications;
+    },
+    timeoutMs,
+    {
+      errorMsg: `Did not receive any notifications in ${timeoutMs}ms.`
+    }
+  );
 }
 
 /**
@@ -54,6 +124,31 @@ export async function focusOnSection(
   await section.getDriver().sleep(100);
   await section.getDriver().actions().mouseMove(section).perform();
   return section;
+}
+
+interface LabeledObj {
+  getLabel(): Promise<string>;
+}
+
+/**
+ * Retrieve the labels of the supplied [[TreeItem]]s.
+ * **Caution:** you must call this function before performing any further
+ *              manipulations with the tree items, as they store some state
+ *              internally and get implicitly modified as well (see
+ *              https://github.com/redhat-developer/vscode-extension-tester/issues/158)
+ */
+export async function getLabelsOfTreeItems(
+  items: (LabeledObj | TreeItem | ViewItem)[] | void
+): Promise<string[]> {
+  if (items === undefined) {
+    return [];
+  }
+  assert(
+    items
+      .map((i) => typeof (i as any).getLabel === "function")
+      .filter((hasGetLabelFunc) => !hasGetLabelFunc).length === 0
+  );
+  return Promise.all((items as TreeItem[]).map((item) => item.getLabel()));
 }
 
 /**
@@ -72,4 +167,207 @@ export async function findAndClickButtonOnTreeItem(
   await button.getDriver().actions().mouseMove(treeItem).perform();
   await button.click();
   return button;
+}
+
+const apiUrl = testUser.apiUrl;
+const repository = [
+  {
+    name: "openSUSE_Tumbleweed",
+    path: [{ project: "openSUSE:Factory", repository: "snapshot" }],
+    arch: [Arch.I586, Arch.X86_64]
+  }
+];
+
+const testProjMeta: ProjectMeta = {
+  description: "Test project for UI tests of vscode-obs",
+  name: `home:${testUser.username}:vscode_obs_test`,
+  title: "Test Project for vscode-obs"
+};
+const testProj: Project = {
+  apiUrl,
+  meta: testProjMeta,
+  name: testProjMeta.name
+};
+
+const pkg: Package = {
+  apiUrl,
+  projectName: testProj.name,
+  name: "foo"
+};
+
+const fooSpec: PackageFile = {
+  name: "foo.spec",
+  projectName: testProj.name,
+  packageName: pkg.name,
+  contents: Buffer.from("well, not really a spec but good enough")
+};
+
+export async function createTestPackage(con: Connection): Promise<void> {
+  await createProject(con, testProjMeta);
+  await createPackage(
+    con,
+    testProj,
+    pkg.name,
+    "A test package",
+    "This is really just for testing"
+  );
+}
+
+export async function ensureExtensionOpen() {
+  // open the extension beforehands and wait for a bit so that everything can
+  // initialize in the background
+  const activityBar = new ActivityBar();
+  await activityBar.getViewControl("Open Build Service").openView();
+  return activityBar;
+}
+
+/**
+ * Creates a promise with an added timeout.
+ *
+ * @param promise  A function that returns the Promise to which a timeout should
+ *     be added.
+ * @param timeoutMs  The timeout in milliseconds
+ * @param errorMsg Optional error message with which the returned promise is
+ *     rejected if the timeout expires.
+ */
+export function promiseWithTimeout<T>(
+  promise: () => Promise<T>,
+  timeoutMs: number,
+  {
+    errorMsg,
+    finalizer
+  }: { errorMsg?: string; finalizer?: () => Promise<void> }
+): Promise<T> {
+  let tmout: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    tmout = setTimeout(
+      () => reject(new Error(errorMsg ?? `Timeout ${timeoutMs} expired`)),
+      timeoutMs
+    );
+  });
+
+  finalizer;
+
+  return Promise.race([promise(), timeoutPromise]).then(async (result) => {
+    clearTimeout(tmout);
+    return result;
+  });
+  // .finally(finalizer);
+}
+
+/**
+ * Wait for `timeoutMs` ms for the package bookmark of the package
+ * `projectName/packageName` to appear in the "My bookmarks" section.
+ */
+export function waitForPackageBookmark(
+  projectName: string,
+  packageName: string,
+  timeoutMs: number = 5000
+): Promise<TreeItem> {
+  return promiseWithTimeout(
+    async () => {
+      let pkgElem: TreeItem | undefined = undefined;
+      const bookmarkSection = await focusOnSection(
+        BOOKMARKED_PROJECTS_SECTION_NAME
+      );
+      while (pkgElem === undefined) {
+        await bookmarkSection.getDriver().sleep(500);
+
+        const myBookmarksItem = await bookmarkSection.findItem("My bookmarks");
+        expect(myBookmarksItem).to.not.equal(undefined);
+        const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
+        const childLabels = await Promise.all(
+          bookmarkChildren.map((c) => c.getLabel())
+        );
+        const projIndex = childLabels.findIndex((lbl) => lbl === projectName);
+        if (projIndex !== -1) {
+          if (!(await bookmarkChildren[projIndex].isSelected())) {
+            await bookmarkChildren[projIndex].select();
+          }
+          const pkgElements = await bookmarkChildren[projIndex].getChildren();
+
+          const pkgNames = await Promise.all(
+            pkgElements.map((p) => p.getLabel())
+          );
+          const pkgInd = pkgNames.findIndex((name) => name === packageName);
+          if (pkgInd !== -1) {
+            pkgElem = pkgElements[pkgInd];
+          }
+        }
+      }
+      return pkgElem;
+    },
+    timeoutMs,
+    {
+      errorMsg: `Failed to find the package bookmark ${projectName}/${packageName} in ${timeoutMs}ms`
+    }
+  );
+}
+
+export async function addProjectBookmark(
+  projectName: string,
+  packages?: string[]
+): Promise<void> {
+  const bookmarkSection = await focusOnSection(
+    BOOKMARKED_PROJECTS_SECTION_NAME
+  );
+  const addBookmarkItem = await bookmarkSection.findItem("Bookmark a Project");
+  expect(addBookmarkItem).to.not.be.undefined;
+
+  await addBookmarkItem!.click();
+  await bookmarkSection.getDriver().sleep(100);
+
+  await dismissAllNotifications();
+
+  const projectNameInput = await InputBox.create();
+  await projectNameInput.setText(projectName);
+  await projectNameInput.confirm();
+
+  const pkgSelectionInput = await InputBox.create();
+  const pkgs =
+    packages ??
+    (await Promise.all(
+      (await pkgSelectionInput.getQuickPicks()).map((pick) => pick.getLabel())
+    ));
+
+  for (const pkgName of pkgs) {
+    await pkgSelectionInput.setText(pkgName);
+    await pkgSelectionInput.selectQuickPick(pkgName);
+  }
+
+  await pkgSelectionInput.confirm();
+}
+
+/**
+ * Wait for `timeoutMs` milliseconds for the editor tab with the given title to
+ * appear. If it appears, then the corresponding [[Editor]] object is returned,
+ * otherwise an error is thrown.
+ */
+export function waitForEditorWindow(title: string, timeoutMs: number = 5000) {
+  return promiseWithTimeout(
+    async () => {
+      while (true) {
+        const editorView = new EditorView();
+        try {
+          const editor = await editorView.openEditor(title);
+          return editor;
+        } catch {
+          await editorView.getDriver().sleep(500);
+        }
+      }
+    },
+    timeoutMs,
+    {
+      errorMsg: `Failed to open the editor window with the title '${title}' in ${timeoutMs}ms`
+    }
+  );
+}
+
+/**
+ * Creates a temporary directory either in a subfolder of the environment
+ * variable `TMPDIR` or in the systems temporary folder.
+ * The path to the created temporary directory is returned.
+ */
+export function createTestTempDir(): Promise<string> {
+  return fsPromises.mkdtemp(path.join(getTmpPrefix(), "obs-connector"));
 }
