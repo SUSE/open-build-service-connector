@@ -39,18 +39,17 @@ import { RepositoryTreeProvider } from "./repository";
 import { PackageScmHistoryTree } from "./scm-history";
 import { PackageScm } from "./vcs";
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
   const showCollapseAll = true;
 
   const logFile = join(
-    context.logPath,
-    `vscode-obs.${new Date().getTime()}.log`
+    context.logUri.fsPath,
+    `open-build-service-connector.${new Date()
+      .toString()
+      .replace(/\s+/g, "_")}.log`
   );
-
   let options: pino.LoggerOptions;
   if (process.env.EXTENSION_DEBUG === "1") {
     options = {
