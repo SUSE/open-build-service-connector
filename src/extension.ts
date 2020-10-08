@@ -65,26 +65,24 @@ export async function activate(
         .get<pino.Level>("logLevel", "error")
     };
   }
-  await fsPromises.mkdir(context.logPath, { recursive: true });
+  await fsPromises.mkdir(context.logUri.fsPath, { recursive: true });
   const logger = pino(options, pino.destination(logFile));
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
-  const [projectBookmarks, currentPackageWatcher] = await Promise.all([
-    ProjectBookmarkManager.createProjectBookmarkManager(
-      context,
-      accountManager,
-      logger
-    ),
-    CurrentPackageWatcherImpl.createCurrentPackageWatcher(
-      accountManager,
-      logger
-    )
-  ]);
-
+  const projectBookmarkManager = await ProjectBookmarkManager.createProjectBookmarkManager(
+    context,
+    accountManager,
+    logger
+  );
+  const currentPackageWatcher = await CurrentPackageWatcherImpl.createCurrentPackageWatcher(
+    accountManager,
+    logger,
+    projectBookmarkManager
+  );
   const bookmarkedProjectsTreeProvider = new BookmarkedProjectsTreeProvider(
     accountManager,
-    projectBookmarks,
+    projectBookmarkManager,
     logger
   );
   const bookmarkedProjectsTree = vscode.window.createTreeView(
