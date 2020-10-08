@@ -443,10 +443,42 @@ class MetadataCache extends ConnectionListenerLoggerBase {
   }
 }
 
+type GetBookmarkedProjectRetT = ProjectBookmark | undefined;
+
+type GetBookmarkedPackageRetT = PackageBookmark | undefined;
+
 /**
  * Class that is responsible for storing project bookmarks.
  */
 export class ProjectBookmarkManager extends LoggingDisposableBase {
+  public static async getBookmarkedProjectCommand(
+    apiUrl?: ApiUrl,
+    projectName?: string,
+    refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
+  ): Promise<GetBookmarkedProjectRetT> {
+    return await vscode.commands.executeCommand<GetBookmarkedProjectRetT>(
+      GET_BOOKMARKED_PROJECT_COMMAND,
+      apiUrl,
+      projectName,
+      refreshBehavior
+    );
+  }
+
+  public static async getBookmarkedPackageCommand(
+    apiUrl?: ApiUrl,
+    projectName?: string,
+    packageName?: string,
+    refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
+  ): Promise<GetBookmarkedPackageRetT> {
+    return await vscode.commands.executeCommand<GetBookmarkedPackageRetT>(
+      GET_BOOKMARKED_PACKAGE_COMMAND,
+      apiUrl,
+      projectName,
+      packageName,
+      refreshBehavior
+    );
+  }
+
   public static async createProjectBookmarkManager(
     ctx: vscode.ExtensionContext,
     accountManager: AccountManager,
@@ -507,6 +539,11 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
         GET_BOOKMARKED_PROJECT_COMMAND,
         this.getBookmarkedProject,
         this
+      ),
+      vscode.commands.registerCommand(
+        GET_BOOKMARKED_PACKAGE_COMMAND,
+        this.getBookmarkedPackage,
+        this
       )
       // vscode.commands.registerCommand(
       //   UPDATE_AND_GET_BOOKMARKED_PROJECT_COMMAND,
@@ -554,7 +591,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
     apiUrl?: ApiUrl,
     projectName?: string,
     refreshBehavior: RefreshBehavior = RefreshBehavior.FetchWhenMissing
-  ): Promise<Project | undefined> {
+  ): Promise<GetBookmarkedProjectRetT> {
     if (apiUrl === undefined || projectName === undefined) {
       this.logger.debug(
         "getBookmarkedProject called without a valid apiUrl (%s) or projectName (%s)",

@@ -728,13 +728,11 @@ export class CurrentPackageWatcherImpl
         pkgFile
       } = RemotePackageFileContentProvider.uriToPackageFile(uri);
       [project, pkg] = await Promise.all([
-        vscode.commands.executeCommand<Project | undefined>(
-          GET_BOOKMARKED_PROJECT_COMMAND,
+        ProjectBookmarkManager.getBookmarkedProjectCommand(
           apiUrl,
           pkgFile.projectName
         ),
-        vscode.commands.executeCommand<Package | undefined>(
-          GET_BOOKMARKED_PACKAGE_COMMAND,
+        ProjectBookmarkManager.getBookmarkedPackageCommand(
           apiUrl,
           pkgFile.projectName,
           pkgFile.packageName
