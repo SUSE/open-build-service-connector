@@ -2,6 +2,7 @@ out
 node_modules
 .vscode-test/
 *.vsix
+.log/
 coverage/
 .nyc_output/
 documentation/
@@ -10,5 +11,5 @@ logfile.json
 test-resources/
 open-build-service/
 mocklibsecret/.mypy_cache/*
-src/ui-tests/repositoryTreeView/fakeHome/*
-src/ui-tests/repositoryTreeView/settings.json
+src/ui-tests/default/fakeHome/*
+src/ui-tests/default/settings.json
