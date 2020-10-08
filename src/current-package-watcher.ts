@@ -21,15 +21,16 @@
 
 import * as assert from "assert";
 import {
-  fetchPackage,
-  fetchProject,
+  Connection,
+  isProjectWithMeta,
   ModifiedPackage,
   Package,
   PackageFile,
   pathExists,
   PathType,
   Project,
-  readInCheckedOutProject,
+  ProjectWithMeta,
+  readInAndUpdateCheckedoutProject,
   readInModifiedPackageFromDir
 } from "open-build-service-api";
 import { basename, dirname, join, relative } from "path";
@@ -37,16 +38,26 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
-import { PackageBookmark, ProjectBookmark } from "./bookmarks";
+import {
+  isProjectBookmark,
+  PackageBookmark,
+  ProjectBookmark
+} from "./bookmarks";
 import { debounce } from "./decorators";
-import { VscodeWindow, VscodeWorkspace } from "./dependency-injection";
+import {
+  DEFAULT_OBS_FETCHERS,
+  ObsFetchers,
+  VscodeWindow,
+  VscodeWorkspace
+} from "./dependency-injection";
 import {
   OBS_PACKAGE_FILE_URI_SCHEME,
   RemotePackageFileContentProvider
 } from "./package-file-contents";
 import {
-  GET_BOOKMARKED_PACKAGE_COMMAND,
-  GET_BOOKMARKED_PROJECT_COMMAND
+  BookmarkUpdate,
+  ChangedObject,
+  ProjectBookmarkManager
 } from "./project-bookmarks";
 import { deepEqual } from "./util";
 import { getPkgPathFromVcsUri } from "./vcs";
@@ -59,7 +70,7 @@ export interface CurrentPackage {
    * The Project belonging to the currently opened file.
    * `undefined` if the file does not belong to any Project.
    */
-  readonly currentProject: Project | CheckedOutProject | undefined;
+  readonly currentProject: ProjectWithMeta | CheckedOutProject | undefined;
 
   /**
    *
@@ -92,7 +103,7 @@ const normalizePath = (path: string): string =>
 
 interface LocalPackage {
   pkg: ModifiedPackage;
-  project: Project;
+  project: ProjectWithMeta | CheckedOutProject;
   // FIXME: use CheckedOutProject instead?
   projectCheckedOut: boolean;
   packageWatcher: vscode.FileSystemWatcher;
@@ -114,7 +125,7 @@ export function isModifiedPackage(
   );
 }
 
-interface CheckedOutProject extends Project {
+export interface CheckedOutProject extends ProjectWithMeta {
   readonly checkoutPath: string;
 }
 
@@ -227,14 +238,18 @@ export class CurrentPackageWatcherImpl
   public static async createCurrentPackageWatcher(
     accountManager: AccountManager,
     logger: Logger,
+    bookmarkManager: ProjectBookmarkManager,
     vscodeWindow: VscodeWindow = vscode.window,
-    vscodeWorkspace: VscodeWorkspace = vscode.workspace
+    vscodeWorkspace: VscodeWorkspace = vscode.workspace,
+    obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ): Promise<CurrentPackageWatcher> {
     const pkgWatcher = new CurrentPackageWatcherImpl(
       accountManager,
       logger,
+      bookmarkManager.onBookmarkUpdate,
       vscodeWindow,
-      vscodeWorkspace
+      vscodeWorkspace,
+      obsFetchers
     );
 
     await Promise.all(
@@ -256,7 +271,7 @@ export class CurrentPackageWatcherImpl
 
   private watchedProjects = new Map<
     string,
-    { project: Project; watcher: vscode.FileSystemWatcher }
+    { project: Project; watcher?: vscode.FileSystemWatcher; con?: Connection }
   >();
 
   public get currentPackage(): CurrentPackage {
@@ -270,8 +285,10 @@ export class CurrentPackageWatcherImpl
   private constructor(
     accountManager: AccountManager,
     logger: Logger,
+    onBookmarkUpdate: vscode.Event<BookmarkUpdate>,
     private readonly vscodeWindow: VscodeWindow,
-    private readonly vscodeWorkspace: VscodeWorkspace
+    private readonly vscodeWorkspace: VscodeWorkspace,
+    private readonly obsFetchers: ObsFetchers
   ) {
     super(accountManager, logger);
     this.onDidChangeCurrentPackage = this.onDidChangeCurrentPackageEmitter.event;
@@ -280,7 +297,46 @@ export class CurrentPackageWatcherImpl
       this.vscodeWindow.onDidChangeActiveTextEditor(
         this.onActiveEditorChange,
         this
-      )
+      ),
+      onBookmarkUpdate(async (bookmarkUpdate) => {
+        if (
+          this.currentPackage === undefined ||
+          this.currentPackage.currentPackage === undefined
+        ) {
+          return;
+        }
+        if (bookmarkUpdate.changedObject === ChangedObject.Project) {
+          if (this.currentPackage.currentProject !== undefined) {
+            if (
+              this.currentPackage.currentProject.name ===
+                bookmarkUpdate.element.name &&
+              this.currentPackage.currentProject.apiUrl ===
+                bookmarkUpdate.element.apiUrl
+            ) {
+              await this.reloadCurrentPackage();
+            }
+          } else {
+            if (
+              this.currentPackage.currentPackage.projectName ===
+                bookmarkUpdate.element.name &&
+              this.currentPackage.currentPackage.apiUrl ===
+                bookmarkUpdate.element.apiUrl
+            ) {
+              await this.reloadCurrentPackage();
+            }
+          }
+        } else {
+          assert(bookmarkUpdate.changedObject === ChangedObject.Package);
+          if (
+            this.currentPackage.currentPackage.name ===
+              bookmarkUpdate.element.name &&
+            this.currentPackage.currentPackage.apiUrl ===
+              bookmarkUpdate.element.apiUrl
+          ) {
+            await this.reloadCurrentPackage();
+          }
+        }
+      }, this)
     );
   }
 
@@ -405,7 +461,7 @@ export class CurrentPackageWatcherImpl
           );
           return;
         }
-        const currentPackage = await fetchPackage(
+        const currentPackage = await this.obsFetchers.fetchPackage(
           con,
           this._currentPackage.currentPackage.projectName,
           this._currentPackage.currentPackage.name,
@@ -430,23 +486,6 @@ export class CurrentPackageWatcherImpl
         );
         // FIXME: remove this package now
       }
-    }
-  }
-
-  private async getProjectOfPackage(
-    packagePath: string
-  ): Promise<Project | undefined> {
-    const potentialProjPath = dirname(packagePath);
-    const wsFolder = this.vscodeWorkspace.getWorkspaceFolder(
-      vscode.Uri.file(potentialProjPath)
-    );
-    if (wsFolder === undefined) {
-      return undefined;
-    }
-    try {
-      return readInCheckedOutProject(potentialProjPath);
-    } catch {
-      return undefined;
     }
   }
 
@@ -478,13 +517,16 @@ export class CurrentPackageWatcherImpl
       );
       return;
     }
+    const { con, watcher } = watchedProj;
 
     try {
-      const project = await readInCheckedOutProject(projKey);
-      this.watchedProjects.set(projKey, {
-        project,
-        watcher: watchedProj.watcher
-      });
+      if (con === undefined) {
+        throw new Error(
+          `Cannot fetch project metadata from the API '${watchedProj.project.apiUrl}': no account is defined`
+        );
+      }
+      const project = await readInAndUpdateCheckedoutProject(con, projKey);
+      this.watchedProjects.set(projKey, { project, watcher, con });
       if (this._currentPackage.currentProject !== undefined) {
         const isCur = isCheckedOutProject(this._currentPackage.currentProject)
           ? this._currentPackage.currentProject.checkoutPath === projKey
@@ -501,7 +543,7 @@ export class CurrentPackageWatcherImpl
         projKey,
         (err as Error).toString()
       );
-      this.watchedProjects.get(projKey)?.watcher.dispose();
+      watcher?.dispose();
       this.watchedProjects.delete(projKey);
     }
   }
@@ -614,11 +656,37 @@ export class CurrentPackageWatcherImpl
           );
           const remotePkg = this.remotePackages.get(editor.document.uri);
           if (remotePkg !== undefined) {
+            let currentProject: ProjectWithMeta;
+            const remoteProj = remotePkg.project;
+            if (
+              remoteProj.meta === undefined ||
+              !isProjectBookmark(remoteProj)
+            ) {
+              const con = this.activeAccounts.getConfig(
+                remotePkg.project.apiUrl
+              )?.connection;
+              if (con === undefined) {
+                throw new Error(
+                  `Could not get a connection for the api '${remotePkg.project.apiUrl}' but one must exist as this belongs to a remote package`
+                );
+              }
+              currentProject = await this.obsFetchers.fetchProject(
+                con,
+                remotePkg.project.name,
+                {
+                  fetchPackageList: true
+                }
+              );
+            } else {
+              assert(isProjectWithMeta(remoteProj));
+              currentProject = remoteProj;
+            }
             return {
-              currentProject: remotePkg.project,
+              currentProject,
               currentPackage: remotePkg.pkg,
               currentFilename,
               properties: {
+                // FIXME: the true branch is probably unreachable
                 checkedOutPath: isCheckedOutProject(remotePkg.project)
                   ? remotePkg.project.checkoutPath
                   : undefined
@@ -721,7 +789,7 @@ export class CurrentPackageWatcherImpl
       uri.toString()
     );
     if (uri.scheme === OBS_PACKAGE_FILE_URI_SCHEME) {
-      let project: Project | undefined;
+      let project;
       let pkg: Package | undefined;
       const {
         apiUrl,
@@ -739,7 +807,11 @@ export class CurrentPackageWatcherImpl
         )
       ]);
 
-      if (project === undefined || pkg === undefined) {
+      if (
+        project === undefined ||
+        pkg === undefined ||
+        !isProjectWithMeta(project)
+      ) {
         // apparently this is not a bookmark, try to fetch the project/package instead
         const con = this.activeAccounts.getConfig(apiUrl)?.connection;
         if (con === undefined) {
@@ -753,9 +825,13 @@ export class CurrentPackageWatcherImpl
         } else {
           try {
             if (project === undefined) {
-              project = await fetchProject(con, pkgFile.projectName, {
-                fetchPackageList: true
-              });
+              project = await this.obsFetchers.fetchProject(
+                con,
+                pkgFile.projectName,
+                {
+                  fetchPackageList: true
+                }
+              );
             }
           } catch (err) {
             this.logger.error(
@@ -770,7 +846,7 @@ export class CurrentPackageWatcherImpl
 
           try {
             if (pkg === undefined) {
-              pkg = await fetchPackage(
+              pkg = await this.obsFetchers.fetchPackage(
                 con,
                 pkgFile.projectName,
                 pkgFile.packageName,
@@ -801,7 +877,10 @@ export class CurrentPackageWatcherImpl
       }
 
       return {
-        currentProject: project,
+        currentProject:
+          project !== undefined && isProjectWithMeta(project)
+            ? project
+            : undefined,
         currentPackage: pkg,
         currentFilename: basename(uri.toString())
         // FIXME: find out if the project is checked out somewhere
@@ -858,12 +937,28 @@ export class CurrentPackageWatcherImpl
           fsPath
         );
 
-        const proj = await this.getProjectOfPackage(fsPath);
+        const projPath = dirname(fsPath);
+        const con = this.activeAccounts.getConfig(pkg.apiUrl)?.connection;
+
+        if (con === undefined) {
+          throw new Error(
+            `Cannot fetch project via from the API '${pkg.apiUrl}': no account is configured`
+          );
+        }
+
+        let proj: ProjectWithMeta | undefined;
+        try {
+          proj = await readInAndUpdateCheckedoutProject(con, projPath);
+        } catch (err) {
+          this.logger.trace(
+            "Got the following error while reading in a project from %s: %s",
+            projPath,
+            err.toString()
+          );
+          proj = undefined;
+        }
 
         if (proj !== undefined) {
-          // the package has a parent project that needs to be watched
-          const projPath = dirname(fsPath);
-
           this.logger.trace("Found project in %s: %s", projPath, proj.name);
 
           const watchedProj = this.watchedProjects.get(projPath);
@@ -871,37 +966,38 @@ export class CurrentPackageWatcherImpl
             const wsFolder = this.vscodeWorkspace.getWorkspaceFolder(
               vscode.Uri.file(projPath)
             );
+            // we need to handle the case where the project does not belong to
+            // the workspace:
+            // we still want to be able to read it in, but we do not want to add
+            // to the watched projects
+            // FIXME: or do we?
+            let watcher: undefined | vscode.FileSystemWatcher;
+
             if (wsFolder === undefined) {
-              // FIXME: should we actually bail out here?
-              // the package belonging to a workspace, but the project not could
-              // be a valid case
-              this.logger.error(
+              this.logger.debug(
                 "Cannot get workspace folder from project in path: %s",
                 projPath
               );
-              return EMPTY_CURRENT_PACKAGE;
+            } else {
+              const relPath = relative(wsFolder.uri.fsPath, projPath);
+              watcher = this.vscodeWorkspace.createFileSystemWatcher(
+                new vscode.RelativePattern(wsFolder, `${relPath}/.osc*/*`)
+              );
+
+              this.disposables.push(
+                watcher,
+                watcher.onDidChange(this.projUpdateCallback, this),
+                watcher.onDidCreate(this.projUpdateCallback, this),
+                watcher.onDidDelete(this.projUpdateCallback, this)
+              );
             }
-            const relPath = relative(wsFolder.uri.fsPath, projPath);
-            const projWatcher = this.vscodeWorkspace.createFileSystemWatcher(
-              new vscode.RelativePattern(wsFolder, `${relPath}/.osc*/*`)
-            );
 
-            this.disposables.push(
-              projWatcher,
-              projWatcher.onDidChange(this.projUpdateCallback, this),
-              projWatcher.onDidCreate(this.projUpdateCallback, this),
-              projWatcher.onDidDelete(this.projUpdateCallback, this)
-            );
-
-            this.watchedProjects.set(projPath, {
-              project: proj,
-              watcher: projWatcher
-            });
-
+            this.watchedProjects.set(projPath, { project: proj, watcher, con });
             this.logger.trace(
-              "Successfully registered the project %s in %s",
+              "Successfully registered the project '%s' in '%s'%s",
               proj.name,
-              projPath
+              projPath,
+              watcher === undefined ? "" : " with a filesystem watcher enabled"
             );
           }
         } else {
@@ -912,10 +1008,12 @@ export class CurrentPackageWatcherImpl
           );
         }
 
-        const currentProject = proj ?? {
-          name: pkg.projectName,
-          apiUrl: pkg.apiUrl
-        };
+        const currentProject =
+          proj ??
+          (await this.obsFetchers.fetchProject(con, pkg.projectName, {
+            fetchPackageList: true
+          }));
+
         this.localPackages.set(pkg.path, {
           pkg,
           project: currentProject,

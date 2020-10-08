@@ -28,15 +28,18 @@ import {
   modifyProjectMeta,
   Path,
   Project,
+  readInCheckedOutProject,
   updateCheckedOutProject
 } from "open-build-service-api";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
-import { ProjectBookmark } from "./bookmarks";
 import { cmdPrefix } from "./constants";
-import { CurrentPackageWatcher } from "./current-package-watcher";
+import {
+  CheckedOutProject,
+  CurrentPackageWatcher
+} from "./current-package-watcher";
 import { logAndReportExceptions } from "./decorators";
 import { VscodeWindow } from "./dependency-injection";
 import { GET_INSTANCE_INFO_COMMAND, ObsInstance } from "./instance-info";
@@ -221,7 +224,7 @@ export class RepositoryTreeProvider
   implements vscode.TreeDataProvider<RepositoryElement> {
   public onDidChangeTreeData: vscode.Event<RepositoryElement | undefined>;
 
-  public currentProject: Project | ProjectBookmark | undefined;
+  public currentProject: Project | CheckedOutProject | undefined;
 
   private onDidChangeTreeDataEmitter: vscode.EventEmitter<
     RepositoryElement | undefined
@@ -307,15 +310,14 @@ export class RepositoryTreeProvider
   public async addRepositoryFromDistro(): Promise<void> {
     const con = this.getConnectionOfCurrentProject();
 
+    let meta = this.currentProject?.meta;
+
     // FIXME: what should we do if we need to fetch the meta?
-    if (this.currentProject!.meta === undefined) {
-      this.currentProject!.meta = await fetchProjectMeta(
-        con,
-        this.currentProject!.name
-      );
+    if (meta === undefined) {
+      meta = await fetchProjectMeta(con, this.currentProject!.name);
     }
     assert(
-      this.currentProject!.meta !== undefined,
+      meta !== undefined,
       "The project meta must be defined at this point"
     );
 
@@ -336,7 +338,7 @@ export class RepositoryTreeProvider
 
     const hostedDistros = instanceInfo.hostedDistributions;
 
-    const { repository, ...rest } = this.currentProject!.meta;
+    const { repository, ...rest } = meta;
     const presentRepos = deepCopyProperties(repository) ?? [];
 
     const distrosToAddNames = await this.vscodeWindow.showQuickPick(
@@ -496,7 +498,10 @@ export class RepositoryTreeProvider
       );
     }
 
-    assert(false, "This code should be unreachable");
+    assert(
+      false,
+      "This code must be unreachable, but reached it via a '${element.contextValue}'"
+    );
   }
 
   private async movePathUpOrDown(
@@ -714,7 +719,17 @@ export class RepositoryTreeProvider
     this.currentProject!.meta = newMeta;
 
     if (projFolder !== undefined) {
-      await updateCheckedOutProject(this.currentProject!, projFolder);
+      // FIXME: we must actually get the project's root folder as this is not
+      // necessarily the WorkspaceFolder of the current text editor
+      try {
+        const proj = await readInCheckedOutProject(projFolder);
+        if (
+          proj.name === activeProj.name &&
+          proj.apiUrl === activeProj.apiUrl
+        ) {
+          await updateCheckedOutProject(this.currentProject!, projFolder);
+        }
+      } catch {}
     }
 
     this.refresh();

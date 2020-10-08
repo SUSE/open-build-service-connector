@@ -79,7 +79,8 @@ class LocalFileTreeElement extends FileTreeElement {
   }
 }
 
-export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
+export class CurrentProjectTreeProvider
+  extends ConnectionListenerLoggerBase
   implements vscode.TreeDataProvider<ProjectTreeItem> {
   public onDidChangeTreeData: vscode.Event<ProjectTreeItem | undefined>;
 
@@ -111,7 +112,6 @@ export class CurrentProjectTreeProvider extends ConnectionListenerLoggerBase
         this.refresh();
       }, this),
       this.onDidChangeTreeDataEmitter,
-      // tslint:disable-next-line: variable-name
       this.onAccountChange((_apiUrls) => {
         this.refresh();
       })

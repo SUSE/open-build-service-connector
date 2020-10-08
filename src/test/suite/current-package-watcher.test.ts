@@ -34,6 +34,7 @@ import {
   EDITOR_CHANGE_DELAY_MS,
   EMPTY_CURRENT_PACKAGE
 } from "../../current-package-watcher";
+import { createTestTempDir } from "../../ui-tests/util";
 import { isUri } from "../../util";
 import {
   AccountMapInitializer,
@@ -43,16 +44,17 @@ import {
   FakeVscodeWorkspace,
   FakeWatcherType
 } from "./fakes";
+import { ProjectBookmarkManagerFixture } from "./project-bookmarks.test";
 import { fakeAccount1, fakeApi1ValidAcc } from "./test-data";
 import {
   castToAsyncFunc,
+  createStubbedObsFetchers,
   createStubbedVscodeWindow,
-  LoggingFixture,
   testLogger
 } from "./test-utils";
 import { safeRmRf } from "./utilities";
 
-class CurrentPackageWatcherFixture extends LoggingFixture {
+class CurrentPackageWatcherFixture extends ProjectBookmarkManagerFixture {
   public fakeAccountManager?: FakeAccountManager;
 
   public currentPackageWatcher: CurrentPackageWatcher | undefined = undefined;
@@ -63,9 +65,7 @@ class CurrentPackageWatcherFixture extends LoggingFixture {
 
   public vscodeWorkspace = new FakeVscodeWorkspace(this.sandbox);
 
-  constructor(ctx: Context) {
-    super(ctx);
-  }
+  public obsFetchers = createStubbedObsFetchers(this.sandbox);
 
   public getPackageFsWatchers(): FakeWatcherType[] {
     return this.vscodeWorkspace.fakeWatchers.filter((w) =>
@@ -76,41 +76,40 @@ class CurrentPackageWatcherFixture extends LoggingFixture {
     );
   }
 
-  public async createActivePackageWatcher(
+  public async createCurrentPackageWatcher(
     initialAccountMap?: AccountMapInitializer,
     activeTextEditor?: vscode.TextEditor,
     visibleTextEditors: vscode.TextEditor[] = []
   ): Promise<CurrentPackageWatcher> {
-    this.fakeAccountManager = new FakeAccountManager(initialAccountMap);
+    await this.createProjectBookmarkManager({ initialAccountMap });
     this.vscodeWindow.activeTextEditor = activeTextEditor;
     this.vscodeWindow.visibleTextEditors = visibleTextEditors;
     this.currentPackageWatcher = await CurrentPackageWatcherImpl.createCurrentPackageWatcher(
-      this.fakeAccountManager,
+      this.fakeAccountManager!,
       testLogger,
+      this.projectBookmarkManager!,
       this.vscodeWindow,
-      this.vscodeWorkspace
+      this.vscodeWorkspace,
+      this.obsFetchers
     );
 
     if (activeTextEditor !== undefined) {
       await sleep(1.5 * EDITOR_CHANGE_DELAY_MS);
     }
 
-    return this.currentPackageWatcher;
-  }
+    this.disposables.push(this.currentPackageWatcher);
 
-  public afterEach(ctx: Context) {
-    super.afterEach(ctx);
-    this.fakeAccountManager?.dispose();
-    this.currentPackageWatcher?.dispose();
-    this.sandbox.restore();
+    return this.currentPackageWatcher;
   }
 }
 
 type TestCtx = Context & { fixture: CurrentPackageWatcherFixture };
 
 describe("CurrentPackageWatcher", () => {
-  beforeEach(function () {
-    this.fixture = new CurrentPackageWatcherFixture(this);
+  beforeEach(async function () {
+    const fixture = new CurrentPackageWatcherFixture(this);
+    await fixture.beforeEach();
+    this.fixture = fixture;
   });
 
   afterEach(function () {
@@ -121,7 +120,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "has no package set as the default",
       castToAsyncFunc<TestCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher();
+        const watcher = await this.fixture.createCurrentPackageWatcher();
         expect(watcher.currentPackage).to.deep.equal(EMPTY_CURRENT_PACKAGE);
       })
     );
@@ -129,7 +128,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "sets no package if the active editor changes to undefined",
       castToAsyncFunc<TestCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher();
+        const watcher = await this.fixture.createCurrentPackageWatcher();
 
         const spy = this.fixture.sandbox.spy();
         watcher.onDidChangeCurrentPackage(spy);
@@ -147,7 +146,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "does not fire the event when a TextEditor is opened without a package",
       castToAsyncFunc<TestCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher();
+        const watcher = await this.fixture.createCurrentPackageWatcher();
 
         const spy = this.fixture.sandbox.spy();
         watcher.onDidChangeCurrentPackage(spy);
@@ -177,6 +176,10 @@ describe("CurrentPackageWatcher", () => {
     const basePkg = {
       name: packageName,
       projectName,
+      apiUrl: fakeAccount1.apiUrl
+    };
+    const baseProj = {
+      name: projectName,
       apiUrl: fakeAccount1.apiUrl
     };
 
@@ -209,6 +212,25 @@ describe("CurrentPackageWatcher", () => {
           match((v) => isUri(v) && v.toString() === tmpDirUri.toString())
         )
         .returns(createFakeWorkspaceFolder(tmpDirUri));
+      this.fixture.obsFetchers.fetchPackage
+        .withArgs(
+          match(fakeApi1ValidAcc.connection),
+          projectName,
+          packageName,
+          match({ retrieveFileContents: match.bool })
+        )
+        .resolves({ basePkg, files: [], meta: { title: "", description: "" } });
+      this.fixture.obsFetchers.fetchProject
+        .withArgs(
+          match(fakeApi1ValidAcc.connection),
+          projectName,
+          match({ fetchPackageList: true })
+        )
+        .resolves({
+          ...baseProj,
+          meta: { name: projectName, title: "", description: "" },
+          packages: [basePkg]
+        });
     });
 
     afterEach(() => safeRmRf(tmpDir));
@@ -216,7 +238,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "finds a locally checked out package",
       castToAsyncFunc<LocalFileCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher([
+        const watcher = await this.fixture.createCurrentPackageWatcher([
           [fakeAccount1.apiUrl, fakeApi1ValidAcc]
         ]);
 
@@ -236,10 +258,7 @@ describe("CurrentPackageWatcher", () => {
         expect(watcher.currentPackage.currentPackage).to.deep.include(
           getBasePkg()
         );
-        expect(watcher.currentPackage.currentProject).to.deep.include({
-          name: projectName,
-          apiUrl: fakeAccount1.apiUrl
-        });
+        expect(watcher.currentPackage.currentProject).to.deep.include(baseProj);
         testLogger.info("%s", watcher.currentPackage.currentFilename);
         expect(watcher.currentPackage.currentFilename).to.deep.equal(
           this.fooFileEditor.document.fileName
@@ -250,7 +269,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "ads the locally checked out package on launch into the registered packages",
       castToAsyncFunc<LocalFileCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher(
+        const watcher = await this.fixture.createCurrentPackageWatcher(
           [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
           this.fooFileEditor,
           [this.fooFileEditor]
@@ -271,7 +290,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "does not fire the event for untracked URI schemes",
       castToAsyncFunc<LocalFileCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher([
+        const watcher = await this.fixture.createCurrentPackageWatcher([
           [fakeAccount1.apiUrl, fakeApi1ValidAcc]
         ]);
 
@@ -295,7 +314,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "registers when a file changes in the package",
       castToAsyncFunc<LocalFileCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher(
+        const watcher = await this.fixture.createCurrentPackageWatcher(
           [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
           this.fooFileEditor,
           [this.fooFileEditor]
@@ -330,7 +349,7 @@ describe("CurrentPackageWatcher", () => {
         const apiUrlPath = join(tmpDir, ".osc", "_apiurl");
         await fsPromises.unlink(apiUrlPath);
 
-        const watcher = await this.fixture.createActivePackageWatcher(
+        const watcher = await this.fixture.createCurrentPackageWatcher(
           [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
           this.fooFileEditor,
           [this.fooFileEditor]
@@ -342,7 +361,7 @@ describe("CurrentPackageWatcher", () => {
     it(
       "does not emit an event when the package is unchanged",
       castToAsyncFunc<LocalFileCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher(
+        const watcher = await this.fixture.createCurrentPackageWatcher(
           [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
           this.fooFileEditor,
           [this.fooFileEditor]
@@ -372,7 +391,7 @@ describe("CurrentPackageWatcher", () => {
     xit(
       "discards the package if it does not belong to a workspace",
       castToAsyncFunc<LocalFileCtx>(async function () {
-        const watcher = await this.fixture.createActivePackageWatcher(
+        const watcher = await this.fixture.createCurrentPackageWatcher(
           [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
           this.fooFileEditor,
           [this.fooFileEditor]
@@ -399,7 +418,7 @@ describe("CurrentPackageWatcher", () => {
       castToAsyncFunc<LocalFileCtx>(async function () {
         this.fixture.vscodeWorkspace.getWorkspaceFolder.reset();
         this.fixture.vscodeWorkspace.getWorkspaceFolder.returns(undefined);
-        const watcher = await this.fixture.createActivePackageWatcher(
+        const watcher = await this.fixture.createCurrentPackageWatcher(
           [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
           this.fooFileEditor,
           [this.fooFileEditor]
@@ -413,7 +432,7 @@ describe("CurrentPackageWatcher", () => {
       it(
         "does nothing if no editor is open",
         castToAsyncFunc<TestCtx>(async function () {
-          const watcher = await this.fixture.createActivePackageWatcher(
+          const watcher = await this.fixture.createCurrentPackageWatcher(
             [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
             this.fooFileEditor,
             [this.fooFileEditor]
@@ -431,7 +450,7 @@ describe("CurrentPackageWatcher", () => {
       it(
         "reloads the current package and emits the event if it changed",
         castToAsyncFunc<TestCtx>(async function () {
-          const watcher = await this.fixture.createActivePackageWatcher(
+          const watcher = await this.fixture.createCurrentPackageWatcher(
             [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
             this.fooFileEditor,
             [this.fooFileEditor]
@@ -471,7 +490,7 @@ describe("CurrentPackageWatcher", () => {
       it(
         "removes the current package if it got destroyed",
         castToAsyncFunc<TestCtx>(async function () {
-          const watcher = await this.fixture.createActivePackageWatcher(
+          const watcher = await this.fixture.createCurrentPackageWatcher(
             [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
             this.fooFileEditor,
             [this.fooFileEditor]
@@ -495,7 +514,7 @@ describe("CurrentPackageWatcher", () => {
       it(
         "does not emit an event if the current package is unchanged",
         castToAsyncFunc<TestCtx>(async function () {
-          const watcher = await this.fixture.createActivePackageWatcher(
+          const watcher = await this.fixture.createCurrentPackageWatcher(
             [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
             this.fooFileEditor,
             [this.fooFileEditor]
@@ -520,7 +539,7 @@ describe("CurrentPackageWatcher", () => {
       it(
         "disposes of the filewatcher when disposing of the class",
         castToAsyncFunc<TestCtx>(async function () {
-          const watcher = await this.fixture.createActivePackageWatcher(
+          const watcher = await this.fixture.createCurrentPackageWatcher(
             [[fakeAccount1.apiUrl, fakeApi1ValidAcc]],
             this.fooFileEditor,
             [this.fooFileEditor]
