@@ -99,9 +99,7 @@ export class ProjectBookmarkManagerFixture extends LoggingFixture {
 
   public async beforeEach(): Promise<void> {
     const prefix = join(getTmpPrefix(), "obs-connector");
-    testLogger.trace("Prefix: %s", prefix);
     this.globalStorageUri = vscode.Uri.file(await fsPromises.mkdtemp(prefix));
-    testLogger.trace("globalStorageUri: %s", this.globalStorageUri.toString());
   }
 
   public async afterEach(ctx: Context) {
