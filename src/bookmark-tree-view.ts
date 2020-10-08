@@ -102,6 +102,9 @@ export const CHECK_OUT_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.checkOutPackage`
 /** ID of the command to check a project out to the file system. */
 export const CHECK_OUT_PROJECT_COMMAND = `${cmdPrefix}.${cmdId}.checkOutProject`;
 
+/** ID of the command to branch and checkout a package */
+export const BRANCH_AND_BOOKMARK_AND_CHECKOUT_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.branchAndBookmarkAndCheckoutPackage`;
+
 type BookmarkTreeItem =
   | ProjectTreeItem
   | ObsServerTreeElement
@@ -385,6 +388,11 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
         this.updatePackage,
         this
       ),
+      vscode.commands.registerCommand(
+        BRANCH_AND_BOOKMARK_AND_CHECKOUT_PACKAGE_COMMAND,
+        this.branchAndBookmarkAndCheckoutPackage,
+        this
+      ),
 
       bookmarkMngr.onBookmarkUpdate(
         ({ changeType, changedObject, element }) => {
@@ -582,6 +590,43 @@ export class BookmarkedProjectsTreeProvider extends ConnectionListenerLoggerBase
     }
 
     assert(false, "This part of the code must be unreachable");
+
+  @logAndReportExceptions()
+  public async branchAndBookmarkAndCheckoutPackage(
+    element?: BookmarkTreeItem
+  ): Promise<void> {
+    if (element === undefined || !isBookmarkedPackageTreeElement(element)) {
+      this.logger.error(
+        "branchAndBookmarkPackage called on the wrong element: %s",
+        element?.contextValue
+      );
+      return;
+    }
+    const con = this.activeAccounts.getConfig(element.pkg.apiUrl)?.connection;
+    if (con === undefined) {
+      throw new Error(
+        `cannot branch package ${element.pkg.projectName}/${element.pkg.name}: no account is configured`
+      );
+    }
+
+    let branchedPkg: Package | undefined;
+    await this.vscodeWindow.withProgress(
+      {
+        cancellable: false,
+        location: vscode.ProgressLocation.Notification,
+        title: `Branching package ${element.pkg.projectName}/${element.pkg.name}`
+      },
+      async (progress) => {
+        branchedPkg = await this.obsFetchers.branchPackage(con, element.pkg);
+        progress.report({ message: "Branched" });
+        await this.bookmarkMngr.addPackageToBookmarks(branchedPkg);
+      }
+    );
+    assert(branchedPkg !== undefined);
+    await vscode.commands.executeCommand(
+      CHECK_OUT_PACKAGE_COMMAND,
+      new BookmarkedPackageTreeElement(packageBookmarkFromPackage(branchedPkg))
+    );
   }
 
   /**
