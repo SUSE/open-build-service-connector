@@ -341,7 +341,7 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "icon": "media/obs-line-dark.svg",
+          "icon": "media/dark/obs-line-dark.svg",
           "title": "Open Build Service Project",
           "id": "obs-tree-view"
         }

@@ -1,4 +1,8 @@
 obs-logo.svg:                                https://openbuildservice.org/images/obs-logo.svg
 obs-logo_meta.png:                           exported from obs-logo.svg
 obs-line-dark.svg, obs-line-light.svg:       Created by Stasiek Michalski (https://github.com/Hellcp)
-ic_export_import.svg:                        https://publicdomainvectors.org/en/free-clipart/Vector-image-of-round-grey-import-icon/17674.html
+broken_image.svg:                            https://eos-icons-picker-api.herokuapp.com/icon/svg/download/broken_image
+branch.svg:                                  https://eos-icons-picker-api.herokuapp.com/icon/svg/download/branch
+diff_deleted_outlined.svg:                   https://eos-icons-picker-api.herokuapp.com/icon/svg/download/diff_deleted_outlined
+diff_modified_outlined.svg:                  https://eos-icons-picker-api.herokuapp.com/icon/svg/download/diff_modified_outlined
+diff_new_outlined.svg:                       https://eos-icons-picker-api.herokuapp.com/icon/svg/download/diff_new_outlined
