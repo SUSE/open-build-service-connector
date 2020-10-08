@@ -24,29 +24,27 @@ import * as chaiAsPromised from "chai-as-promised";
 import * as chaiThings from "chai-things";
 import { promises as fsPromises } from "fs";
 import {
-  addAndDeleteFilesFromPackage,
   Arch,
+  checkOutPackage,
   checkOutProject,
-  commit,
+  createPackage,
   createProject,
   deleteProject,
   fetchProjectMeta,
   modifyProjectMeta,
   Package,
-  PackageFile,
+  packageFileFromBuffer,
   Project,
   ProjectMeta,
-  readInModifiedPackageFromDir,
-  rmRf
+  rmRf,
+  setFileContentsAndCommit
 } from "open-build-service-api";
-// FIXME: import from "open-build-service-api" directly once the library
-// correctly exports this
-import { createPackage } from "open-build-service-api/lib/package";
 import * as path from "path";
 import { join } from "path";
-import { inspect } from "util";
+import { Context } from "vm";
 import {
   ActivityBar,
+  EditorView,
   InputBox,
   QuickPickItem,
   SideBarView,
@@ -55,8 +53,13 @@ import {
   ViewSection,
   Workbench
 } from "vscode-extension-tester";
+import { DialogHandler } from "vscode-extension-tester-native";
 import { testCon, testUser } from "../testEnv";
-import { findAndClickButtonOnTreeItem, focusOnSection } from "../util";
+import {
+  findAndClickButtonOnTreeItem,
+  focusOnSection,
+  getLabelsOfTreeItems
+} from "../util";
 
 use(chaiAsPromised);
 use(chaiThings);
@@ -88,14 +91,14 @@ const pkg: Package = {
   name: "foo"
 };
 
-const fooSpec: PackageFile = {
-  name: "foo.spec",
-  projectName: testProj.name,
-  packageName: pkg.name,
-  contents: Buffer.from("well, not really a spec but good enough")
-};
+const fooSpec = packageFileFromBuffer(
+  "foo.spec",
+  pkg.name,
+  testProj.name,
+  "well, not really a spec but good enough"
+);
 
-const checkOutPath: string = path.join(process.env.HOME!, testProj.name);
+const checkOutPath: string = path.join(process.env.HOME!, "checkoutDir");
 
 const tw = "openSUSE Tumbleweed";
 const twRepoName = tw.replace(" ", "_");
@@ -133,59 +136,7 @@ const addPathToRepository = async (
   await projectNameInput.getDriver().sleep(3000);
 };
 
-describe("RepositoryTreeProvider", function () {
-  this.timeout(30000);
-
-  before(async () => {
-    await createProject(testCon, testProjMeta);
-    await createPackage(
-      testCon,
-      testProj,
-      pkg.name,
-      "A test package",
-      "This is really just for testing"
-    );
-    await checkOutProject(testCon, testProj, checkOutPath);
-    await fsPromises.writeFile(
-      join(checkOutPath, pkg.name, fooSpec.name),
-      fooSpec.contents!
-    );
-
-    let modPkg = await readInModifiedPackageFromDir(
-      join(checkOutPath, pkg.name)
-    );
-
-    modPkg = await addAndDeleteFilesFromPackage(modPkg, [], [fooSpec.name]);
-    await commit(testCon, modPkg, "Add foo.spec");
-
-    const bench = new Workbench();
-    await bench.executeCommand("extest.addFolder");
-
-    const input = await InputBox.create();
-    await input.setText(checkOutPath);
-    await input.confirm();
-    await input.getDriver().sleep(100);
-
-    await bench.executeCommand("extest.openFile");
-    const fileInput = await InputBox.create();
-    await fileInput.setText(join(checkOutPath, pkg.name, fooSpec.name));
-    await fileInput.confirm();
-    await fileInput.getDriver().sleep(100);
-
-    // open the extension beforehands and wait for a bit so that everything can
-    // initialize in the background
-    const activityBar = new ActivityBar();
-    await activityBar.getViewControl("Open Build Service").click();
-    await activityBar.getDriver().sleep(3000);
-  });
-
-  after(async () => {
-    try {
-      await deleteProject(testCon, testProj.name);
-    } catch (err) {}
-    await rmRf(checkOutPath);
-  });
-
+function addRepositorySideBarTests() {
   it("shows no repositories by default", async () => {
     const repositorySection = await focusOnSection("Repositories");
 
@@ -262,13 +213,13 @@ describe("RepositoryTreeProvider", function () {
 
     const pathChildren = await section.openItem(twRepoName, "Paths");
     expect(pathChildren).to.be.an("array").and.have.length(1);
-    expect(
+    await Promise.all(
       (pathChildren as TreeItem[]).map((item) => item.getLabel())
-    ).to.deep.equal(["openSUSE:Factory/snapshot"]);
+    ).should.eventually.deep.equal(["openSUSE:Factory/snapshot"]);
 
     const archChildren = await section.openItem(twRepoName, "Architectures");
     expect(archChildren).to.be.an("array").and.have.length(2);
-    const arches = (archChildren as TreeItem[]).map((item) => item.getLabel());
+    const arches = await getLabelsOfTreeItems(archChildren);
     expect(arches).to.include.a.thing.that.equals(Arch.X86_64);
     expect(arches).to.include.a.thing.that.equals(Arch.I586);
 
@@ -316,7 +267,7 @@ describe("RepositoryTreeProvider", function () {
 
     for (const archChild of archChildren as ViewItem[]) {
       const treeItem = archChild as TreeItem;
-      if (treeItem.getLabel() === Arch.X86_64) {
+      if ((await treeItem.getLabel()) === Arch.X86_64) {
         const actButton = await treeItem.getActionButton(removeArchLabel);
         expect(actButton).to.not.equal(undefined);
         await section.getDriver().actions().mouseMove(treeItem).perform();
@@ -329,7 +280,9 @@ describe("RepositoryTreeProvider", function () {
 
     archChildren = await getArchChildren(section);
     expect(archChildren).to.be.an("array").and.have.length(1);
-    expect((archChildren as TreeItem[])[0].getLabel()).to.deep.equal(Arch.I586);
+    await (archChildren as TreeItem[])[0]
+      .getLabel()
+      .should.eventually.deep.equal(Arch.I586);
   });
 
   it("removes the last architecture by clicking on the respective button", async () => {
@@ -351,18 +304,19 @@ describe("RepositoryTreeProvider", function () {
 
     // the architecture element must not disappear
     const twChildren = await section.openItem(twRepoName);
-    expect(
-      (twChildren as TreeItem[]).map((child) => child.getLabel())
-    ).to.deep.equal(["Paths", "Architectures"]);
+    await getLabelsOfTreeItems(twChildren).should.eventually.deep.equal([
+      "Paths",
+      "Architectures"
+    ]);
   });
 
   it("allows us to add a new architecture to the Tumbleweed repository", async () => {
     const section = await focusOnSection("Repositories");
 
-    const archElement = ((await section.openItem(
-      twRepoName
-    )) as TreeItem[]).find(
-      (treeItem) => treeItem.getLabel() === "Architectures"
+    const twRepoChildren = (await section.openItem(twRepoName)) as TreeItem[];
+    const twRepoChildrenLabels = await getLabelsOfTreeItems(twRepoChildren);
+    const archElement = twRepoChildren.find(
+      (_treeItem, ind) => twRepoChildrenLabels[ind] === "Architectures"
     );
     expect(archElement).to.not.equal(undefined);
 
@@ -384,9 +338,9 @@ describe("RepositoryTreeProvider", function () {
 
     let archChildren = await getArchChildren(section);
     expect(archChildren).to.be.an("array").and.have.length(1);
-    expect(
-      (archChildren as TreeItem[]).map((treeItem) => treeItem.getLabel())
-    ).to.deep.equal([Arch.Aarch64]);
+    await getLabelsOfTreeItems(archChildren).should.eventually.deep.equal([
+      Arch.Aarch64
+    ]);
   });
 
   it("allows us to add a new project as a path", async () => {
@@ -399,9 +353,8 @@ describe("RepositoryTreeProvider", function () {
 
     const projectNameInput = await InputBox.create();
     const projects = await projectNameInput.getQuickPicks();
-    const projectNames = await Promise.all(
-      projects.map((proj) => proj.getLabel())
-    );
+    const projectNames = await getLabelsOfTreeItems(projects);
+
     expect(projectNames.length).to.be.greaterThan(2);
     ["Tumbleweed", "Factory"].forEach((subProj) =>
       expect(projectNames).to.include.a.thing.that.equals(`openSUSE:${subProj}`)
@@ -412,9 +365,10 @@ describe("RepositoryTreeProvider", function () {
     await projectNameInput.getDriver().sleep(100);
 
     const reposInput = await InputBox.create();
-    const repoNames = await Promise.all(
-      (await reposInput.getQuickPicks()).map((item) => item.getLabel())
+    const repoNames = await getLabelsOfTreeItems(
+      await reposInput.getQuickPicks()
     );
+
     expect(repoNames).to.be.an("array").and.have.length(2);
     ["standard", "standard_debug"].forEach((repoName) =>
       repoNames.should.include.a.thing.that.equals(repoName)
@@ -427,9 +381,10 @@ describe("RepositoryTreeProvider", function () {
     const newPaths = await section.openItem(twRepoName, "Paths");
     expect(newPaths).to.be.an("array").and.have.length(2);
 
-    expect(
-      (newPaths as TreeItem[]).map((path) => path.getLabel())
-    ).to.include.a.thing.that.equals("openSUSE:Tumbleweed/standard");
+    const newPathLabels = await getLabelsOfTreeItems(newPaths);
+    newPathLabels.should.include.a.thing.that.equals(
+      "openSUSE:Tumbleweed/standard"
+    );
   });
 
   it("allows us to remove a repository path", async () => {
@@ -440,7 +395,7 @@ describe("RepositoryTreeProvider", function () {
 
     await Promise.all(
       (pathElements as TreeItem[]).map(async (pathElement) => {
-        if (pathElement.getLabel() === "openSUSE:Factory/snapshot") {
+        if ((await pathElement.getLabel()) === "openSUSE:Factory/snapshot") {
           await findAndClickButtonOnTreeItem(pathElement, removePathLabel);
         }
       })
@@ -451,9 +406,9 @@ describe("RepositoryTreeProvider", function () {
     pathElements = await section.openItem(twRepoName, "Paths");
     expect(pathElements).to.be.an("array").and.have.length(1);
 
-    (pathElements as TreeItem[])[0]
+    await (pathElements as TreeItem[])[0]
       .getLabel()
-      .should.deep.equal("openSUSE:Tumbleweed/standard");
+      .should.eventually.deep.equal("openSUSE:Tumbleweed/standard");
   });
 
   it("correctly updated the _meta on OBS", async () => {
@@ -480,7 +435,7 @@ describe("RepositoryTreeProvider", function () {
 
     const buttons = await (pathElements as TreeItem[])[0].getActionButtons();
 
-    [movePathUpLabel, movePathDownLabel].forEach((label) =>
+    [movePathUpLabel, movePathDownLabel].map((label) =>
       expect(buttons.find((button) => button.getLabel() === label)).to.equal(
         undefined
       )
@@ -537,9 +492,12 @@ describe("RepositoryTreeProvider", function () {
 
     const pathsBeforeMove = await section.openItem(twRepoName, "Paths");
     expect(pathsBeforeMove).to.be.an("array").and.have.length(3);
+    const labelsBeforeMove = await getLabelsOfTreeItems(pathsBeforeMove);
 
     const middlePathEntry = (pathsBeforeMove as TreeItem[])[1];
-    middlePathEntry.getLabel().should.deep.equal("openSUSE:Factory/standard");
+    await middlePathEntry
+      .getLabel()
+      .should.eventually.deep.equal("openSUSE:Factory/standard");
     const moveUpButton = await findAndClickButtonOnTreeItem(
       middlePathEntry,
       movePathUpLabel
@@ -549,12 +507,7 @@ describe("RepositoryTreeProvider", function () {
     const pathsAfterMove = await section.openItem(twRepoName, "Paths");
     expect(pathsAfterMove).to.be.an("array").and.have.length(3);
 
-    const labelsBeforeMove = (pathsBeforeMove as TreeItem[]).map((pth) =>
-      pth.getLabel()
-    );
-    const labelsAfterMove = (pathsAfterMove as TreeItem[]).map((pth) =>
-      pth.getLabel()
-    );
+    const labelsAfterMove = await getLabelsOfTreeItems(pathsAfterMove);
 
     labelsAfterMove[0].should.deep.equal(labelsBeforeMove[1]);
     labelsAfterMove[1].should.deep.equal(labelsBeforeMove[0]);
@@ -566,11 +519,12 @@ describe("RepositoryTreeProvider", function () {
 
     const pathsBeforeMove = await section.openItem(twRepoName, "Paths");
     expect(pathsBeforeMove).to.be.an("array").and.have.length(3);
+    const labelsBeforeMove = await getLabelsOfTreeItems(pathsBeforeMove);
 
     const middlePathEntry = (pathsBeforeMove as TreeItem[])[1];
-    middlePathEntry
+    await middlePathEntry
       .getLabel()
-      .should.deep.equal("openSUSE:Tumbleweed/standard");
+      .should.eventually.deep.equal("openSUSE:Tumbleweed/standard");
     const moveDownButton = await findAndClickButtonOnTreeItem(
       middlePathEntry,
       movePathDownLabel
@@ -579,13 +533,8 @@ describe("RepositoryTreeProvider", function () {
 
     const pathsAfterMove = await section.openItem(twRepoName, "Paths");
     expect(pathsAfterMove).to.be.an("array").and.have.length(3);
+    const labelsAfterMove = await getLabelsOfTreeItems(pathsAfterMove);
 
-    const labelsBeforeMove = (pathsBeforeMove as TreeItem[]).map((pth) =>
-      pth.getLabel()
-    );
-    const labelsAfterMove = (pathsAfterMove as TreeItem[]).map((pth) =>
-      pth.getLabel()
-    );
     labelsAfterMove[0].should.deep.equal(labelsBeforeMove[0]);
     labelsAfterMove[1].should.deep.equal(labelsBeforeMove[2]);
     labelsAfterMove[2].should.deep.equal(labelsBeforeMove[1]);
@@ -631,7 +580,7 @@ describe("RepositoryTreeProvider", function () {
     expect(visibleItems).to.be.an("array").and.have.length(1);
 
     const testProjEntry = visibleItems[0] as TreeItem;
-    testProjEntry.getLabel().should.deep.equal(testProj.name);
+    await testProjEntry.getLabel().should.eventually.deep.equal(testProj.name);
 
     const updateProj = await findAndClickButtonOnTreeItem(
       testProjEntry,
@@ -642,8 +591,150 @@ describe("RepositoryTreeProvider", function () {
     const repoSection = await focusOnSection("Repositories");
     const pathsAfterMove = await repoSection.openItem(twRepoName, "Paths");
     expect(pathsAfterMove).to.be.an("array").and.have.length(1);
-    (pathsAfterMove as TreeItem[])[0]
+    await (pathsAfterMove as TreeItem[])[0]
       .getLabel()
-      .should.deep.equal("openSUSE:Factory/standard");
+      .should.eventually.deep.equal("openSUSE:Factory/standard");
+  });
+}
+
+type TestCtx = Context & {
+  wsFolderPath: string;
+  pkgBasePath: string;
+};
+
+async function createTestProject(): Promise<void> {
+  await createProject(testCon, testProjMeta);
+  await createPackage(
+    testCon,
+    testProj,
+    pkg.name,
+    "A test package",
+    "This is really just for testing"
+  );
+  await setFileContentsAndCommit(testCon, fooSpec, "Add foo.spec");
+}
+
+async function ensureExtensionOpen() {
+  // open the extension beforehands and wait for a bit so that everything can
+  // initialize in the background
+  const activityBar = new ActivityBar();
+  await activityBar.getViewControl("Open Build Service").openView();
+  return activityBar;
+}
+
+async function openSpecFile(this: TestCtx): Promise<void> {
+  const bench = new Workbench();
+
+  await DialogHandler.getOpenDialog();
+
+  await bench.executeCommand("extest.addFolder");
+
+  const input = await InputBox.create();
+  await input.setText(this.wsFolderPath);
+  await input.confirm();
+  await input.getDriver().sleep(100);
+
+  await bench.executeCommand("extest.openFile");
+  const fileInput = await InputBox.create();
+  await fileInput.setText(join(this.pkgBasePath, fooSpec.name));
+  await fileInput.confirm();
+  await fileInput.getDriver().sleep(100);
+
+  await ensureExtensionOpen();
+}
+
+async function cleanupAfterTests(): Promise<void> {
+  try {
+    const editorView = new EditorView();
+    await editorView.closeAllEditors();
+
+    // await new Workbench().executeCommand("close workspace");
+    // await (await DialogHandler.getOpenDialog()).cancel();
+
+    await deleteProject(testCon, testProj.name);
+    // if ((await pathExists(checkOutPath)) !== undefined) {
+    //   await rmRf(checkOutPath);
+    // }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+before(() => fsPromises.mkdir(checkOutPath, { recursive: true }));
+
+describe("RepositoryTreeProvider", function () {
+  this.timeout(30000);
+
+  after(() => rmRf(checkOutPath));
+
+  describe("locally checked out project", function () {
+    before(async function () {
+      await createTestProject();
+
+      this.wsFolderPath = join(checkOutPath, "proj");
+      this.pkgBasePath = join(checkOutPath, "proj", pkg.name);
+      // await fsPromises.mkdir(join(checkOutPath, "proj"), { recursive: true });
+      await checkOutProject(testCon, testProj, this.wsFolderPath);
+
+      this.openSpecFile = openSpecFile;
+      await this.openSpecFile();
+    });
+
+    after(cleanupAfterTests);
+
+    addRepositorySideBarTests();
+  });
+
+  describe("locally checked out package", function () {
+    before(async function () {
+      await createTestProject();
+
+      this.wsFolderPath = join(checkOutPath, "pkg");
+      this.pkgBasePath = join(checkOutPath, "pkg");
+      // await fsPromises.mkdir(this.basePath, { recursive: true });
+      await checkOutPackage(testCon, testProj.name, pkg.name, this.pkgBasePath);
+
+      this.openSpecFile = openSpecFile;
+      await this.openSpecFile();
+
+      // give the CurrentPackageWatcher a bit of time to read in the project
+      await new Workbench().getDriver().sleep(500);
+    });
+
+    after(cleanupAfterTests);
+
+    addRepositorySideBarTests();
+  });
+
+  describe("remote package file", function () {
+    before(async function () {
+      await createTestProject();
+
+      const activityBar = await ensureExtensionOpen();
+
+      const bench = new Workbench();
+      await bench.executeCommand(
+        "Bookmark a project from the Open Build Service"
+      );
+
+      const projNameInput = await InputBox.create();
+      await projNameInput.setText(testProj.name);
+      await projNameInput.confirm();
+      await projNameInput.getDriver().sleep(100);
+
+      const sec = await focusOnSection("Bookmarked Projects");
+      await activityBar.getDriver().sleep(3000);
+
+      await (await sec.findItem(testProj.name))!.select();
+      await (await sec.findItem(pkg.name))!.select();
+      await (await sec.findItem(fooSpec.name))!.select();
+
+      // give the CurrentPackageWatcher a bit of time to read in the project
+      await bench.getDriver().sleep(500);
+    });
+
+    after(cleanupAfterTests);
+
+    addRepositorySideBarTests();
   });
 });
