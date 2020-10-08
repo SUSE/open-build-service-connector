@@ -35,7 +35,7 @@ async function main() {
     // Passed to --extensionTestsPath
     const extensionTestsPath = path.resolve(__dirname, "./suite/index");
 
-    const launchArgs = ["--disable-extensions"];
+    const launchArgs = ["--disable-extensions", "--disable-gpu"];
 
     // vscode insiders must be launched with --no-sandbox when running as root
     // (this should only happen on the CI anyway)
