@@ -87,6 +87,11 @@
         {
           "group": "inline",
           "when": "view == bookmarkedProjectsTree && viewItem == package",
+          "command": "vscodeObs.obsProject.branchAndBookmarkAndCheckoutPackage"
+        },
+        {
+          "group": "inline",
+          "when": "view == bookmarkedProjectsTree && viewItem == package",
           "command": "vscodeObs.obsProject.checkOutPackage"
         },
         {
@@ -169,19 +174,28 @@
         },
         {
           "command": "vscodeObs.obsScm.discardChanges",
-          "when": "scmProvider == obs && scmResourceGroup == changes",
+          "when": "scmProvider == obs && scmResourceGroup != unmodified",
           "group": "inline"
         },
         {
           "command": "vscodeObs.obsScm.addFile",
           "when": "scmProvider == obs && scmResourceGroup == untracked",
           "group": "inline"
+        },
+        {
+          "command": "vscodeObs.obsScm.removeFile",
+          "when": "scmProvider == obs && scmResourceGroup == changes",
+          "group": "inline"
+        },
+        {
+          "command": "vscodeObs.obsScm.removeFile",
+          "when": "scmProvider == obs && scmResourceGroup == unmodified",
+          "group": "inline"
         }
       ]
     },
     "commands": [
       {
-        "icon": "media/ic_export_import.svg",
         "title": "Import accounts from osc's configuration file",
         "command": "vscodeObs.obsAccount.importAccountsFromOsrc"
       },
@@ -254,13 +268,21 @@
         "command": "vscodeObs.obsProject.updateProject"
       },
       {
+        "icon": {
+          "dark": "media/dark/branch.svg",
+          "light": "media/light/branch.svg"
+        },
+        "title": "Branch, bookmark and checkout this package",
+        "command": "vscodeObs.obsProject.branchAndBookmarkAndCheckoutPackage"
+      },
+      {
         "icon": "$(refresh)",
         "title": "Update this Project",
         "command": "vscodeObs.obsProject.updateCheckedOutProject"
       },
       {
         "icon": "$(refresh)",
-        "title": "Update this Package and its content",
+        "title": "Update this Package and its contents",
         "command": "vscodeObs.obsProject.updatePackage"
       },
       {
@@ -351,14 +373,7 @@
       "properties": {
         "vscode-obs.logLevel": {
           "default": "error",
-          "enum": [
-            "trace",
-            "debug",
-            "info",
-            "warn",
-            "error",
-            "fatal"
-          ],
+          "enum": ["trace", "debug", "info", "warn", "error", "fatal"],
           "description": "Logging level used",
           "type": "string"
         },
@@ -379,11 +394,7 @@
           "default": [],
           "scope": "application",
           "items": {
-            "required": [
-              "accountName",
-              "username",
-              "apiUrl"
-            ],
+            "required": ["accountName", "username", "apiUrl"],
             "additionalProperties": false,
             "properties": {
               "email": {
@@ -440,7 +451,9 @@
           "extraOscArgs": {
             "type": "array",
             "default": [],
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "An array of additional command line options that can be passed to 'osc build'"
           },
           "oscBinaryPath": {
@@ -459,10 +472,7 @@
     "workspaceContains:**/.osc",
     "workspaceContains:**/.osc_obs_ts"
   ],
-  "categories": [
-    "SCM Providers",
-    "Other"
-  ],
+  "categories": ["SCM Providers", "Other"],
   "engines": {
     "vscode": "^1.40.0"
   },

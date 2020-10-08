@@ -27,8 +27,10 @@ import {
   FileState,
   ModifiedPackage,
   pathExists,
-  PathType
+  PathType,
+  untrackFiles
 } from "open-build-service-api";
+import { undoFileDeletion } from "open-build-service-api/lib/vcs";
 import { basename, dirname, join, sep } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -40,7 +42,12 @@ import {
   isModifiedPackage
 } from "./current-package-watcher";
 import { logAndReportExceptions } from "./decorators";
-import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
+import {
+  EmptyDocumentForDiffProvider,
+  fsPathFromEmptyDocumentUri
+} from "./empty-file-provider";
+import { fsPathFromObsRevisionUri } from "./scm-history";
+import { makeThemedIconPath } from "./util";
 
 interface LineChange {
   readonly originalStartLineNumber: number;
@@ -84,7 +91,27 @@ export const fileAtHeadUri = {
   getFsPath: fsPathFromFileAtHeadUri
 };
 
-export class PackageScm extends ConnectionListenerLoggerBase
+/**
+ * Given any uri used by the source control and associated modules, this function
+ * returns the path to the actual package or undefined if the Uri does not belong
+ * to a source control file.
+ */
+export function getPkgPathFromVcsUri(uri: vscode.Uri): string | undefined {
+  let fsPath =
+    uri.scheme === "file"
+      ? uri.fsPath
+      : fsPathFromFileAtHeadUri(uri) ?? fsPathFromEmptyDocumentUri(uri);
+
+  if (fsPath !== undefined) {
+    fsPath = dirname(fsPath);
+  } else {
+    fsPath = fsPathFromObsRevisionUri(uri);
+  }
+  return fsPath;
+}
+
+export class PackageScm
+  extends ConnectionListenerLoggerBase
   implements vscode.QuickDiffProvider, vscode.TextDocumentContentProvider {
   private currentPackage: ModifiedPackage | undefined;
 
@@ -175,7 +202,7 @@ export class PackageScm extends ConnectionListenerLoggerBase
       : fsPromises.readFile(path, { encoding: "utf-8" });
   }
 
-  public dispose() {
+  public dispose(): void {
     this.scmDisposable?.dispose();
     super.dispose();
   }
@@ -344,7 +371,15 @@ ${msg}
     const fname = basename(uri.fsPath);
     const fileState = this.currentPackage.filesInWorkdir.find(
       (f) => f.name === fname
-    )!.state;
+    )?.state;
+
+    if (fileState === undefined) {
+      this.logger.error(
+        "Cannot show diff of %s, package is not known to the currently active package (%s)",
+        fname,
+        this.currentPackage.name
+      );
+    }
 
     if (fileState === FileState.ToBeAdded) {
       await vscode.commands.executeCommand(
@@ -417,6 +452,8 @@ ${msg}
   private async discardChanges(
     ...resourceStates: vscode.SourceControlResourceState[]
   ): Promise<void> {
+    let packageChange = false;
+
     await Promise.all(
       resourceStates.map(async (resourceState) => {
         const matchingEditors = vscode.window.visibleTextEditors.filter(
@@ -424,18 +461,57 @@ ${msg}
             editor.document.uri.toString() ===
             resourceState.resourceUri.toString()
         );
+        const fname = basename(resourceState.resourceUri.fsPath);
         const uriAtHead = this.getUriOfOriginalResource(
           resourceState.resourceUri
         );
         if (uriAtHead === undefined) {
           this.logger.error(
             "Could not get uri of the original file of the file %s from %s/%s",
-            basename(resourceState.resourceUri.fsPath),
-            this.activePackage?.projectName,
-            this.activePackage?.name
+            fname,
+            this.currentPackage?.projectName,
+            this.currentPackage?.name
           );
           return;
         }
+        if (this.currentPackage === undefined) {
+          this.logger.error(
+            "currentPackage is undefined although a source control is active"
+          );
+          return;
+        }
+        const matchingPkgFile = this.currentPackage?.filesInWorkdir.find(
+          (f) => f.name === fname
+        );
+        if (matchingPkgFile === undefined) {
+          this.logger.error(
+            "matchingPkgFile is undefined although uriAtHead is not (%s)",
+            uriAtHead.toString()
+          );
+          return;
+        }
+
+        switch (matchingPkgFile.state) {
+          case FileState.Unmodified:
+          case FileState.Untracked:
+            this.logger.error(
+              "tried to revert the file '%s' that is unmodified or untracked",
+              matchingPkgFile.name
+            );
+            return;
+
+          case FileState.ToBeAdded:
+            await untrackFiles(this.currentPackage, [matchingPkgFile.name]);
+            packageChange = true;
+            return;
+
+          case FileState.ToBeDeleted:
+          case FileState.Missing:
+            await undoFileDeletion(this.currentPackage, [matchingPkgFile.name]);
+            packageChange = true;
+            return;
+        }
+        assert(matchingPkgFile.state === FileState.Modified);
 
         // if the document is not open, then just overwrite the file contents
         if (matchingEditors.length === 0) {
@@ -470,8 +546,13 @@ ${msg}
             })
           );
         }
+        packageChange = true;
       })
     );
+
+    if (packageChange) {
+      await this.currentPackageWatcher.reloadCurrentPackage();
+    }
   }
 
   private async showDiff(
@@ -551,9 +632,12 @@ ${msg}
         )
       );
     } else {
-      const origDocument = await vscode.workspace.openTextDocument(
-        this.getUriOfOriginalResource(uri)!
+      const origUri = this.getUriOfOriginalResource(uri);
+      assert(
+        origUri !== undefined,
+        `Could not get the original uri of the document ${uri.toString()}`
       );
+      const origDocument = await vscode.workspace.openTextDocument(origUri);
 
       const origContent = origDocument.getText(
         new vscode.Range(
@@ -637,23 +721,27 @@ ${msg}
   private updateScm(): void {
     this.scmDisposable?.dispose();
 
-    this.activePackage = this.activePackageWatcher.activePackage;
+    this.currentPackage =
+      this.currentPackageWatcher.currentPackage.currentPackage !== undefined &&
+      isModifiedPackage(
+        this.currentPackageWatcher.currentPackage.currentPackage
+      )
+        ? this.currentPackageWatcher.currentPackage.currentPackage
+        : undefined;
 
-    if (this.activePackage !== undefined) {
-      this.curScm = this.scmFromModifiedPackage(this.activePackage);
-
-      this.scmStatusBar = vscode.window.createStatusBarItem(
-        vscode.StatusBarAlignment.Left
-      );
-
-      this.scmStatusBar.text = `$(package) ${this.activePackage.name}`;
-      this.scmStatusBar.show();
-
-      this.scmDisposable = vscode.Disposable.from(
-        this.curScm,
-        this.scmStatusBar
-      );
+    if (this.currentPackage === undefined) {
+      return;
     }
+    this.curScm = this.scmFromModifiedPackage(this.currentPackage);
+
+    this.scmStatusBar = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Left
+    );
+
+    this.scmStatusBar.text = `$(package) ${this.currentPackage.name}`;
+    this.scmStatusBar.show();
+
+    this.scmDisposable = vscode.Disposable.from(this.curScm, this.scmStatusBar);
   }
 
   private scmFromModifiedPackage(pkg: ModifiedPackage): vscode.SourceControl {
@@ -671,20 +759,35 @@ ${msg}
       .filter((f) => f.state === FileState.Untracked)
       .map((f) => ({ resourceUri: vscode.Uri.file(join(pkg.path, f.name)) }));
 
-    // const removedFiles = obsScm.createResourceGroup(
-    //   "deleted",
-    //   "removed files"
-    // );
-    // untrackedFiles.resourceStates = pkg.filesInWorkdir
-    //   .filter((f) => f.state === FileState.ToBeDeleted)
-    //   .map((f) => ({ resourceUri: vscode.Uri.file(join(pkg.path, f.name)) }));
+    const removedFiles = obsScm.createResourceGroup("deleted", "removed files");
+    removedFiles.hideWhenEmpty = true;
+    removedFiles.resourceStates = pkg.filesInWorkdir
+      .filter(
+        (f) =>
+          f.state === FileState.ToBeDeleted || f.state === FileState.Missing
+      )
+      .map((f) => ({
+        resourceUri: vscode.Uri.file(join(pkg.path, f.name)),
+        decorations: {
+          strikeThrough: f.state === FileState.ToBeDeleted,
+          ...makeThemedIconPath("diff_deleted_outlined.svg", true)
+        }
+      }));
+
+    const unmodifiedFiles = obsScm.createResourceGroup(
+      "unmodified",
+      "unmodified files"
+    );
+    unmodifiedFiles.hideWhenEmpty = true;
+    unmodifiedFiles.resourceStates = pkg.filesInWorkdir
+      .filter((f) => f.state === FileState.Unmodified)
+      .map((f) => ({ resourceUri: vscode.Uri.file(join(pkg.path, f.name)) }));
 
     const changed = obsScm.createResourceGroup("changes", "Changed files");
 
     changed.resourceStates = pkg.filesInWorkdir
       .filter(
-        (f) =>
-          f.state !== FileState.Unmodified && f.state !== FileState.Untracked
+        (f) => f.state === FileState.Modified || f.state === FileState.ToBeAdded
       )
       .map((f) => {
         const resourceUri = vscode.Uri.file(join(pkg.path, f.name));
@@ -694,10 +797,12 @@ ${msg}
             command: SHOW_DIFF_FROM_URI_COMMAND,
             title: "Show the diff to HEAD"
           },
-          decorations: {
-            faded: f.state === FileState.Missing,
-            strikeThrough: f.state === FileState.ToBeDeleted
-          },
+          decorations: makeThemedIconPath(
+            f.state === FileState.ToBeAdded
+              ? "diff_new_outlined.svg"
+              : "diff_modified_outlined.svg",
+            true
+          ),
           resourceUri
         };
       });
@@ -706,7 +811,7 @@ ${msg}
     obsScm.inputBox.placeholder = "Commit message";
     obsScm.acceptInputCommand = {
       command: COMMIT_CHANGES_COMMAND,
-      title: "commit the current changes"
+      title: "Commit the current changes"
     };
 
     return obsScm;

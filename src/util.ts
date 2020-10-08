@@ -22,6 +22,7 @@
 import * as assert from "assert";
 import { fetchProject } from "open-build-service-api";
 import { zip } from "open-build-service-api/lib/util";
+import { join, resolve } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { ActiveAccounts, promptUserForAccount } from "./accounts";
@@ -398,4 +399,37 @@ export function createItemInserter<T>(
     ];
     return (newItems) => firstPart.concat(newItems, secondPart);
   }
+}
+
+const MEDIA_DIR = resolve(__dirname, "..", "media");
+
+export type IconPath = { readonly light: string; readonly dark: string };
+
+/**
+ * Creates a decoration object for a Source Control Resource from the provided
+ * `fileName`. This should be a svg or png that is in the `media/{dark|light}`
+ * subfolders
+ */
+export function makeThemedIconPath(
+  fileName: string,
+  themable: boolean & true
+): vscode.SourceControlResourceDecorations;
+/**
+ * Creates a [[IconPath]] object from the provided icon in `fileName`. This
+ * should be a svg or png that is in the `media/{dark|light}` subfolders.
+ */
+export function makeThemedIconPath(
+  fileName: string,
+  themable: boolean & false
+): IconPath;
+
+export function makeThemedIconPath(
+  fileName: string,
+  themable: boolean
+): IconPath | vscode.SourceControlResourceDecorations {
+  const light = join(MEDIA_DIR, "light", fileName);
+  const dark = join(MEDIA_DIR, "dark", fileName);
+  return themable
+    ? { dark: { iconPath: dark }, light: { iconPath: light } }
+    : { dark, light };
 }
