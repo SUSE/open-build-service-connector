@@ -10,6 +10,24 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Allow to run local builds via `osc build`
+- Add new resource states for the source control
+- Add command to branch and checkout a package
+- New input form for project names
+
+### Changed
+
+- Make detection of the currently active project/package more robust
+- The Project Tree Views allow for packages & projects that have been deleted
+- Use bookmark codicon instead of EOS icon
+- Make check for present accounts less brittle
+
+### Removed
+
+## [0.0.2] - 2020-06-17
+
+### Added
+
 - Repository paths can now be moved up and down in the Repositories view.
 
 ### Changed
