@@ -126,6 +126,23 @@ export async function focusOnSection(
   return section;
 }
 
+export async function waitForRepository({
+  repositoryName,
+  timeoutMs = 5000
+}: { repositoryName?: string; timeoutMs?: number } = {}): Promise<TreeItem> {
+  return promiseWithTimeout(async () => {
+    const sect = await focusOnSection("Repositories");
+    let repository: ViewItem | undefined;
+    while (repository === undefined) {
+      repository =
+        repositoryName !== undefined
+          ? await sect.findItem(repositoryName)
+          : (await sect.getVisibleItems())[0];
+    }
+    return repository as TreeItem;
+  }, timeoutMs);
+}
+
 interface LabeledObj {
   getLabel(): Promise<string>;
 }
