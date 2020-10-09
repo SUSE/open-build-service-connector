@@ -728,7 +728,14 @@ describe("RepositoryTreeProvider", function () {
       });
     });
 
-    after(cleanupAfterTests);
+    after(async () => {
+      const projElem = await waitForProjectBookmark(pkg.projectName);
+      await (await (await projElem.openContextMenu()).getItem(
+        "Remove this Bookmark"
+      ))!.select();
+
+      await cleanupAfterTests();
+    });
 
     addRepositorySideBarTests();
   });
