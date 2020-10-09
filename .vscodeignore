@@ -29,3 +29,5 @@ logfile.json
 .log/**
 .eslintignore
 writing_ui_tests.md
+.vagrant/**
+Vagrantfile

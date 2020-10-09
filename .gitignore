@@ -11,5 +11,6 @@ logfile.json
 test-resources/
 open-build-service/
 mocklibsecret/.mypy_cache/*
+.vagrant/*
 src/ui-tests/default/fakeHome/*
 src/ui-tests/default/settings.json
