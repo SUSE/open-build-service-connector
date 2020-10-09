@@ -255,6 +255,35 @@ export function promiseWithTimeout<T>(
   // .finally(finalizer);
 }
 
+export function waitForProjectBookmark(
+  projectName: string,
+  {
+    timeoutMs = 5000
+  }: {
+    timeoutMs?: number;
+  } = {}
+): Promise<TreeItem> {
+  return promiseWithTimeout(async () => {
+    const bookmarkSection = await focusOnSection(
+      BOOKMARKED_PROJECTS_SECTION_NAME
+    );
+    while (true) {
+      const myBookmarksItem = await bookmarkSection.findItem("My bookmarks");
+      expect(myBookmarksItem).to.not.equal(undefined);
+      const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
+      const childLabels = await Promise.all(
+        bookmarkChildren.map((c) => c.getLabel())
+      );
+      const projIndex = childLabels.findIndex((lbl) => lbl === projectName);
+      if (projIndex !== -1) {
+        return bookmarkChildren[projIndex];
+      }
+
+      await bookmarkSection.getDriver().sleep(500);
+    }
+  }, timeoutMs);
+}
+
 /**
  * Wait for `timeoutMs` ms for the package bookmark of the package
  * `projectName/packageName` to appear in the "My bookmarks" section.
