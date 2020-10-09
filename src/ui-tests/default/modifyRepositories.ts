@@ -59,7 +59,9 @@ import {
   ensureExtensionOpen,
   findAndClickButtonOnTreeItem,
   focusOnSection,
-  getLabelsOfTreeItems
+  getLabelsOfTreeItems,
+  waitForPackageBookmark,
+  waitForProjectBookmark
 } from "../util";
 
 use(chaiAsPromised);
@@ -641,9 +643,6 @@ async function cleanupAfterTests(): Promise<void> {
     const editorView = new EditorView();
     await editorView.closeAllEditors();
 
-    // await new Workbench().executeCommand("close workspace");
-    // await (await DialogHandler.getOpenDialog()).cancel();
-
     await deleteProject(testCon, testProj.name);
     if ((await pathExists(checkOutPath)) !== undefined) {
       await safeRmRf(checkOutPath);
@@ -703,10 +702,9 @@ describe("RepositoryTreeProvider", function () {
     before(async function () {
       await createTestProject();
 
-      const activityBar = await ensureExtensionOpen();
+      await ensureExtensionOpen();
 
-      const bench = new Workbench();
-      await bench.executeCommand(
+      await new Workbench().executeCommand(
         "Bookmark a project from the Open Build Service"
       );
 
@@ -721,7 +719,7 @@ describe("RepositoryTreeProvider", function () {
       await pkgNameInput.getDriver().sleep(100);
 
       const sec = await focusOnSection("Bookmarked Projects");
-      await activityBar.getDriver().sleep(3000);
+      await sec.getDriver().sleep(3000);
 
       await (await sec.findItem(testProj.name))!.select();
       await (await sec.findItem(pkg.name))!.select();
