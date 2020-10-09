@@ -45,3 +45,20 @@ export async function safeRmRf(path: string): Promise<void> {
     await rmRf(path);
   }
 }
+
+/**
+ * Call the function `func` with the specified arguments `args` and the object
+ * `thisArg` as this. In contrast to [[apply]] all exceptions that are thrown by
+ * `func` are caught and the thrown object is printed to stderr.
+ */
+export async function swallowException<T>(
+  func: (...args: any[]) => Promise<T> | T,
+  { thisArg, args = [] }: { thisArg?: any; args?: any[] } = {}
+): Promise<T | undefined> {
+  try {
+    return await func.apply(thisArg, args);
+  } catch (err) {
+    console.error(err.toString());
+    return undefined;
+  }
+}
