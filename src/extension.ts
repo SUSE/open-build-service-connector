@@ -53,9 +53,7 @@ export async function activate(
   let options: pino.LoggerOptions;
   if (process.env.EXTENSION_DEBUG === "1") {
     options = {
-      level: "trace",
-      prettyPrint: true,
-      prettifier: require("pino-pretty")
+      level: "trace"
     };
     console.log(logFile);
   } else {
