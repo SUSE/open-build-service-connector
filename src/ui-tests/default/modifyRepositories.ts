@@ -715,6 +715,11 @@ describe("RepositoryTreeProvider", function () {
       await projNameInput.confirm();
       await projNameInput.getDriver().sleep(100);
 
+      const pkgNameInput = await InputBox.create();
+      await pkgNameInput.selectQuickPick(pkg.name);
+      await pkgNameInput.confirm();
+      await pkgNameInput.getDriver().sleep(100);
+
       const sec = await focusOnSection("Bookmarked Projects");
       await activityBar.getDriver().sleep(3000);
 
