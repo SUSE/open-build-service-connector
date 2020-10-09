@@ -285,43 +285,62 @@ export function waitForProjectBookmark(
 }
 
 /**
- * Wait for `timeoutMs` ms for the package bookmark of the package
- * `projectName/packageName` to appear in the "My bookmarks" section.
+ * Wait for `timeoutMs` ms for the package element of the package
+ * `projectName/packageName` to appear in the "My bookmarks" or "Current
+ * Project" section.
  */
 export function waitForPackageBookmark(
   projectName: string,
   packageName: string,
-  timeoutMs: number = 5000
+  {
+    timeoutMs = 5000,
+    section = BOOKMARKED_PROJECTS_SECTION_NAME
+  }: {
+    timeoutMs?: number;
+    section?: "Current Project" | "Bookmarked Projects";
+  } = {}
 ): Promise<TreeItem> {
   return promiseWithTimeout(
     async () => {
       let pkgElem: TreeItem | undefined = undefined;
-      const bookmarkSection = await focusOnSection(
-        BOOKMARKED_PROJECTS_SECTION_NAME
-      );
+      const curSection = await focusOnSection(section);
       while (pkgElem === undefined) {
-        await bookmarkSection.getDriver().sleep(500);
+        await curSection.getDriver().sleep(500);
 
-        const myBookmarksItem = await bookmarkSection.findItem("My bookmarks");
-        expect(myBookmarksItem).to.not.equal(undefined);
-        const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
-        const childLabels = await Promise.all(
-          bookmarkChildren.map((c) => c.getLabel())
-        );
-        const projIndex = childLabels.findIndex((lbl) => lbl === projectName);
-        if (projIndex !== -1) {
-          if (!(await bookmarkChildren[projIndex].isSelected())) {
-            await bookmarkChildren[projIndex].select();
-          }
-          const pkgElements = await bookmarkChildren[projIndex].getChildren();
+        let projElement: TreeItem | undefined;
 
-          const pkgNames = await Promise.all(
-            pkgElements.map((p) => p.getLabel())
+        if (section === "Bookmarked Projects") {
+          const myBookmarksItem = await curSection.findItem("My bookmarks");
+          expect(myBookmarksItem).to.not.equal(undefined);
+          const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
+          const childLabels = await Promise.all(
+            bookmarkChildren.map((c) => c.getLabel())
           );
-          const pkgInd = pkgNames.findIndex((name) => name === packageName);
-          if (pkgInd !== -1) {
-            pkgElem = pkgElements[pkgInd];
+          const projIndex = childLabels.findIndex((lbl) => lbl === projectName);
+          if (projIndex !== -1) {
+            projElement = bookmarkChildren[projIndex];
           }
+        } else {
+          projElement = (await curSection.findItem(projectName)) as
+            | TreeItem
+            | undefined;
+        }
+
+        if (projElement === undefined) {
+          continue;
+        }
+
+        if (!(await projElement.isSelected())) {
+          await projElement.select();
+        }
+        const pkgElements = await projElement.getChildren();
+
+        const pkgNames = await Promise.all(
+          pkgElements.map((p) => p.getLabel())
+        );
+        const pkgInd = pkgNames.findIndex((name) => name === packageName);
+        if (pkgInd !== -1) {
+          pkgElem = pkgElements[pkgInd];
         }
       }
       return pkgElem;
