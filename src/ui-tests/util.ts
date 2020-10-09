@@ -253,7 +253,7 @@ export function promiseWithTimeout<T>(
   {
     errorMsg,
     finalizer
-  }: { errorMsg?: string; finalizer?: () => Promise<void> }
+  }: { errorMsg?: string; finalizer?: () => Promise<void> } = {}
 ): Promise<T> {
   let tmout: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
