@@ -689,7 +689,9 @@ describe("RepositoryTreeProvider", function () {
       await this.openSpecFile();
 
       // give the CurrentPackageWatcher a bit of time to read in the project
-      await new Workbench().getDriver().sleep(500);
+      await waitForPackageBookmark(testProj.name, pkg.name, {
+        section: "Current Project"
+      });
     });
 
     after(cleanupAfterTests);
@@ -721,7 +723,9 @@ describe("RepositoryTreeProvider", function () {
       await (await sec.findItem(fooSpec.name))!.select();
 
       // give the CurrentPackageWatcher a bit of time to read in the project
-      await bench.getDriver().sleep(500);
+      await waitForPackageBookmark(testProj.name, pkg.name, {
+        section: "Current Project"
+      });
     });
 
     after(cleanupAfterTests);
