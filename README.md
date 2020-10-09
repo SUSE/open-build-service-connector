@@ -193,8 +193,6 @@ settings in your `settings.json` and change the account password via the command
 - Checking out projects currently results in **all** packages being checked
   out.
 
-- The current project view sometimes does not show the files of a package.
-
 Please also be sure to checkout the issue tracker!
 
 
