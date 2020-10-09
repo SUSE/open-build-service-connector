@@ -658,15 +658,13 @@ before(() => fsPromises.mkdir(checkOutPath, { recursive: true }));
 describe("RepositoryTreeProvider", function () {
   this.timeout(30000);
 
-  after(() => safeRmRf(checkOutPath));
-
   describe("locally checked out project", function () {
     before(async function () {
       await createTestProject();
 
       this.wsFolderPath = join(checkOutPath, "proj");
       this.pkgBasePath = join(checkOutPath, "proj", pkg.name);
-      // await fsPromises.mkdir(join(checkOutPath, "proj"), { recursive: true });
+      await fsPromises.mkdir(this.wsFolderPath, { recursive: true });
       await checkOutProject(testCon, testProj, this.wsFolderPath);
 
       this.openSpecFile = openSpecFile;
@@ -684,7 +682,7 @@ describe("RepositoryTreeProvider", function () {
 
       this.wsFolderPath = join(checkOutPath, "pkg");
       this.pkgBasePath = join(checkOutPath, "pkg");
-      // await fsPromises.mkdir(this.basePath, { recursive: true });
+      await fsPromises.mkdir(this.wsFolderPath, { recursive: true });
       await checkOutPackage(testCon, testProj.name, pkg.name, this.pkgBasePath);
 
       this.openSpecFile = openSpecFile;
