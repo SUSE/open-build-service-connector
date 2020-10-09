@@ -108,6 +108,11 @@ export class CurrentProjectTreeProvider
 
     this.disposables.push(
       currentPackageWatcher.onDidChangeCurrentPackage((curPkg) => {
+        this.logger.trace(
+          "CurrentProjectTreeProvider received an updated current package: %s/%s",
+          curPkg.currentPackage?.projectName,
+          curPkg.currentPackage?.name
+        );
         this.currentPackage = curPkg;
         this.refresh();
       }, this),

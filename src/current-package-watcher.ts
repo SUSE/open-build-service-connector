@@ -39,6 +39,7 @@ import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import {
+  isPackageBookmark,
   isProjectBookmark,
   PackageBookmark,
   ProjectBookmark
@@ -70,7 +71,11 @@ export interface CurrentPackage {
    * The Project belonging to the currently opened file.
    * `undefined` if the file does not belong to any Project.
    */
-  readonly currentProject: ProjectWithMeta | CheckedOutProject | undefined;
+  readonly currentProject:
+    | ProjectWithMeta
+    | CheckedOutProject
+    | ProjectBookmark
+    | undefined;
 
   /**
    *
@@ -478,6 +483,25 @@ export class CurrentPackageWatcherImpl
             pkg: currentPackage
           });
         }
+        const newCurrentProject = isPackageBookmark(
+          this._currentPackage.currentPackage
+        )
+          ? await ProjectBookmarkManager.getBookmarkedProjectCommand(
+              this._currentPackage.currentPackage.apiUrl,
+              this._currentPackage.currentPackage.projectName
+            )
+          : await this.obsFetchers.fetchProject(
+              con,
+              this._currentPackage.currentPackage.projectName,
+              { fetchPackageList: false }
+            );
+        this.fireCurrentPackageEvent({
+          currentPackage,
+          currentFilename,
+          currentProject:
+            newCurrentProject ?? this._currentPackage.currentProject,
+          properties
+        });
       } catch (err) {
         this.logger.error(
           "Tried to reload the package %s, but got the error %s. Removing it now.",
