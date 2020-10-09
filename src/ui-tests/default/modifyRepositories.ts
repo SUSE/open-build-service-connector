@@ -53,7 +53,7 @@ import {
   Workbench
 } from "vscode-extension-tester";
 import { DialogHandler } from "vscode-extension-tester-native";
-import { safeRmRf } from "../../test/suite/utilities";
+import { getTmpPrefix, safeRmRf } from "../../test/suite/utilities";
 import { testCon, testUser } from "../testEnv";
 import {
   ensureExtensionOpen,
@@ -99,7 +99,7 @@ const fooSpec = packageFileFromBuffer(
   "well, not really a spec but good enough"
 );
 
-const checkOutPath: string = path.join(process.env.HOME!, "checkoutDir");
+const checkOutPath: string = path.join(getTmpPrefix(), "checkoutDir");
 
 const tw = "openSUSE Tumbleweed";
 const twRepoName = tw.replace(" ", "_");
