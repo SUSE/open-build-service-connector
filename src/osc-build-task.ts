@@ -27,6 +27,7 @@ import {
   runProcess
 } from "open-build-service-api";
 import { Logger } from "pino";
+import { inspect } from "util";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import {
@@ -84,7 +85,14 @@ function isOscTaskDefinition(
       return false;
     }
   }
-  return true;
+  return (
+    (typeof task["oscBinaryPath"] === "undefined" ||
+      typeof task["oscBinaryPath"] === "string") &&
+    (typeof task["cleanBuildRoot"] === "undefined" ||
+      typeof task["cleanBuildRoot"] === "boolean") &&
+    (typeof task["extraOscArgs"] === "undefined" ||
+      Array.isArray(task["extraOscArgs"]))
+  );
 }
 
 // export const RPMLINT_PROBLEM_MATCHER = "rpmlint";
@@ -183,6 +191,8 @@ export class CustomExecutionTerminal
 
 /** A [[Task]] that runs `osc build $repo $arch` */
 export class OscBuildTask extends vscode.Task {
+  readonly definition: OscTaskDefinition;
+
   /** Create a new from a task definition, a workspace folder and a task name */
   constructor(
     taskDef: vscode.TaskDefinition,
@@ -223,7 +233,14 @@ export class OscBuildTask extends vscode.Task {
         { cwd: taskDef.pkgPath }
       )
     );
-
+    if (!isOscTaskDefinition(taskDef)) {
+      throw new Error(
+        `Received an invalid task definition for a osc build task: ${inspect(
+          taskDef
+        )}`
+      );
+    }
+    this.definition = taskDef;
     this.group = [vscode.TaskGroup.Build];
   }
 

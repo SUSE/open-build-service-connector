@@ -258,7 +258,7 @@ describe("OscBuildTaskProvider", () => {
           testLogger.info(taskDefs);
 
           const commonDef = {
-            oscBinary: "/usr/bin/osc",
+            oscBinaryPath: "/usr/bin/osc",
             type: OSC_BUILD_TASK_TYPE
           };
 
@@ -405,6 +405,13 @@ describe("OscBuildTaskProvider", () => {
 });
 
 describe("OscBuildTask", () => {
+  it("throws an error when the Task Definition has the wrong type", () => {
+    (() => new OscBuildTask({ type: "foo" }, wsFolder, MOD_PKG)).should.throw(
+      Error,
+      /invalid task definition/i
+    );
+  });
+
   describe("#execution", () => {
     const repositoryName = "foo";
     const arch = Arch.Riscv64;
