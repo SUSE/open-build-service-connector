@@ -28,7 +28,7 @@ function setupCoverage() {
   const nyc = new NYC({
     all: true,
     cwd: path.join(__dirname, "..", "..", ".."),
-    exclude: ["**/test/**", ".vscode-test/**"],
+    exclude: ["**/test/**", "**/ui-tests/**", ".vscode-test/**"],
     hookRequire: true,
     hookRunInContext: true,
     hookRunInThisContext: true,
