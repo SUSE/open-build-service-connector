@@ -486,6 +486,10 @@
             "default": "x86_64",
             "description": "The architecture for which the package should be build"
           },
+          "pkgPath": {
+            "type": "string",
+            "description": "The path to the packages' root directory"
+          },
           "cleanBuildRoot": {
             "type": "boolean",
             "default": true,
