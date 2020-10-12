@@ -49,12 +49,26 @@ export const OSC_BUILD_TASK_TYPE = "osc";
  * **WARNING:** if you change anything in here, then you **must** also change
  *              the corresponding entry in `package.json`
  */
-export interface OscTaskDefinition extends vscode.TaskDefinition {
+export interface OscTaskDefinition {
+  readonly type: "osc";
+
+  /** Name of the repository that will be build */
   readonly repository: string;
+  /** Path to the root folder in which the package resides */
   readonly pkgPath: string;
+  /**
+   * Build architecture of the package.
+   * in case a new architecture gets added, add it to package.json as well
+   */
   readonly arch: Arch;
+
+  /** If true or undefined, then `osc build` is run with `--clean` */
   readonly cleanBuildRoot?: boolean;
+
+  /** Additional arguments that should be added to the osc invocation */
   readonly extraOscArgs?: string[];
+
+  /** path to the `osc` binary */
   readonly oscBinaryPath?: string;
 }
 
