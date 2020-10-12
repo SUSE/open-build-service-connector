@@ -377,18 +377,14 @@ export class OscBuildTaskProvider
                 (typeof repo.build === "boolean" && repo.build) ||
                 (repo.build instanceof Map && repo.build.get(arch))
               ) {
-                tasks.push(
-                  new OscBuildTask(
-                    {
-                      type: OSC_BUILD_TASK_TYPE,
-                      repository: repo.name,
-                      arch,
-                      oscBinary: this.oscPath
-                    },
-                    wsFolder,
-                    pkg
-                  )
-                );
+                const taskDef: OscTaskDefinition = {
+                  type: OSC_BUILD_TASK_TYPE,
+                  repository: repo.name,
+                  arch,
+                  oscBinaryPath: this.oscPath,
+                  pkgPath: pkg.path
+                };
+                tasks.push(new OscBuildTask(taskDef, wsFolder, pkg));
               }
             });
           });

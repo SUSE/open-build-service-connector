@@ -259,6 +259,7 @@ describe("OscBuildTaskProvider", () => {
 
           const commonDef = {
             oscBinaryPath: "/usr/bin/osc",
+            pkgPath: PATH,
             type: OSC_BUILD_TASK_TYPE
           };
 
