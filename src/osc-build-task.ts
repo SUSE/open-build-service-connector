@@ -27,6 +27,7 @@ import {
   runProcess
 } from "open-build-service-api";
 import { Logger } from "pino";
+import { inspect } from "util";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import {
@@ -49,12 +50,26 @@ export const OSC_BUILD_TASK_TYPE = "osc";
  * **WARNING:** if you change anything in here, then you **must** also change
  *              the corresponding entry in `package.json`
  */
-export interface OscTaskDefinition extends vscode.TaskDefinition {
+export interface OscTaskDefinition {
+  readonly type: "osc";
+
+  /** Name of the repository that will be build */
   readonly repository: string;
+  /** Path to the root folder in which the package resides */
   readonly pkgPath: string;
+  /**
+   * Build architecture of the package.
+   * in case a new architecture gets added, add it to package.json as well
+   */
   readonly arch: Arch;
+
+  /** If true or undefined, then `osc build` is run with `--clean` */
   readonly cleanBuildRoot?: boolean;
+
+  /** Additional arguments that should be added to the osc invocation */
   readonly extraOscArgs?: string[];
+
+  /** path to the `osc` binary */
   readonly oscBinaryPath?: string;
 }
 
@@ -70,7 +85,14 @@ function isOscTaskDefinition(
       return false;
     }
   }
-  return true;
+  return (
+    (typeof task["oscBinaryPath"] === "undefined" ||
+      typeof task["oscBinaryPath"] === "string") &&
+    (typeof task["cleanBuildRoot"] === "undefined" ||
+      typeof task["cleanBuildRoot"] === "boolean") &&
+    (typeof task["extraOscArgs"] === "undefined" ||
+      Array.isArray(task["extraOscArgs"]))
+  );
 }
 
 // export const RPMLINT_PROBLEM_MATCHER = "rpmlint";
@@ -169,6 +191,8 @@ export class CustomExecutionTerminal
 
 /** A [[Task]] that runs `osc build $repo $arch` */
 export class OscBuildTask extends vscode.Task {
+  readonly definition: OscTaskDefinition;
+
   /** Create a new from a task definition, a workspace folder and a task name */
   constructor(
     taskDef: vscode.TaskDefinition,
@@ -209,7 +233,14 @@ export class OscBuildTask extends vscode.Task {
         { cwd: taskDef.pkgPath }
       )
     );
-
+    if (!isOscTaskDefinition(taskDef)) {
+      throw new Error(
+        `Received an invalid task definition for a osc build task: ${inspect(
+          taskDef
+        )}`
+      );
+    }
+    this.definition = taskDef;
     this.group = [vscode.TaskGroup.Build];
   }
 
@@ -346,18 +377,14 @@ export class OscBuildTaskProvider
                 (typeof repo.build === "boolean" && repo.build) ||
                 (repo.build instanceof Map && repo.build.get(arch))
               ) {
-                tasks.push(
-                  new OscBuildTask(
-                    {
-                      type: OSC_BUILD_TASK_TYPE,
-                      repository: repo.name,
-                      arch,
-                      oscBinary: this.oscPath
-                    },
-                    wsFolder,
-                    pkg
-                  )
-                );
+                const taskDef: OscTaskDefinition = {
+                  type: OSC_BUILD_TASK_TYPE,
+                  repository: repo.name,
+                  arch,
+                  oscBinaryPath: this.oscPath,
+                  pkgPath: pkg.path
+                };
+                tasks.push(new OscBuildTask(taskDef, wsFolder, pkg));
               }
             });
           });
