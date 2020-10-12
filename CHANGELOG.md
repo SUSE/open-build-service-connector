@@ -6,6 +6,16 @@ documented in this file.
 The format is based on [Keep a
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - 2020-10-14
+
+### Added
+
+### Changed
+
+- Fixed multiple backend bugs involving branched packages
+
+### Removed
+
 ## [0.0.3] - 2020-10-09
 
 ### Added
