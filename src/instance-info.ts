@@ -27,6 +27,7 @@ import {
   fetchProjectList
 } from "open-build-service-api";
 import { Logger } from "pino";
+import { URL } from "url";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
@@ -43,6 +44,9 @@ interface ObsFetchers {
 export interface ObsInstance {
   /** URL to the API, used for identification purposes. */
   readonly apiUrl: ApiUrl;
+
+  /** URL to the webUI */
+  readonly webUiUrl?: URL;
 
   /**
    * Linux distributions known to this instance that can be directly added via
@@ -238,6 +242,7 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
       apiUrl,
       hostedDistributions,
       supportedArchitectures: conf?.schedulers,
+      webUiUrl: conf?.webUiUrl,
       projectList: projectList?.map((proj) => proj.name)
     };
   }

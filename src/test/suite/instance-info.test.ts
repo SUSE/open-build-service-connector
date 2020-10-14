@@ -157,7 +157,8 @@ describe("ObsServerInformation", () => {
         openBuildServiceApi.Arch.X86_64,
         openBuildServiceApi.Arch.Aarch64
       ],
-      title: "openSUSE Build Service"
+      title: "openSUSE Build Service",
+      webUiUrl: new URL("https://build.opensuse.org/")
     };
 
     const fooInstanceConfig: openBuildServiceApi.Configuration = {
@@ -183,7 +184,8 @@ describe("ObsServerInformation", () => {
       apiUrl: fakeAccount2.apiUrl,
       hostedDistributions: [tumbleweed],
       supportedArchitectures: obsConfig.schedulers,
-      projectList
+      projectList,
+      webUiUrl: new URL("https://build.opensuse.org")
     };
 
     beforeEach(function () {
@@ -216,7 +218,8 @@ describe("ObsServerInformation", () => {
           apiUrl: fakeAccount1.apiUrl,
           hostedDistributions: [tumbleweed],
           supportedArchitectures: [],
-          projectList
+          projectList,
+          webUiUrl: undefined
         });
 
         expect(serverInfo.getInfo("https://api.opensuse.org/")).to.equal(
@@ -289,7 +292,8 @@ describe("ObsServerInformation", () => {
           apiUrl: thirdAccount.apiUrl,
           hostedDistributions: [tumbleweed],
           supportedArchitectures: undefined,
-          projectList
+          projectList,
+          webUiUrl: undefined
         });
       })
     );
