@@ -14,6 +14,7 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Button to branch a package is moved to the context menu
 - Fixed multiple backend bugs involving branched packages
 
 ### Removed

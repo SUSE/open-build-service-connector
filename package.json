@@ -85,7 +85,6 @@
           "command": "vscodeObs.obsProject.updatePackage"
         },
         {
-          "group": "inline",
           "when": "view == bookmarkedProjectsTree && viewItem == package",
           "command": "vscodeObs.obsProject.branchAndBookmarkAndCheckoutPackage"
         },
