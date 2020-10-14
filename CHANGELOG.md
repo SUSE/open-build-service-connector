@@ -10,6 +10,8 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Packages can be submitted via submit-requests
+
 ### Changed
 
 - Fixed multiple backend bugs involving branched packages

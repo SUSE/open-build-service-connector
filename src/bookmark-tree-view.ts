@@ -56,6 +56,7 @@ import {
   ObsFetchers,
   VscodeWindow
 } from "./dependency-injection";
+import { ObsServerInformation } from "./instance-info";
 import {
   OBS_PACKAGE_FILE_URI_SCHEME,
   RemotePackageFileContentProvider,
@@ -112,6 +113,8 @@ export const CHECK_OUT_PROJECT_COMMAND = `${cmdPrefix}.${cmdId}.checkOutProject`
 
 /** ID of the command to branch and checkout a package */
 export const BRANCH_AND_BOOKMARK_AND_CHECKOUT_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.branchAndBookmarkAndCheckoutPackage`;
+
+export const SUBMIT_PACKAGE_COMMAND = `${cmdPrefix}.${cmdId}.submitPackage`;
 
 type BookmarkTreeItem =
   | BookmarkedProjectTreeElement
@@ -503,6 +506,11 @@ export class BookmarkedProjectsTreeProvider
         this.branchAndBookmarkAndCheckoutPackage,
         this
       ),
+      vscode.commands.registerCommand(
+        SUBMIT_PACKAGE_COMMAND,
+        this.submitPackage,
+        this
+      ),
 
       bookmarkMngr.onBookmarkUpdate(
         ({ changeType, changedObject, element }) => {
@@ -711,6 +719,76 @@ export class BookmarkedProjectsTreeProvider
 
     assert(false, "This part of the code must be unreachable");
     }*/
+
+  @logAndReportExceptions()
+  public async submitPackage(element?: BookmarkTreeItem): Promise<void> {
+    if (element === undefined || !isBookmarkedPackageTreeElement(element)) {
+      this.logger.error(
+        "branchAndBookmarkPackage called on the wrong element: %s",
+        element?.contextValue
+      );
+      return;
+    }
+    const apiUrl = element.pkg.apiUrl;
+    const con = this.activeAccounts.getConfig(apiUrl)?.connection;
+    if (con === undefined) {
+      throw new Error(
+        `cannot branch package ${element.pkg.projectName}/${element.pkg.name}: no account is configured`
+      );
+    }
+
+    const pkg = await this.bookmarkMngr.getBookmarkedPackage(
+      apiUrl,
+      element.pkg.projectName,
+      element.pkg.name
+    );
+    if (pkg === undefined) {
+      this.logger.error(
+        "Could not retrieve package %s/%s, cannot submit it.",
+        element.pkg.projectName,
+        element.pkg.name
+      );
+      return;
+    }
+
+    let target = {
+      projectName: pkg.sourceLink?.project,
+      packageName: pkg.sourceLink?.package ?? pkg.name
+    };
+
+    if (target.projectName === undefined) {
+      target.projectName = await promptUserForProjectName(
+        apiUrl,
+        `Target project for the submission of ${pkg.projectName}/${pkg.name}`,
+        this.vscodeWindow
+      );
+    }
+    if (target.projectName === undefined) {
+      this.logger.debug("User did not enter a target project");
+      return;
+    }
+
+    const req = await this.obsFetchers.submitPackage(
+      con,
+      element.pkg,
+      // Typescript is being extra dense here: just passing `target` does not
+      // work, but destructuring works…
+      {
+        projectName: target.projectName,
+        packageName: target.packageName
+      }
+    );
+    const webUiUrl = (await ObsServerInformation.getInstanceInfoCommand(apiUrl))
+      ?.webUiUrl;
+
+    await this.vscodeWindow.showInformationMessage(
+      "Created request ".concat(
+        webUiUrl === undefined
+          ? req.id.toString()
+          : `[${req.id}](${webUiUrl}request/show/${req.id})`
+      )
+    );
+  }
 
   @logAndReportExceptions()
   public async branchAndBookmarkAndCheckoutPackage(

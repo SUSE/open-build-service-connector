@@ -90,6 +90,10 @@
           "command": "vscodeObs.obsProject.branchAndBookmarkAndCheckoutPackage"
         },
         {
+          "when": "view == bookmarkedProjectsTree && viewItem == package",
+          "command": "vscodeObs.obsProject.submitPackage"
+        },
+        {
           "group": "inline",
           "when": "view == bookmarkedProjectsTree && viewItem == package",
           "command": "vscodeObs.obsProject.checkOutPackage"
@@ -274,6 +278,11 @@
         },
         "title": "Branch, bookmark and checkout this package",
         "command": "vscodeObs.obsProject.branchAndBookmarkAndCheckoutPackage"
+      },
+      {
+        "icon": "$(git-pull-request)",
+        "title": "Submit package",
+        "command": "vscodeObs.obsProject.submitPackage"
       },
       {
         "icon": "$(refresh)",
