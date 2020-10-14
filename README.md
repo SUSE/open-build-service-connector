@@ -162,6 +162,8 @@ by other means as well (e.g. local only or a VPN).
 
 ## Installation and setup
 
+### Secret storage
+
 Linux users have to install
 [libsecret](https://wiki.gnome.org/Projects/Libsecret) for storing the account
 passwords. The installation command will differ depending on your distribution:
@@ -184,6 +186,9 @@ an interactive wizard. Once setup, you can always modify the general account
 settings in your `settings.json` and change the account password via the command
 `Set the password of a Build Service Account`.
 
+MacOSX and Windows users don't have to install anything, as
+[node-keytar](https://github.com/atom/node-keytar) uses the operating system's
+secret storage.
 
 ## Current limitations
 
