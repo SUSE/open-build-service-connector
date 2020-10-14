@@ -46,6 +46,7 @@ import {
   isProjectBookmark,
   PackageBookmark,
   packageBookmarkFromPackage,
+  PackageBookmarkImpl,
   ProjectBookmark,
   ProjectBookmarkImpl
 } from "./bookmarks";
@@ -622,8 +623,8 @@ class MetadataCache extends ConnectionListenerLoggerBase {
       return {
         ...proj,
         state: BookmarkState.RemoteGone,
-        packages: (projectFromCache?.packages ?? []).map((pkg) =>
-          packageBookmarkFromPackage(pkg)
+        packages: (projectFromCache?.packages ?? []).map(
+          (pkg) => new PackageBookmarkImpl(pkg, BookmarkState.RemoteGone)
         )
       };
     }
