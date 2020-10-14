@@ -199,3 +199,6 @@ Please also be sure to checkout the issue tracker!
 ## Credits
 
 - [@hellcp](https://github.com/Hellcp) for the icon used in the Activity Bar
+- [@hennevogel](https://github.com/hennevogel) for improving the mini OBS test
+  setup
+- [@adrianschroeter](https://github.com/adrianschroeter) for help with OBS' API
