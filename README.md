@@ -36,7 +36,9 @@ packages that should be bookmarked:
 
 You can browse the bookmarked projects, packages and their files. Clicking on a
 file opens a read-only view of the file contents retrieved from the Open Build
-Service.
+Service:
+
+![browse_bookmarks](screenshots/browse_bookmarks.gif)
 
 
 ### Checking out projects and packages
@@ -73,7 +75,12 @@ architectures of the specific repository. Paths and architectures can be added
 or removed via the `+` and `-` icons that appear next to the respective entries
 in the tree view:
 
-![expanded_repository](screenshots/expanded_repository.png)
+![modify_repository_archs.gif](screenshots/modify_repository_archs.gif)
+
+Repository paths can be modified in the same way, additionally the individual
+paths can be moved up and down:
+
+![modify_repository_paths.gif](screenshots/modify_repository_paths.gif)
 
 
 ### Source control integration
@@ -94,9 +101,31 @@ provide the basic features:
 
 The modifications can be committed to the Open Build Service via the source
 control input box. Optionally one can use the same input box to add an entry to
-changelog:
+the changelog:
 
 ![add_changelog_entry](screenshots/add_changelog_entry.gif)
+
+
+### Build locally checked out packages
+
+If [osc](https://github.com/openSUSE/osc) is available in `$PATH`, then the
+extension provides VSCode with tasks to build a locally checked out package:
+
+![osc_build.gif](screenshots/osc_build.gif)
+
+
+### Branch packages and submit changes back
+
+Bookmarked packages can be branched into your home project from the context
+menu:
+
+![branch_pkg.png](screenshots/branch_pkg.png)
+
+The branched package will be directly bookmarked and checked out to a desired
+location on your filesystem. Once you have applied your changes, you can submit
+the changes back via a submitrequest:
+
+![submit_package.gif](screenshots/submit_package.gif)
 
 
 ## Requirements
