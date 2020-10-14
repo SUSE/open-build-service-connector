@@ -540,7 +540,7 @@
   },
   "license": "MIT",
   "publisher": "SUSE",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Connector to the Open Build Service",
   "displayName": "Open Build Service Connector",
   "name": "open-build-service-connector",
