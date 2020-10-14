@@ -190,6 +190,15 @@ MacOSX and Windows users don't have to install anything, as
 [node-keytar](https://github.com/atom/node-keytar) uses the operating system's
 secret storage.
 
+### Building packages
+
+The extension allows you to build checked out packages via
+[osc](https://github.com/openSUSE/osc). To use this feature, please install osc
+either using your distribution's package manager, from
+[OBS](http://download.opensuse.org/repositories/openSUSE:/Tools/) or from the
+[git repository](https://github.com/openSUSE/osc).
+
+
 ## Current limitations
 
 - Repositories can only be created from existing distributions and not
