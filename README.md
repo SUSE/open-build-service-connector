@@ -199,12 +199,3 @@ Please also be sure to checkout the issue tracker!
 ## Credits
 
 - [@hellcp](https://github.com/Hellcp) for the icon used in the Activity Bar
-
-
-## Release Notes
-
-### 2020-06-03: 0.0.1
-
-First Beta released accompanying the talk "Building a Visual Studio Code
-extension for the Open Build Service" (session id DEV-1287) at [SUSECON Digital
-2020](https://www.susecon.com/).
