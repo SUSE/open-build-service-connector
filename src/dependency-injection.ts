@@ -23,7 +23,8 @@ import {
   branchPackage,
   fetchFileContents,
   fetchPackage,
-  fetchProject
+  fetchProject,
+  submitPackage
 } from "open-build-service-api";
 import { readInUnifiedPackage } from "open-build-service-api/lib/package";
 import * as vscode from "vscode";
@@ -63,6 +64,7 @@ export interface ObsFetchers {
   readonly fetchProject: typeof fetchProject;
   readonly branchPackage: typeof branchPackage;
   readonly readInUnifiedPackage: typeof readInUnifiedPackage;
+  readonly submitPackage: typeof submitPackage;
 }
 
 export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
@@ -70,5 +72,6 @@ export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
   fetchFileContents,
   fetchPackage,
   branchPackage,
-  readInUnifiedPackage
+  readInUnifiedPackage,
+  submitPackage
 };
