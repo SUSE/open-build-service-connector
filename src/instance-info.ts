@@ -101,6 +101,15 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
    */
   public updateInstanceInfosPromise: Promise<string[]>;
 
+  public static async getInstanceInfoCommand(
+    apiUrl: ApiUrl
+  ): Promise<ObsInstance | undefined> {
+    return await vscode.commands.executeCommand<ObsInstance>(
+      GET_INSTANCE_INFO_COMMAND,
+      apiUrl
+    );
+  }
+
   private instances: ObsInstance[] = [];
 
   constructor(
