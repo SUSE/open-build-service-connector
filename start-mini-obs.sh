@@ -4,7 +4,6 @@ set -euox pipefail
 
 export repo_dir="open-build-service"
 export obs_url="http://localhost:3000"
-obs_version=2.10.7
 
 pushd .
 
@@ -14,14 +13,12 @@ fi
 
 cd "${repo_dir}"
 git fetch -tp origin
-git checkout -b v${obs_version} ${obs_version} || git checkout v${obs_version}
+git checkout master
 git submodule init
 git submodule update
 
 # don't build the containers for testing, we don't need them and it just takes ages
 sed -i '/docker-compose.*docker-compose\.yml.*docker-compose\.minitest\.yml.*docker-compose\.minitest-user\.yml.*build.*minitest/d' Rakefile
-# temporary workaround for codecov 0.1.14 no longer being available
-sed -i 's/codecov (0\.1\.14)/codecov (0.2.8)/' src/api/Gemfile.lock
 rake docker:build
 docker-compose up -d
 
