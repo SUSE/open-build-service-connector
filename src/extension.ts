@@ -46,10 +46,9 @@ export async function activate(
 
   const logFile = join(
     context.logUri.fsPath,
-    `open-build-service-connector.${new Date()
-      .toString()
-      .replace(/\s+/g, "_")}.log`
+    `vscode-obs.${new Date().getTime()}.log`
   );
+
   let options: pino.LoggerOptions;
   if (process.env.EXTENSION_DEBUG === "1") {
     options = {
