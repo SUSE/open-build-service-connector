@@ -8,8 +8,11 @@
 
 Visual Studio Code extension for integration with the [Open Build
 Service](https://openbuildservice.org/): it allows you to view existing packages
-and project, check them out locally and integrates into VSCode's source
-control.
+and projects, check them out locally, build them and integrates into VSCode's
+source control.
+
+The Open Build Service Connector is also available in the
+[Open VSX registry](https://open-vsx.org/extension/SUSE/open-build-service-connector).
 
 **NOTE:** The extension is still in the Beta, thus exercise caution when using
 it in production.
