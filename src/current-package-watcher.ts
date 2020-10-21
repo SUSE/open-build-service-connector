@@ -757,14 +757,12 @@ export class CurrentPackageWatcherImpl
    * sets the current active package to that value.
    */
   private fireCurrentPackageEvent(newCurrentPkg: CurrentPackage): void {
-    if (!currentPackagesEqual(newCurrentPkg, this._currentPackage)) {
-      this.logger.trace(
-        "New current package: %s",
-        this._currentPackage.currentPackage?.name ?? "undefined"
-      );
-      this._currentPackage = newCurrentPkg;
-      this.onDidChangeCurrentPackageEmitter.fire(this._currentPackage);
-    }
+    this.logger.trace(
+      "New current package: %s",
+      this._currentPackage.currentPackage?.name ?? "undefined"
+    );
+    this._currentPackage = newCurrentPkg;
+    this.onDidChangeCurrentPackageEmitter.fire(this._currentPackage);
   }
 
   private isTextDocumentTracked(document: vscode.TextDocument): boolean {
