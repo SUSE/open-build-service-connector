@@ -20,7 +20,6 @@
  */
 
 import * as assert from "assert";
-import { createHash } from "crypto";
 import { promises as fsPromises } from "fs";
 import {
   Package,
@@ -648,14 +647,19 @@ class MetadataCache extends ConnectionListenerLoggerBase {
     }
   }
 
-  private getApiHash(projectOrPackage: BaseProject | BasePackage): string {
-    let hash = createHash("md5");
-    hash = hash.update(projectOrPackage.apiUrl);
-    return hash.digest("hex");
-  }
-
+  /**
+   * Returns the path in which the project's metadata will be stored.
+   *
+   * The path is a combination of the project's api url and it's name encoded as
+   * hexadecimal to avoid using any invalid characters in filenames (e.g. ':' on
+   * Windows).
+   */
   private getProjectBasePath(proj: BaseProject): string {
-    return join(this.baseStoragePath, this.getApiHash(proj), proj.name);
+    return join(
+      this.baseStoragePath,
+      Buffer.from(proj.apiUrl).toString("hex"),
+      Buffer.from(proj.name).toString("hex")
+    );
   }
 }
 
