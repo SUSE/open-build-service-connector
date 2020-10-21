@@ -22,6 +22,7 @@
 import * as assert from "assert";
 import { promises as fsPromises } from "fs";
 import {
+  ModifiedPackage,
   Package,
   PackageFile,
   pathExists,
@@ -127,12 +128,13 @@ export function insertPackageIntoProject(
   return changeType;
 }
 
-function dropFileContents(pkg: PackageBookmark): PackageBookmark;
-function dropFileContents(pkg: Package): Package;
+export function dropFileContents(pkg: ModifiedPackage): ModifiedPackage;
+export function dropFileContents(pkg: PackageBookmark): PackageBookmark;
+export function dropFileContents(pkg: Package): Package;
 
-function dropFileContents(
-  pkg: Package | PackageBookmark
-): Package | PackageBookmark {
+export function dropFileContents(
+  pkg: Package | PackageBookmark | ModifiedPackage
+): Package | PackageBookmark | ModifiedPackage {
   const { files, ...rest } = pkg;
   return {
     files: files?.map((f) => new BasePackageFile(f)),
