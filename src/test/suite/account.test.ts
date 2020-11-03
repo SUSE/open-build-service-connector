@@ -607,6 +607,29 @@ describe("AccountManager", function () {
           this.fixture.sandbox.assert.notCalled(this.fixture.accountChangeSpy);
         })
       );
+
+      it(
+        "falls back to ~/.oscrc when the default contains no accounts",
+        castToAsyncFunc<FixtureContext>(async function () {
+          const mngr = await this.fixture.createAccountManager([]);
+
+          this.fixture.readAccountsFromOscrcMock
+            .onCall(1)
+            .resolves([
+              { ...fakeAccount1, password: "fooPassword", aliases: [] }
+            ]);
+          this.fixture.readAccountsFromOscrcMock.onCall(0).resolves([]);
+
+          await executeAndWaitForEvent(
+            () => mngr.importAccountsFromOsrc(),
+            mngr.onAccountChange
+          );
+
+          expect(mngr.activeAccounts.getAllApis()).to.deep.equal([
+            fakeAccount1.apiUrl
+          ]);
+        })
+      );
     });
 
     describe("#promptForUninmportedAccount", () => {

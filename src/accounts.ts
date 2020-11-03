@@ -1029,7 +1029,7 @@ export class AccountManagerImpl extends LoggingBase {
     oscrcAccounts?: Account[]
   ): Promise<void> {
     if (oscrcAccounts === undefined) {
-      oscrcAccounts = await this.obsReadAccountsFromOscrc();
+      oscrcAccounts = await this.readAccountsFromOscConfigs();
     }
 
     let added: boolean = false;
@@ -1115,6 +1115,20 @@ export class AccountManagerImpl extends LoggingBase {
     this.notifyOffAccountChange();
   }
 
+  private async readAccountsFromOscConfigs(): Promise<Account[]> {
+    const defaultAccounts = await this.obsReadAccountsFromOscrc();
+
+    const res =
+      defaultAccounts.length === 0
+        ? await this.obsReadAccountsFromOscrc("~/.oscrc")
+        : defaultAccounts;
+    this.logger.trace(
+      "Read the following accounts from osc's config file: %o",
+      res
+    );
+    return res;
+  }
+
   /**
    * Save the current account configuration to VSCode's storage without
    * triggering our [[configurationChangeListener]].
@@ -1175,7 +1189,7 @@ export class AccountManagerImpl extends LoggingBase {
   private async unimportedAccountsInOscrc(): Promise<Account[]> {
     this.logger.trace("Checking for unimported accounts");
 
-    const accounts = await this.obsReadAccountsFromOscrc();
+    const accounts = await this.readAccountsFromOscConfigs();
     const oscrcAccountsApiUrls = accounts.map((acc) => acc.apiUrl);
     this.logger.trace("found the accounts in oscrc: %s", oscrcAccountsApiUrls);
 
