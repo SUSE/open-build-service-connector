@@ -1,6 +1,7 @@
 # Open Build Service Connector
 
 [![Visual Studio Marketplace](https://vsmarketplacebadge.apphb.com/version/SUSE.open-build-service-connector.svg)](https://marketplace.visualstudio.com/items?itemName=SUSE.open-build-service-connector)
+[![Open VSX Registry](https://img.shields.io/open-vsx/v/SUSE/open-build-service-connector)](https://open-vsx.org/extension/SUSE/open-build-service-connector)
 [![Build Status](https://travis-ci.org/SUSE/open-build-service-connector.svg?branch=master)](https://travis-ci.org/SUSE/open-build-service-connector)
 [![CI](https://img.shields.io/github/workflow/status/SUSE/open-build-service-connector/CI)](https://github.com/SUSE/open-build-service-connector/actions?query=workflow%3ACI)
 [![UI_tests](https://img.shields.io/github/workflow/status/SUSE/open-build-service-connector/UI_tests?style=plastic)](https://github.com/SUSE/open-build-service-connector/actions?query=workflow%3A%22UI_tests%22)
@@ -10,9 +11,6 @@ Visual Studio Code extension for integration with the [Open Build
 Service](https://openbuildservice.org/): it allows you to view existing packages
 and projects, check them out locally, build them and integrates into VSCode's
 source control.
-
-The Open Build Service Connector is also available in the
-[Open VSX registry](https://open-vsx.org/extension/SUSE/open-build-service-connector).
 
 **NOTE:** The extension is still in the Beta, thus exercise caution when using
 it in production.
