@@ -183,7 +183,7 @@ async function main() {
         ? vscodeVersion === "insider"
           ? ReleaseQuality.Insider
           : ReleaseQuality.Stable
-        : undefined;
+        : ReleaseQuality.Stable;
 
     process.env.LD_PRELOAD = pathToLibsecret;
     process.env.HOME = testEnv.fakeHomeDir;
