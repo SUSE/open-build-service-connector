@@ -31,3 +31,4 @@ logfile.json
 writing_ui_tests.md
 .vagrant/**
 Vagrantfile
+screenshots/**
