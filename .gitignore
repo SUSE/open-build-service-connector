@@ -14,3 +14,4 @@ mocklibsecret/.mypy_cache/*
 .vagrant/*
 src/ui-tests/default/fakeHome/*
 src/ui-tests/default/settings.json
+dist/*

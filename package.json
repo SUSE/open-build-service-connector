@@ -13,6 +13,7 @@
     "@types/vscode": "^1.40.0",
     "@typescript-eslint/eslint-plugin": "^4",
     "@typescript-eslint/parser": "^4",
+    "awesome-node-loader": "^1.1.1",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
     "chai-things": "^0.2.0",
@@ -25,13 +26,16 @@
     "prettier": "^2",
     "sinon": "^9",
     "sinon-chai": "^3.5.0",
+    "ts-loader": "^8.0.11",
     "ts-mock-imports": "^1.2.6",
     "typedoc": ">=0.17",
     "typescript": ">=3.8",
     "vsce": "^1.74",
     "vscode-extension-tester": "^3",
     "vscode-extension-tester-native": "^3",
-    "vscode-test": "^1"
+    "vscode-test": "^1",
+    "webpack": "^5.9.0",
+    "webpack-cli": "^4.2.0"
   },
   "dependencies": {
     "config-ini-parser": "^1.3",
@@ -43,6 +47,9 @@
   "scripts": {
     "doc:devel": "typedoc --mode modules --theme minimal --exclude \"src/test/**\" --exclude \"src/ui-tests/**\" --out ./documentation src/ doc/",
     "package": "vsce package --yarn",
+    "webpack": "webpack --mode development",
+    "webpack-dev": "webpack --mode development --watch",
+    "test-compile": "tsc -p ./",
     "cleandeps": "rm -rf node_modules/",
     "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources/ ./mocklibsecret/build/ ./.vscode-test/ ./src/ui-tests/repositoryTreeView/fakeHome/",
     "coverage": "COVERAGE=1 ./runTests.sh && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
@@ -55,7 +62,7 @@
     "compile": "tsc -p ./",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "format": "prettier --write \"src/**/*.ts\"",
-    "vscode:prepublish": "yarn run compile"
+    "vscode:prepublish": "webpack --mode production"
   },
   "contributes": {
     "menus": {
@@ -519,7 +526,7 @@
       }
     ]
   },
-  "main": "./out/extension.js",
+  "main": "./dist/extension",
   "activationEvents": [
     "onView:bookmarkedProjectsTree",
     "onView:currentProjectTree",

@@ -32,6 +32,7 @@ import {
   Project,
   ProjectMeta
 } from "open-build-service-api";
+import { join } from "path";
 import {
   ActivityBar,
   EditorView,
@@ -47,7 +48,6 @@ import {
 } from "vscode-extension-tester";
 import { getTmpPrefix } from "../test/suite/utilities";
 import { testUser } from "./testEnv";
-import path = require("path");
 
 export const BOOKMARKED_PROJECTS_SECTION_NAME = "Bookmarked Projects";
 
@@ -434,5 +434,5 @@ export function waitForEditorWindow(title: string, timeoutMs: number = 5000) {
  * The path to the created temporary directory is returned.
  */
 export function createTestTempDir(): Promise<string> {
-  return fsPromises.mkdtemp(path.join(getTmpPrefix(), "obs-connector"));
+  return fsPromises.mkdtemp(join(getTmpPrefix(), "obs-connector"));
 }

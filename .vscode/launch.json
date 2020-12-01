@@ -15,8 +15,11 @@
         "--user-data-dir=/tmp/vscode-extension-devel/"
       ],
       "env": { "EXTENSION_DEBUG": "1" },
-      "outFiles": ["${workspaceFolder}/out/**/*.js"],
-      "preLaunchTask": "npm: watch"
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "smartStep": true,
+      "sourceMaps": true,
+      "trace": true,
+      "preLaunchTask": "npm: webpack"
     },
     {
       "name": "Extension Tests",
@@ -29,7 +32,7 @@
         "--extensionTestsPath=${workspaceFolder}/out/test/suite/index"
       ],
       "outFiles": ["${workspaceFolder}/out/test/**/*.js"],
-      "preLaunchTask": "npm: watch"
+      "preLaunchTask": "npm: test-compile"
     }
   ]
 }

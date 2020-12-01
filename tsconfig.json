@@ -11,7 +11,14 @@
     "noImplicitReturns": true /* Report error when not all code paths in function return a value. */,
     "noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
     "noUnusedParameters": true /* Report errors on unused parameters. */,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "moduleResolution": "node"
   },
-  "exclude": ["node_modules", ".vscode-test", "test-resources", "flycheck_*", "open-build-service"]
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "test-resources",
+    "flycheck_*",
+    "open-build-service"
+  ]
 }
