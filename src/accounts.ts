@@ -76,25 +76,26 @@ import { setDifference } from "./util";
  */
 
 /** Top level key for configuration options of this extension  */
-export const configurationExtensionName = "vscode-obs";
+export const CONFIGURATION_EXTENSION_NAME = "vscode-obs";
 
 /** Key under which the AccountStorage array is stored. */
-export const configurationAccounts = "accounts";
+export const CONFIGURATION_ACCOUNTS = "accounts";
 
 /** Key under which the setting whether https is enforced is stored */
-export const configurationforceHttps = "forceHttps";
+export const CONFIGURATION_FORCE_HTTPS = "forceHttps";
 
 /** Full key under which the AccountStorage array is stored */
-export const configurationAccountsFullName = `${configurationExtensionName}.${configurationAccounts}`;
+export const configurationAccountsFullName = `${CONFIGURATION_EXTENSION_NAME}.${CONFIGURATION_ACCOUNTS}`;
 
 /**
  * Key under which the setting is stored whether the extension should check for
  * unimported Accounts on launch.
  */
-export const configurationCheckUnimportedAccounts = "checkUnimportedAccounts";
+export const CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS =
+  "checkUnimportedAccounts";
 
 /** Service name under which the passwords are stored in the OS' keyring */
-const keytarServiceName = configurationAccountsFullName;
+export const KEYTAR_SERVICE_NAME = configurationAccountsFullName;
 
 const cmdId = "obsAccount";
 
@@ -200,9 +201,9 @@ const getForceHttpsSetting = (
   wsConfig?: vscode.WorkspaceConfiguration
 ): boolean | undefined =>
   (wsConfig === undefined
-    ? vscode.workspace.getConfiguration(configurationExtensionName)
+    ? vscode.workspace.getConfiguration(CONFIGURATION_EXTENSION_NAME)
     : wsConfig
-  ).get<boolean>(configurationforceHttps);
+  ).get<boolean>(CONFIGURATION_FORCE_HTTPS);
 
 /**
  * Ask the user to specify which account to use for an action with the given
@@ -320,10 +321,10 @@ class RuntimeAccountConfiguration extends LoggingBase {
     this.logger.debug("Configuration change affecting us detected");
 
     const wsConfig = vscode.workspace.getConfiguration(
-      configurationExtensionName
+      CONFIGURATION_EXTENSION_NAME
     );
     const newAccounts = wsConfig.get<AccountStorage[]>(
-      configurationAccounts,
+      CONFIGURATION_ACCOUNTS,
       []
     );
     const forceHttps = getForceHttpsSetting(wsConfig);
@@ -453,7 +454,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
 
     // try to set the password first, if that fails, we'll get an exception and
     // won't leave the system in a dirty state
-    await keytar.setPassword(keytarServiceName, account.apiUrl, password);
+    await keytar.setPassword(KEYTAR_SERVICE_NAME, account.apiUrl, password);
 
     this.apiAccountMap.set(account.apiUrl, { account, connection });
   }
@@ -466,7 +467,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
    *     it does not exist).
    */
   public async removeAccount(apiUrl: ApiUrl): Promise<boolean> {
-    if (!(await keytar.deletePassword(keytarServiceName, apiUrl))) {
+    if (!(await keytar.deletePassword(KEYTAR_SERVICE_NAME, apiUrl))) {
       this.logger.error(
         "Failed to delete the password of the account %s",
         apiUrl
@@ -477,9 +478,11 @@ class RuntimeAccountConfiguration extends LoggingBase {
 
   /** Save the currently valid accounts in VSCode's storage */
   public async saveToStorage(): Promise<void> {
-    const conf = vscode.workspace.getConfiguration(configurationExtensionName);
+    const conf = vscode.workspace.getConfiguration(
+      CONFIGURATION_EXTENSION_NAME
+    );
     await conf.update(
-      configurationAccounts,
+      CONFIGURATION_ACCOUNTS,
       [...this.apiAccountMap.values()].map(
         (validAccount) => validAccount.account
       ),
@@ -501,9 +504,9 @@ class RuntimeAccountConfiguration extends LoggingBase {
    */
   public async loadFromStorage(): Promise<[AccountStorage[], string[]]> {
     const wsConfig = vscode.workspace.getConfiguration(
-      configurationExtensionName
+      CONFIGURATION_EXTENSION_NAME
     );
-    const accounts = wsConfig.get<AccountStorage[]>(configurationAccounts, []);
+    const accounts = wsConfig.get<AccountStorage[]>(CONFIGURATION_ACCOUNTS, []);
     const forceHttps = getForceHttpsSetting(wsConfig);
 
     this.logger.trace(
@@ -531,7 +534,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
 
       assert(account.apiUrl !== "" && account.accountName !== undefined);
       const password = await keytar.getPassword(
-        keytarServiceName,
+        KEYTAR_SERVICE_NAME,
         account.apiUrl
       );
       assert(
@@ -861,9 +864,9 @@ export class AccountManagerImpl extends LoggingBase {
         }
         assert(changeForceHttpsSetting === "Yes");
         await this.vscodeWorkspace
-          .getConfiguration(configurationExtensionName)
+          .getConfiguration(CONFIGURATION_EXTENSION_NAME)
           .update(
-            configurationforceHttps,
+            CONFIGURATION_FORCE_HTTPS,
             false,
             vscode.ConfigurationTarget.Global
           );
@@ -986,10 +989,10 @@ export class AccountManagerImpl extends LoggingBase {
    */
   public async promptForUninmportedAccountsInOscrc(): Promise<void> {
     const config = vscode.workspace.getConfiguration(
-      configurationExtensionName
+      CONFIGURATION_EXTENSION_NAME
     );
 
-    if (!config.get<boolean>(configurationCheckUnimportedAccounts, true)) {
+    if (!config.get<boolean>(CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS, true)) {
       return;
     }
     const unimportedAccounts = await this.unimportedAccountsInOscrc();
@@ -1012,7 +1015,7 @@ export class AccountManagerImpl extends LoggingBase {
         await this.importAccountsFromOsrc(unimportedAccounts);
       } else if (selected === neverShowAgain) {
         await config.update(
-          configurationCheckUnimportedAccounts,
+          CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS,
           false,
           vscode.ConfigurationTarget.Global
         );

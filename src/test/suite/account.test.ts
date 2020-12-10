@@ -32,9 +32,10 @@ import {
   AccountManager,
   AccountManagerImpl,
   AccountStorage,
-  configurationAccounts,
-  configurationCheckUnimportedAccounts,
-  configurationExtensionName
+  CONFIGURATION_ACCOUNTS,
+  CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS,
+  CONFIGURATION_EXTENSION_NAME,
+  KEYTAR_SERVICE_NAME
 } from "../../accounts";
 import { fakeAccount1, fakeAccount2 } from "./test-data";
 import {
@@ -55,8 +56,12 @@ async function addFakeAcountsToConfig(
   accounts: AccountStorage[]
 ): Promise<void> {
   await vscode.workspace
-    .getConfiguration(configurationExtensionName)
-    .update(configurationAccounts, accounts, vscode.ConfigurationTarget.Global);
+    .getConfiguration(CONFIGURATION_EXTENSION_NAME)
+    .update(
+      CONFIGURATION_ACCOUNTS,
+      accounts,
+      vscode.ConfigurationTarget.Global
+    );
 }
 
 interface FixtureContext extends Mocha.Context {
@@ -92,8 +97,8 @@ class AccountManagerFixture extends LoggingFixture {
     super(context);
 
     this.accountSettingsBackup = vscode.workspace
-      .getConfiguration(configurationExtensionName)
-      .get<AccountStorage[]>(configurationAccounts, []);
+      .getConfiguration(CONFIGURATION_EXTENSION_NAME)
+      .get<AccountStorage[]>(CONFIGURATION_ACCOUNTS, []);
   }
 
   public async createAccountManager(
@@ -141,9 +146,9 @@ class AccountManagerFixture extends LoggingFixture {
     this.sandbox.restore();
 
     await vscode.workspace
-      .getConfiguration(configurationExtensionName)
+      .getConfiguration(CONFIGURATION_EXTENSION_NAME)
       .update(
-        configurationAccounts,
+        CONFIGURATION_ACCOUNTS,
         this.accountSettingsBackup,
         vscode.ConfigurationTarget.Global
       );
@@ -428,24 +433,24 @@ describe("AccountManager", function () {
       setting: boolean
     ): Promise<void> =>
       vscode.workspace
-        .getConfiguration(configurationExtensionName)
+        .getConfiguration(CONFIGURATION_EXTENSION_NAME)
         .update(
-          configurationCheckUnimportedAccounts,
+          CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS,
           setting,
           vscode.ConfigurationTarget.Global
         );
 
     beforeEach(async function () {
       this.unimportedAccountsSetting = vscode.workspace
-        .getConfiguration(configurationExtensionName)
-        .get(configurationCheckUnimportedAccounts);
+        .getConfiguration(CONFIGURATION_EXTENSION_NAME)
+        .get(CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS);
     });
 
     afterEach(async function () {
       await vscode.workspace
-        .getConfiguration(configurationExtensionName)
+        .getConfiguration(CONFIGURATION_EXTENSION_NAME)
         .update(
-          configurationCheckUnimportedAccounts,
+          CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS,
           this.unimportedAccountsSetting,
           vscode.ConfigurationTarget.Global
         );
@@ -752,8 +757,8 @@ describe("AccountManager", function () {
 
           expect(
             vscode.workspace
-              .getConfiguration(configurationExtensionName)
-              .get(configurationCheckUnimportedAccounts)
+              .getConfiguration(CONFIGURATION_EXTENSION_NAME)
+              .get(CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS)
           ).to.equal(false);
         })
       );
@@ -784,8 +789,8 @@ describe("AccountManager", function () {
           // config didn't get modified
           expect(
             vscode.workspace
-              .getConfiguration(configurationExtensionName)
-              .get(configurationCheckUnimportedAccounts)
+              .getConfiguration(CONFIGURATION_EXTENSION_NAME)
+              .get(CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS)
           ).to.equal(true);
         })
       );
@@ -822,8 +827,8 @@ describe("AccountManager", function () {
 
           expect(
             vscode.workspace
-              .getConfiguration(configurationExtensionName)
-              .get(configurationCheckUnimportedAccounts)
+              .getConfiguration(CONFIGURATION_EXTENSION_NAME)
+              .get(CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS)
           ).to.equal(true);
         })
       );
