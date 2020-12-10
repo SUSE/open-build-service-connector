@@ -190,10 +190,10 @@ describe("ObsServerInformation", () => {
 
     beforeEach(function () {
       this.fixture.fetchConfigurationMock
-        .withArgs(match.has("url", fakeAccount2.apiUrl))
+        .withArgs(match.has("url", new URL(fakeAccount2.apiUrl)))
         .resolves(obsConfig);
       this.fixture.fetchConfigurationMock
-        .withArgs(match.has("url", fakeAccount1.apiUrl))
+        .withArgs(match.has("url", new URL(fakeAccount1.apiUrl)))
         .resolves(fooInstanceConfig);
       this.fixture.fetchConfigurationMock.rejects(
         Error("Cannot fetch the configuration for this API")

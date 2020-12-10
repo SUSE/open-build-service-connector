@@ -26,6 +26,7 @@ import { afterEach, beforeEach, describe, it } from "mocha";
 import * as openBuildServiceApi from "open-build-service-api";
 import { createSandbox, match, SinonSandbox, SinonStub } from "sinon";
 import { ImportMock } from "ts-mock-imports";
+import { URL } from "url";
 import * as vscode from "vscode";
 import {
   AccountManager,
@@ -101,9 +102,19 @@ class AccountManagerFixture extends LoggingFixture {
   ): Promise<AccountManagerImpl> {
     await addFakeAcountsToConfig(fakeAccounts);
 
-    returnedPasswords.forEach((pw, index) =>
-      this.keytarGetPasswordMock.onCall(index).resolves(pw)
-    );
+    if (returnedPasswords.length === 0) {
+      this.keytarGetPasswordMock.resolves(null);
+    } else {
+      this.keytarGetPasswordMock.callsFake(
+        (serviceName: string, apiUrl: string): string | null => {
+          serviceName.should.equal(KEYTAR_SERVICE_NAME);
+          const foundAccPw = openBuildServiceApi
+            .zip(fakeAccounts, returnedPasswords)
+            .find(([acc, _pw]) => acc.apiUrl === apiUrl);
+          return foundAccPw === undefined ? null : foundAccPw[1];
+        }
+      );
+    }
 
     const mngr = await AccountManagerImpl.createAccountManager(
       testLogger,
@@ -190,7 +201,7 @@ describe("AccountManager", function () {
           .that.deep.equals(fakeAccount1);
         expect(validAccount)
           .to.have.property("connection")
-          .that.deep.includes({ url: fakeAccount1.apiUrl });
+          .that.deep.includes({ url: new URL(fakeAccount1.apiUrl) });
       })
     );
 
@@ -357,7 +368,7 @@ describe("AccountManager", function () {
         expect(
           mngr.activeAccounts.getConfig(fakeAccount1.apiUrl)?.connection
         ).to.deep.include({
-          url: newFakeAccount1.apiUrl,
+          url: new URL(newFakeAccount1.apiUrl),
           username: newFakeAccount1.username
         });
       })
@@ -383,9 +394,7 @@ describe("AccountManager", function () {
         expect(
           mngr.activeAccounts.getConfig(fakeAccount1.apiUrl)!.connection
         ).to.deep.include({
-          password: pw,
-          url: fakeAccount1.apiUrl,
-          username: fakeAccount1.username
+          url: new URL(fakeAccount1.apiUrl)
         });
       })
     );
@@ -446,10 +455,10 @@ describe("AccountManager", function () {
       it(
         "imports an account with a set password",
         castToAsyncFunc<FixtureContext>(async function () {
-          const mngr = await this.fixture.createAccountManager([
-            fakeAccount1,
-            fakeAccount2
-          ]);
+          const mngr = await this.fixture.createAccountManager(
+            [fakeAccount1, fakeAccount2],
+            [fakeAccount1.username, fakeAccount2.username]
+          );
 
           let apiUrl = "https://api.bar.org";
           const password = "barrr";
@@ -465,8 +474,8 @@ describe("AccountManager", function () {
           this.fixture.readAccountsFromOscrcMock.resolves([
             fakeNewOscrcAccount
           ]);
-
           this.fixture.keytarGetPasswordMock.resetHistory();
+          this.fixture.keytarGetPasswordMock.resolves(null);
 
           await executeAndWaitForEvent(
             async () => mngr.importAccountsFromOsrc(),
@@ -491,9 +500,7 @@ describe("AccountManager", function () {
           this.fixture.sandbox.assert.calledOnce(this.fixture.accountChangeSpy);
 
           // the event listener will get the current apiUrl to account map
-          expect(mngr.activeAccounts.getAllApis())
-            .to.have.length(3)
-            .and.include(apiUrl);
+          expect(mngr.activeAccounts.getAllApis()).to.include(apiUrl);
 
           // the map should contain a mapping for our apiUrl and the Connection
           // should have a set value
@@ -512,8 +519,8 @@ describe("AccountManager", function () {
 
           con = con!;
           expect(con).to.deep.include({
-            password,
-            url: apiUrl
+            authSource: { password, username: fakeNewOscrcAccount.username },
+            url: new URL(apiUrl)
           });
         })
       );
@@ -521,10 +528,10 @@ describe("AccountManager", function () {
       it(
         "imports an account without a set password and asks the user to provide it",
         castToAsyncFunc<FixtureContext>(async function (this: FixtureContext) {
-          const mngr = await this.fixture.createAccountManager([
-            fakeAccount1,
-            fakeAccount2
-          ]);
+          const mngr = await this.fixture.createAccountManager(
+            [fakeAccount1, fakeAccount2],
+            [fakeAccount1.username, fakeAccount2.username]
+          );
           const fakeOscrcAccount: openBuildServiceApi.Account = {
             aliases: [],
             apiUrl: "https://api.bar.org",
@@ -557,7 +564,9 @@ describe("AccountManager", function () {
 
           expect(
             mngr.activeAccounts.getConfig(apiUrl)!.connection
-          ).to.deep.include({ password });
+          ).to.deep.include({
+            authSource: { password, username: fakeOscrcAccount.username }
+          });
           expect(
             mngr.activeAccounts.getConfig(apiUrl)!.account
           ).to.deep.include({
@@ -668,7 +677,10 @@ describe("AccountManager", function () {
       it(
         "checks for uninmported accounts, but does not prompt the user if none are to be imported",
         castToAsyncFunc<FixtureContext>(async function () {
-          const mngr = await this.fixture.createAccountManager([fakeAccount1]);
+          const mngr = await this.fixture.createAccountManager(
+            [fakeAccount1],
+            [fakeAccount1.username]
+          );
           this.fixture.readAccountsFromOscrcMock.resolves([fakeAccount1]);
 
           await mngr.promptForUninmportedAccountsInOscrc();
@@ -1146,8 +1158,8 @@ describe("AccountManager", function () {
         expect(activeAccount).to.not.equal(undefined);
         expect(activeAccount!.account).to.deep.equal(fakeAccount1);
         expect(activeAccount!.connection).to.deep.include({
-          password: newPw,
-          url: toChangeApi
+          authSource: { password: newPw, username: fakeAccount1.username },
+          url: new URL(toChangeApi)
         });
       })
     );
@@ -1338,9 +1350,8 @@ Gwc=
               username
             },
             {
-              password,
-              url: apiUrl,
-              username
+              authSource: { password, username },
+              url: new URL(apiUrl)
             }
           );
         })
@@ -1365,9 +1376,8 @@ Gwc=
               username
             },
             {
-              password,
-              url: apiUrl,
-              username
+              authSource: { password, username },
+              url: new URL(apiUrl)
             }
           );
         })
@@ -1434,10 +1444,9 @@ Gwc=
               username
             },
             {
-              password,
               serverCaCertificate: caCertRootCertificate,
-              url: apiUrl,
-              username
+              url: new URL(apiUrl),
+              authSource: { password, username }
             }
           );
         })
@@ -1481,9 +1490,8 @@ Gwc=
               username
             },
             {
-              password,
-              url: apiUrl,
-              username
+              authSource: { password, username },
+              url: new URL(apiUrl)
             }
           );
 

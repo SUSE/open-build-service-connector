@@ -534,6 +534,10 @@ class RuntimeAccountConfiguration extends LoggingBase {
         keytarServiceName,
         account.apiUrl
       );
+      assert(
+        password === null || typeof password === "string",
+        `got an invalid password from keytar, expected a string or null, but got '${typeof password}'`
+      );
       if (password === null) {
         this.logger.trace(
           "Account %s is missing a password",
@@ -1037,7 +1041,7 @@ export class AccountManagerImpl extends LoggingBase {
     for (const acc of oscrcAccounts) {
       const { apiUrl, password, aliases, ...rest } = acc;
       const fixedApiUrl = normalizeUrl(apiUrl);
-      const accStorage = {
+      const accStorage: AccountStorage = {
         accountName: aliases.length === 0 ? fixedApiUrl : aliases[0],
         apiUrl: fixedApiUrl,
         ...rest

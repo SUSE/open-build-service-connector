@@ -129,22 +129,14 @@ export function setupFetchProjectMocks(
   };
 
   fetchers.fetchProject
-    .withArgs(
-      match({ url: rest.apiUrl }),
-      rest.name,
-      match({ fetchPackageList: false })
-    )
+    .withArgs(match.any, rest.name, match({ fetchPackageList: false }))
     .resolves({
       apiUrl: rest.apiUrl,
       meta,
       name: rest.name
     });
   fetchers.fetchProject
-    .withArgs(
-      match({ url: rest.apiUrl }),
-      rest.name,
-      match({ fetchPackageList: true })
-    )
+    .withArgs(match.any, rest.name, match({ fetchPackageList: true }))
     .resolves({
       apiUrl: rest.apiUrl,
       meta,
