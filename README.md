@@ -2,7 +2,6 @@
 
 [![Visual Studio Marketplace](https://vsmarketplacebadge.apphb.com/version/SUSE.open-build-service-connector.svg)](https://marketplace.visualstudio.com/items?itemName=SUSE.open-build-service-connector)
 [![Open VSX Registry](https://img.shields.io/open-vsx/v/SUSE/open-build-service-connector)](https://open-vsx.org/extension/SUSE/open-build-service-connector)
-[![Build Status](https://travis-ci.org/SUSE/open-build-service-connector.svg?branch=master)](https://travis-ci.org/SUSE/open-build-service-connector)
 [![CI](https://img.shields.io/github/workflow/status/SUSE/open-build-service-connector/CI)](https://github.com/SUSE/open-build-service-connector/actions?query=workflow%3ACI)
 [![UI_tests](https://img.shields.io/github/workflow/status/SUSE/open-build-service-connector/UI_tests?style=plastic)](https://github.com/SUSE/open-build-service-connector/actions?query=workflow%3A%22UI_tests%22)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://github.com/SUSE/open-build-service-connector/blob/master/LICENSE)
