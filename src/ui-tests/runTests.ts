@@ -200,7 +200,11 @@ async function main() {
       vscodeVersion,
       `${testDir}/!(flycheck_)**.js`,
       path.join(testSrcDir, "settings.json"),
-      true
+      /* useYarn */ true,
+      /* cleanup */ true,
+      /* config */ undefined,
+      /* install dependencies */ true,
+      /* logLevel */ "all"
     );
   } catch (err) {
     console.error(`Tests ${dir} failed with: ${err.toString()}`);
