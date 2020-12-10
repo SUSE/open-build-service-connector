@@ -297,5 +297,33 @@ describe("ObsServerInformation", () => {
         });
       })
     );
+
+    it(
+      "returns undefined if no connection is present for the instance",
+      castToAsyncFunc<FixtureContext>(async function () {
+        const serverInfo = await this.fixture.createObsServerInformation();
+
+        await serverInfo
+          .updateAllInstanceInfos(["https://api.opensuse.org"])
+          .should.eventually.deep.equal([]);
+
+        expect(serverInfo.getInfo("https://api.opensuse.org")).to.equal(
+          undefined
+        );
+      })
+    );
+
+    it(
+      "is accessible via the getInstanceInfoCommand",
+      castToAsyncFunc<FixtureContext>(async function () {
+        const serverInfo = await this.fixture.createObsServerInformation([
+          [fakeAccount1.apiUrl, fakeApi1ValidAcc]
+        ]);
+
+        await ObsServerInformation.getInstanceInfoCommand(
+          fakeAccount1.apiUrl
+        ).should.eventually.deep.equal(serverInfo.getInfo(fakeAccount1.apiUrl));
+      })
+    );
   });
 });

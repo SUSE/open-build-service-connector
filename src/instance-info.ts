@@ -24,7 +24,8 @@ import {
   Distribution,
   fetchConfiguration,
   fetchHostedDistributions,
-  fetchProjectList
+  fetchProjectList,
+  zip
 } from "open-build-service-api";
 import { Logger } from "pino";
 import { URL } from "url";
@@ -101,6 +102,11 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
    */
   public updateInstanceInfosPromise: Promise<string[]>;
 
+  /**
+   * Wrapper around the [[GET_INSTANCE_INFO_COMMAND]] command to ensure type
+   * safety.
+   * See [[ObsServerInformation.getInfo]].
+   */
   public static async getInstanceInfoCommand(
     apiUrl: ApiUrl
   ): Promise<ObsInstance | undefined> {
@@ -205,12 +211,14 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
     );
 
     this.instances = [];
-    instanceInfos.forEach((instanceInfo) => {
+    const updatedApis: string[] = [];
+    zip(instanceInfos, apisToUpdate).forEach(([instanceInfo, apiUrl]) => {
       if (instanceInfo !== undefined) {
+        updatedApis.push(apiUrl);
         this.instances.push(instanceInfo);
       }
     });
-    return apisToUpdate;
+    return updatedApis;
   }
 
   private async fetchInstanceInfoForApi(
