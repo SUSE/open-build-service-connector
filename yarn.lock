@@ -2055,9 +2055,9 @@ inherits@2, inherits@^2.0.1, inherits@^2.0.3, inherits@^2.0.4, inherits@~2.0.0, 
   integrity sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
 
 ini@~1.3.0:
-  version "1.3.5"
-  resolved "https://registry.yarnpkg.com/ini/-/ini-1.3.5.tgz#eee25f56db1c9ec6085e0c22778083f596abf927"
-  integrity sha512-RZY5huIKCMRWDUqZlEi72f/lmXKMvuszcMBduliQ3nnWbx9X/ZBQO7DijMEYS9EhHBb2qacRUMtC7svLwe0lcw==
+  version "1.3.8"
+  resolved "https://registry.yarnpkg.com/ini/-/ini-1.3.8.tgz#a29da425b48806f34767a4efce397269af28432c"
+  integrity sha512-JV/yugV2uzW5iMRSiZAyDtQd+nxtUnjeLt0acNdw98kKLrvuRVyB80tsREOE7yvGVgalhZ6RNXCmEHkUKBKxew==
 
 interpret@^1.0.0:
   version "1.4.0"
@@ -2538,8 +2538,9 @@ memory-stream@0:
   dependencies:
     readable-stream "~1.0.26-2"
 
-"merge-deep@github:jrichter1/merge-deep#functions":
+merge-deep@jrichter1/merge-deep#functions:
   version "3.0.2"
+  uid "9ffe23b32f281de41bce111e8c38294d96fed34e"
   resolved "https://codeload.github.com/jrichter1/merge-deep/tar.gz/9ffe23b32f281de41bce111e8c38294d96fed34e"
   dependencies:
     arr-union "^3.1.0"
