@@ -1,5 +1,5 @@
 obs-logo.svg:                                https://openbuildservice.org/images/obs-logo.svg
-obs-logo_meta.png:                           exported from obs-logo.svg
+obs_favicon.png:                             generated from https://raw.githubusercontent.com/openSUSE/open-build-service/master/src/api/app/assets/images/favicon.svg
 obs-line-dark.svg, obs-line-light.svg:       Created by Stasiek Michalski (https://github.com/Hellcp)
 broken_image.svg:                            https://eos-icons-picker-api.herokuapp.com/icon/svg/download/broken_image
 branch.svg:                                  https://eos-icons-picker-api.herokuapp.com/icon/svg/download/branch

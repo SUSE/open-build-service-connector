@@ -552,7 +552,7 @@
   "description": "Connector to the Open Build Service",
   "displayName": "Open Build Service Connector",
   "name": "open-build-service-connector",
-  "icon": "media/obs-logo_meta.png",
+  "icon": "media/obs_favicon.png",
   "galleryBanner": {
     "color": "#6da741",
     "theme": "light"
