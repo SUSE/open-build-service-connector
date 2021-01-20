@@ -156,15 +156,18 @@ export class BookmarkedPackageTreeElement extends vscode.TreeItem {
 
   public readonly contextValue = "package";
 
-  public readonly iconPath = new vscode.ThemeIcon("package");
+  public readonly iconPath:
+    | vscode.ThemeIcon
+    | { readonly dark: string; readonly light: string } = new vscode.ThemeIcon(
+    "package"
+  );
 
   constructor(public readonly pkg: PackageBookmark) {
     super(pkg.name, vscode.TreeItemCollapsibleState.Collapsed);
     this.parentProject = new BaseProject(pkg.apiUrl, pkg.projectName);
-    this.iconPath =
-      pkg.state === BookmarkState.Ok
-        ? new vscode.ThemeIcon("package")
-        : BROKEN_BOOKMARK_ICON;
+    if (pkg.state !== BookmarkState.Ok) {
+      this.iconPath = BROKEN_BOOKMARK_ICON;
+    }
   }
 }
 
@@ -202,7 +205,7 @@ export class AddBookmarkElement extends vscode.TreeItem {
     this.command = {
       arguments: [this],
       command: BOOKMARK_PROJECT_COMMAND,
-      title: this.label!
+      title: typeof this.label! === "string" ? this.label! : this.label!.label
     };
   }
 }
