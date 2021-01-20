@@ -91,9 +91,13 @@ class TestEnv {
   public async setUp(): Promise<void> {
     if (await pathExists(this.settingsJson, PathType.File)) {
       this.restoreSettingsJson = true;
-      this.oldSettingsJson = JSON.parse(
-        (await fsPromises.readFile(this.settingsJson)).toString()
-      );
+      try {
+        this.oldSettingsJson = JSON.parse(
+          (await fsPromises.readFile(this.settingsJson)).toString()
+        );
+      } catch (err) {
+        this.oldSettingsJson = undefined;
+      }
     }
 
     const newSettingsJson: any = this.oldSettingsJson ?? {};
