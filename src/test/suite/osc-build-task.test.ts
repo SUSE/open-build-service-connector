@@ -161,7 +161,9 @@ describe("OscBuildTaskProvider", () => {
     it(
       "does not register the osc task provider if a osc binary is not found",
       castToAsyncFunc<Ctx>(async function () {
-        this.fixture.runProcessFunc.rejects(new ProcessError("which", 1, []));
+        this.fixture.runProcessFunc.rejects(
+          new ProcessError("which", 1, [], [])
+        );
         await this.fixture
           .createOscBuildTaskProvider()
           .should.eventually.equal(undefined);
