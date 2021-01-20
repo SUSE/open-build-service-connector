@@ -24,7 +24,7 @@ import { Account, Connection, normalizeUrl } from "open-build-service-api";
 /** Account for accessing the locally running OBS instance */
 export const testUser: Account = {
   aliases: ["miniobs"],
-  apiUrl: normalizeUrl("http://localhost:3000"),
+  apiUrl: normalizeUrl(process.env.OBS_URL || "http://localhost:3000"),
   password: "nots3cr3t",
   username: "obsTestUser"
 };
