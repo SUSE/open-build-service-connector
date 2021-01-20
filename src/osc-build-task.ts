@@ -127,7 +127,7 @@ export class CustomExecutionTerminal
   implements vscode.Pseudoterminal {
   private onDidWriteEmitter = new vscode.EventEmitter<string>();
 
-  private onDidCloseEmitter = new vscode.EventEmitter<number>();
+  private onDidCloseEmitter = new vscode.EventEmitter<number | undefined>();
 
   private child: ChildProcessWithoutNullStreams | undefined = undefined;
   public stdout: string = "";
@@ -153,7 +153,9 @@ export class CustomExecutionTerminal
       this.stderr = this.stdout.concat(line);
       this.onDidWriteEmitter.fire(line);
     });
-    child.on("close", (code) => this.onDidCloseEmitter.fire(code));
+    child.on("close", (code) =>
+      this.onDidCloseEmitter.fire(code === null ? undefined : code)
+    );
 
     this.child = child;
   }
