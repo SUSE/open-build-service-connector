@@ -184,7 +184,7 @@ async function main() {
     const vscodeVersion = process.env.VSCODE_VERSION;
     const releaseType =
       vscodeVersion !== undefined
-        ? vscodeVersion === "insider"
+        ? vscodeVersion.match(/insider/)
           ? ReleaseQuality.Insider
           : ReleaseQuality.Stable
         : ReleaseQuality.Stable;
@@ -201,7 +201,7 @@ async function main() {
       releaseType
     );
     await exTester.setupAndRunTests(
-      vscodeVersion,
+      vscodeVersion === "insider" ? "latest" : vscodeVersion,
       `${testDir}/!(flycheck_)**.js`,
       path.join(testSrcDir, "settings.json"),
       /* useYarn */ true,
