@@ -25,23 +25,41 @@
 const keytar = require("keytar");
 const assert = require("assert");
 
-let result = (async function () {
-  const pw = await keytar.getPassword("foo", "bar");
-  assert(
-    process.env.MOCK_SECRET_PASSWORD_LOOKUP === undefined
-      ? pw === null
-      : pw === process.env.MOCK_SECRET_PASSWORD_LOOKUP
+const SERVICE_NAME = "foo";
+
+(async function () {
+  await Promise.all(
+    (await keytar.findCredentials(SERVICE_NAME)).map((cred) =>
+      keytar.deletePassword(SERVICE_NAME, cred.account)
+    )
   );
 
-  const deleteSuccess = await keytar.deletePassword("foo", "bar");
-  assert(
-    deleteSuccess ===
-      (process.env.MOCK_SECRET_PASSWORD_CLEAR_RETVAL === undefined
-        ? true
-        : process.env.MOCK_SECRET_PASSWORD_CLEAR_RETVAL === "1")
-  );
+  const creds = await keytar.findCredentials(SERVICE_NAME);
+  assert(creds.length === 0);
 
-  await keytar.setPassword("foo", "bar", "baz");
+  const acc1 = "first";
+  const pw1 = `${acc1}_pw`;
+  await keytar.setPassword(SERVICE_NAME, acc1, pw1);
+  assert((await keytar.getPassword(SERVICE_NAME, acc1)) === pw1);
+
+  const acc2 = "second";
+  const pw2 = `pw_${acc2}`;
+  await keytar.setPassword(SERVICE_NAME, acc2, pw2);
+  assert((await keytar.getPassword(SERVICE_NAME, acc2)) === pw2);
+  assert((await keytar.getPassword(SERVICE_NAME, acc1)) === pw1);
+
+  let newCreds = await keytar.findCredentials(SERVICE_NAME);
+  assert(newCreds.length === 2);
+
+  assert(await keytar.deletePassword(SERVICE_NAME, acc1));
+
+  newCreds = await keytar.findCredentials(SERVICE_NAME);
+  assert(newCreds.length === 1);
+  assert(newCreds[0].account === acc2);
+  assert(newCreds[0].password === pw2);
+
+  // this fails due to limitations of mocklibsecret
+  // console.log(await keytar.findPassword(SERVICE_NAME));
 })().catch((err) => {
   console.error(`Test failed with: ${err}`);
   process.exitCode = 1;

@@ -23,6 +23,7 @@ import * as assert from "assert";
 import { promises as fsPromises } from "fs";
 import { pathExists, PathType } from "open-build-service-api";
 import * as path from "path";
+import { join } from "path";
 import { ExTester } from "vscode-extension-tester";
 import { ReleaseQuality } from "vscode-extension-tester/out/util/codeUtil";
 import { testUser } from "./testEnv";
@@ -65,6 +66,11 @@ async function copyRecursive(
   );
 }
 
+interface Credentials {
+  account: string;
+  password: string;
+}
+
 class TestEnv {
   public readonly fakeHomeDir: string;
 
@@ -76,16 +82,26 @@ class TestEnv {
    * @param testSrcDir  The directory in which the test source files are stored
    *     (i.e. the typescript files, the `settings.json` and optionally
    *     additional home directory overrides)
+   * @param credentials  An array of credentials that should be put into the
+   *     fake OS keychain.
    * @param injectTestUserIntoSettings  Flag whether to add the test user
    *     ([[testUser]]) to this test environment's `settings.json`.
    */
   constructor(
     private readonly testSrcDir: string,
+    private readonly credentials: Credentials[],
     public readonly injectTestUserIntoSettings: boolean = true
   ) {
     this.restoreSettingsJson = false;
 
     this.fakeHomeDir = path.join(this.testSrcDir, "fakeHome");
+
+    if (this.injectTestUserIntoSettings) {
+      this.credentials.push({
+        account: testUser.apiUrl,
+        password: testUser.password
+      });
+    }
   }
 
   public async setUp(): Promise<void> {
@@ -99,6 +115,20 @@ class TestEnv {
         this.oldSettingsJson = undefined;
       }
     }
+
+    await fsPromises.writeFile(
+      join(this.fakeHomeDir, "passwords.ini"),
+      // nasty hack: copy-pasta the service name from accounts.ts, because we
+      // cannot import it from there (would require importing vscode, which is
+      // not present under ui tests)
+      `[vscode-obs.accounts]
+`.concat(
+        ...this.credentials.map(
+          (c) => `${c.account} = ${c.password}
+`
+        )
+      )
+    );
 
     const newSettingsJson: any = this.oldSettingsJson ?? {};
 
@@ -172,11 +202,18 @@ async function main() {
   const testDir = path.join(__dirname, dir);
   const testSrcDir = path.join(baseTestSrcDir, dir);
 
-  const injectUserFromEnv =
-    (await pathExists(path.join(testSrcDir, ".injectUser"), PathType.File)) !==
-    undefined;
+  const usersJson = JSON.parse(
+    await fsPromises.readFile(path.join(testSrcDir, "users.json"), "utf8")
+  );
 
-  const testEnv = new TestEnv(testSrcDir, injectUserFromEnv);
+  const credentials: Credentials[] = [];
+  usersJson.users.forEach((u: Credentials) => credentials.push(u));
+
+  const testEnv = new TestEnv(
+    testSrcDir,
+    credentials,
+    usersJson.injectTestUserIntoSettings
+  );
 
   try {
     await testEnv.setUp();
@@ -192,9 +229,6 @@ async function main() {
     process.env.LD_PRELOAD = pathToLibsecret;
     process.env.HOME = testEnv.fakeHomeDir;
     process.env.EXTENSION_DEBUG = "1";
-    if (injectUserFromEnv) {
-      process.env.MOCK_SECRET_PASSWORD_LOOKUP = testUser.password;
-    }
 
     const exTester = new ExTester(
       path.join(storageBaseFolder, dir),

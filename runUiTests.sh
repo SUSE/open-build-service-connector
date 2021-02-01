@@ -3,7 +3,7 @@
 set -euox pipefail
 
 yarn run compile
-yarn run mockLibsecret
+yarn run mocklibsecret
 
 for dir in $(ls -d src/ui-tests/*/);do
   testname=$(basename "${dir}")

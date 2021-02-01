@@ -55,7 +55,7 @@
     "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources/ ./mocklibsecret/build/ ./.vscode-test/ ./src/ui-tests/repositoryTreeView/fakeHome/",
     "coverage": "COVERAGE=1 ./runTests.sh && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
     "test:ui": "./runUiTests.sh",
-    "mockLibsecret": "[ -e ./mocklibsecret/build/libsecret.so ] || (mkdir -p mocklibsecret/build && cd mocklibsecret/build && meson .. && ninja)",
+    "mocklibsecret": "[ -e ./mocklibsecret/build/libsecret.so ] || (cd mocklibsecret && meson build && meson compile -C build)",
     "precoverage": "yarn run compile",
     "test": "./runTests.sh",
     "pretest": "yarn run compile",

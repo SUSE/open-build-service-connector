@@ -72,13 +72,10 @@ jobs:
           npm install keytar@$(< package.json jq ".dependencies.keytar"|sed 's/"//g')
 
     - run: |
-          mkdir -p mocklibsecret/build
-          pushd mocklibsecret/build
-          meson ..
-          ninja
-          cd ..
-          ./run_tests.py
-          popd
+          cd mocklibsecret
+          meson build
+          meson compile -C build
+          meson test -C build
 
   add_license:
     needs: build
