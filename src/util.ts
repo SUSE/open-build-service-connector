@@ -20,8 +20,9 @@
  */
 
 import * as assert from "assert";
+import { promises as fsPromises } from "fs";
 import { fetchProject } from "open-build-service-api";
-import { zip } from "open-build-service-api/lib/util";
+import { pathExists, PathType, zip } from "open-build-service-api/lib/util";
 import { join, resolve } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -414,6 +415,7 @@ export function makeThemedIconPath(
   fileName: string,
   themable: boolean & true
 ): vscode.SourceControlResourceDecorations;
+
 /**
  * Creates a [[IconPath]] object from the provided icon in `fileName`. This
  * should be a svg or png that is in the `media/{dark|light}` subfolders.
@@ -432,4 +434,15 @@ export function makeThemedIconPath(
   return themable
     ? { dark: { iconPath: dark }, light: { iconPath: light } }
     : { dark, light };
+}
+
+/** Remove path if it is defined and if it is a file, otherwise do nothing */
+export async function safeUnlink(path?: string): Promise<void> {
+  if (path === undefined) {
+    return;
+  }
+
+  if ((await pathExists(path, PathType.File)) !== undefined) {
+    return fsPromises.unlink(path);
+  }
 }
