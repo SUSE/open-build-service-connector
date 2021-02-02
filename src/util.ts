@@ -19,7 +19,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import * as assert from "assert";
 import { promises as fsPromises } from "fs";
 import { fetchProject } from "open-build-service-api";
 import { pathExists, PathType, zip } from "open-build-service-api/lib/util";
@@ -27,6 +26,7 @@ import { join, resolve } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { ActiveAccounts, promptUserForAccount } from "./accounts";
+import { assert } from "./assert";
 import { BasePackage } from "./base-components";
 import { showComboBoxInput } from "./combo-box-input";
 import { ignoreFocusOut } from "./constants";

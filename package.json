@@ -352,6 +352,11 @@
         "title": "Discard Changes",
         "icon": "$(discard)",
         "when": "scmProvider == obs"
+      },
+      {
+        "command": "vscodeObs.assert.openErrorReportPage",
+        "title": "Open Error Reporting Page",
+        "icon": "$(bug)"
       }
     ],
     "views": {

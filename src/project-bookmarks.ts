@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import * as assert from "assert";
+import { assert } from "./assert";
 import { promises as fsPromises } from "fs";
 import {
   ModifiedPackage,
@@ -736,9 +736,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
 
   private bookmarkedProjects = new Map<ApiUrl, ProjectBookmark[]>();
 
-  private onBookmarkUpdateEmitter: vscode.EventEmitter<
-    BookmarkUpdate
-  > = new vscode.EventEmitter();
+  private onBookmarkUpdateEmitter: vscode.EventEmitter<BookmarkUpdate> = new vscode.EventEmitter();
 
   private constructor(
     private readonly metadataCache: MetadataCache,

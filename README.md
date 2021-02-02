@@ -239,6 +239,12 @@ either using your distribution's package manager, from
 Please also be sure to checkout the issue tracker!
 
 
+## Reporting Bugs
+
+If you encounter a bug, please execute the command `Open Error Reporting Page`
+and include the information presented in the opened document.
+
+
 ## Credits
 
 - [@hellcp](https://github.com/Hellcp) for the icon used in the Activity Bar

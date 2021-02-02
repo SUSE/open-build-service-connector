@@ -24,10 +24,12 @@ import { join } from "path";
 import * as pino from "pino";
 import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
+import { ErrorPageDocumentProvider } from "./assert";
 import {
   BookmarkedProjectsTreeProvider,
   CheckOutHandler
 } from "./bookmark-tree-view";
+import { cmdPrefix } from "./constants";
 import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
@@ -38,6 +40,8 @@ import { ProjectBookmarkManager } from "./project-bookmarks";
 import { RepositoryTreeProvider } from "./repository";
 import { PackageScmHistoryTree } from "./scm-history";
 import { PackageScm } from "./vcs";
+
+export const GET_LOGFILE_PATH_COMMAND = `${cmdPrefix}.logging.getLogfilePath`;
 
 export async function activate(
   context: vscode.ExtensionContext
@@ -146,7 +150,9 @@ export async function activate(
     packageScmHistoryTree,
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),
-    new CheckOutHandler(accountManager, logger)
+    new CheckOutHandler(accountManager, logger),
+    vscode.commands.registerCommand(GET_LOGFILE_PATH_COMMAND, () => logFile),
+    new ErrorPageDocumentProvider(logger)
   );
   if (oscBuildTaskProvider !== undefined) {
     context.subscriptions.push(oscBuildTaskProvider);

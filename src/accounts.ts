@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import * as assert from "assert";
+import { assert } from "./assert";
 import { promises as fsPromises } from "fs";
 import * as keytar from "keytar";
 import {

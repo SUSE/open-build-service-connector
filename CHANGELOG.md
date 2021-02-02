@@ -6,6 +6,17 @@ documented in this file.
 The format is based on [Keep a
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## Unreleased
+
+### Added
+
+- Log internal errors better and provide the user with a error reporting page
+
+### Changed
+
+### Removed
+
+
 ## [0.0.5] - 2020-10-22
 
 ### Added

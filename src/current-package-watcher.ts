@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import * as assert from "assert";
+import { assert } from "./assert";
 import {
   Connection,
   isProjectWithMeta,
@@ -283,9 +283,7 @@ export class CurrentPackageWatcherImpl
     return this._currentPackage;
   }
 
-  private onDidChangeCurrentPackageEmitter = new vscode.EventEmitter<
-    CurrentPackage
-  >();
+  private onDidChangeCurrentPackageEmitter = new vscode.EventEmitter<CurrentPackage>();
 
   private constructor(
     accountManager: AccountManager,
