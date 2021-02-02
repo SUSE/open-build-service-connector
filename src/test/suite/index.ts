@@ -68,6 +68,9 @@ export async function run(): Promise<void> {
           : resolve(undefined);
       });
     });
+  } catch (err) {
+    console.error(err);
+    throw err;
   } finally {
     if (nyc) {
       nyc.writeCoverageFile();
