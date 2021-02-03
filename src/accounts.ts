@@ -1137,7 +1137,11 @@ export class AccountManagerImpl extends LoggingBase {
         : defaultAccounts;
     this.logger.trace(
       "Read the following accounts from osc's config file: %o",
-      res
+      res.map((acc) => {
+        // ensure that the password does not end up in the log
+        const { password, ...rest } = acc;
+        return rest;
+      })
     );
     return res;
   }
