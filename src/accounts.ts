@@ -789,6 +789,12 @@ export class AccountManagerImpl extends LoggingBase {
    *     account that they want to remove.
    */
   public async removeAccountInteractive(apiUrl?: ApiUrl): Promise<void> {
+    if (this.activeAccounts.getAllApis().length === 0) {
+      await this.vscodeWindow.showInformationMessage(
+        "There are no accounts defined, cannot remove any"
+      );
+      return;
+    }
     if (apiUrl === undefined) {
       const apiUrlCandidate = await promptUserForAccount(
         this.activeAccounts,

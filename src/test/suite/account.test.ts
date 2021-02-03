@@ -939,6 +939,20 @@ describe("AccountManager", function () {
         );
       })
     );
+
+    it(
+      "shows only a notification if no accounts can be removed",
+      castToAsyncFunc<FixtureContext>(async function () {
+        const mngr = await this.fixture.createAccountManager([]);
+
+        await mngr.removeAccountInteractive();
+
+        this.fixture.sandbox.assert.calledOnceWithExactly(
+          this.fixture.vscodeWindow.showInformationMessage,
+          "There are no accounts defined, cannot remove any"
+        );
+      })
+    );
   });
 
   describe("#dispose", () => {
