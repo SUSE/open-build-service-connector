@@ -19,6 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+const mockFs = require("mock-fs");
+
 import { expect, should } from "chai";
 import { promises as fsPromises } from "fs";
 import { afterEach, beforeEach, Context, describe, it } from "mocha";
@@ -32,6 +34,7 @@ import {
   deepCopyProperties,
   deepEqual,
   loadMapFromMemento,
+  safeUnlink,
   saveMapToMemento,
   setDifference,
   setUnion
@@ -298,7 +301,7 @@ describe("utilities", () => {
     });
   });
 
-  describe("getTmpPrefix", () => {
+  describe("#getTmpPrefix", () => {
     beforeEach(function () {
       this.TMPDIR = process.env.TMPDIR;
     });
@@ -315,6 +318,31 @@ describe("utilities", () => {
     it("does uses the os' temporary directory if TMPDIR is unset", () => {
       process.env.TMPDIR = undefined;
       getTmpPrefix().should.include(tmpdir());
+    });
+  });
+
+  describe("#safeUnlink", () => {
+    beforeEach(() => mockFs({ dir: { file: "foo" } }));
+    afterEach(mockFs.restore);
+
+    it("does not fail if path is undefined", async () => {
+      await safeUnlink(undefined).should.be.fulfilled;
+    });
+
+    it("does not fail if path does not exist", async () => {
+      await safeUnlink("dir/not_existent").should.be.fulfilled;
+    });
+
+    it("unlinks a file", async () => {
+      const path = "dir/file";
+      await safeUnlink(path);
+      expect(await pathExists(path)).to.equal(undefined);
+    });
+
+    it("does not unlink a directory", async () => {
+      const path = "dir";
+      await safeUnlink(path);
+      await pathExists(path).should.eventually.not.equal(undefined);
     });
   });
 });
