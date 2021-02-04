@@ -28,14 +28,16 @@ import {
   normalizeUrl,
   readAccountsFromOscrc
 } from "open-build-service-api";
+import { basename } from "path";
 import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
 import { LoggingBase } from "./base-components";
+import { ObsServerTreeElement } from "./bookmark-tree-view";
 import { cmdPrefix, ignoreFocusOut } from "./constants";
 import { logAndReportExceptions } from "./decorators";
 import { VscodeWindow } from "./dependency-injection";
-import { setDifference } from "./util";
+import { findRegexPositionInString, setDifference } from "./util";
 
 /**
  * # Accounts management
@@ -106,6 +108,8 @@ export const SET_ACCOUNT_PASSWORD_COMMAND = `${cmdPrefix}.${cmdId}.setAccountPas
 export const REMOVE_ACCOUNT_COMMAND = `${cmdPrefix}.${cmdId}.removeAccount`;
 
 export const NEW_ACCOUNT_WIZARD_COMMAND = `${cmdPrefix}.${cmdId}.newAccountWizard`;
+
+export const OPEN_SETTINGS_JSON_OF_ACCOUNT_COMMAND = `${cmdPrefix}.${cmdId}.openSettingsJsonOfAccount`;
 
 /** Type as which the URL to the API is stored */
 export type ApiUrl = string;
@@ -277,6 +281,17 @@ interface ConfigChangeResult {
    */
   errorMessages: string[];
 }
+
+const getEol = (eol: vscode.EndOfLine): string => {
+  switch (eol) {
+    case vscode.EndOfLine.LF:
+      return "\n";
+    case vscode.EndOfLine.CRLF:
+      return "\r\n";
+    default:
+      assert(false, `Got an invalid end of line: ${eol}`);
+  }
+};
 
 /**
  * Class for managing the valid accounts at runtime.
@@ -677,6 +692,11 @@ export class AccountManagerImpl extends LoggingBase {
         NEW_ACCOUNT_WIZARD_COMMAND,
         mngr.newAccountWizard,
         mngr
+      ),
+      vscode.commands.registerCommand(
+        OPEN_SETTINGS_JSON_OF_ACCOUNT_COMMAND,
+        mngr.openSettingsJsonAtApiUrl,
+        mngr
       )
     );
 
@@ -826,6 +846,68 @@ export class AccountManagerImpl extends LoggingBase {
     await this.saveAccountsToStorage();
   }
 
+  /**
+   * Command to open the user's settings.json and position the cursor at the
+   * entry of the apiUrl belonging to the supplied `obsServerTreeElement` or to
+   * the `apiUrl` that the user selected.
+   */
+  public async openSettingsJsonAtApiUrl(
+    obsServerTreeElement?: ObsServerTreeElement
+  ): Promise<void> {
+    const accountApiUrl =
+      obsServerTreeElement?.account.account.apiUrl ??
+      (await promptUserForAccount(
+        this.activeAccounts,
+        "Please specify the account for which you'd like to change the settings",
+        this.vscodeWindow
+      ));
+    if (accountApiUrl === undefined) {
+      this.logger.error("Did not get a apiUrl from the user");
+      return;
+    }
+
+    await vscode.commands.executeCommand("workbench.action.openSettingsJson");
+    const settingsEditor = vscode.window.visibleTextEditors.find(
+      (textEditor) => basename(textEditor.document.fileName) === "settings.json"
+    );
+    // hm, the settings editor did not open :-(
+    if (settingsEditor === undefined) {
+      this.logger.error("The settings editor did not open");
+      return;
+    }
+
+    const contents = settingsEditor.document.getText();
+    const settings = JSON.parse(contents);
+    if (
+      settings[configurationAccountsFullName] === undefined ||
+      !Array.isArray(settings[configurationAccountsFullName]) ||
+      settings[configurationAccountsFullName].length === 0
+    ) {
+      this.logger.error(
+        "Did not find the setting %s in the settings.json or it is not an arroy or it has no entries.",
+        configurationAccountsFullName
+      );
+      return;
+    }
+
+    const apiUrlPosition = findRegexPositionInString(
+      contents,
+      new RegExp(`\"apiUrl\":\\s*\"${accountApiUrl}\"`),
+      getEol(settingsEditor.document.eol)
+    );
+    if (apiUrlPosition === undefined) {
+      this.logger.error(
+        "Could not get the position of %s in settings.json",
+        accountApiUrl
+      );
+      return;
+    }
+
+    settingsEditor.selection = new vscode.Selection(
+      apiUrlPosition,
+      apiUrlPosition
+    );
+  }
   /** */
   public async newAccountWizard(): Promise<void> {
     const OBS = "build.opensuse.org (OBS)";

@@ -111,6 +111,10 @@
           "command": "vscodeObs.obsProject.checkOutProject"
         },
         {
+          "when": "view == bookmarkedProjectsTree && viewItem =~ /ObsServer/",
+          "command": "vscodeObs.obsAccount.openSettingsJsonOfAccount"
+        },
+        {
           "group": "inline",
           "when": "view == repositoryTree && viewItem == architectureRoot",
           "command": "vscodeObs.obsRepository.addArchitecturesToRepo"
@@ -222,6 +226,10 @@
       {
         "title": "Add an existing account from the Open Build Service to the extension",
         "command": "vscodeObs.obsAccount.newAccountWizard"
+      },
+      {
+        "title": "Open the settings of a account in the Open Build Service",
+        "command": "vscodeObs.obsAccount.openSettingsJsonOfAccount"
       },
       {
         "icon": "$(add)",

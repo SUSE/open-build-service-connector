@@ -11,6 +11,7 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Log internal errors better and provide the user with a error reporting page
+- Add command to the server entries to open the settings directly
 
 ### Changed
 
