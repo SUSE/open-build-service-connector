@@ -33,6 +33,7 @@ import {
   createItemInserter,
   deepCopyProperties,
   deepEqual,
+  findRegexPositionInString,
   loadMapFromMemento,
   safeUnlink,
   saveMapToMemento,
@@ -343,6 +344,31 @@ describe("utilities", () => {
       const path = "dir";
       await safeUnlink(path);
       await pathExists(path).should.eventually.not.equal(undefined);
+    });
+  });
+
+  describe("#findRegexPositionInString", () => {
+    it("returns undefined if the substring is not found", () => {
+      expect(findRegexPositionInString("fooo", "bar")).to.equal(undefined);
+    });
+
+    it("finds the position if the substring is found", () => {
+      const objs = [
+        { foo: "bar", baz: [{ arr: 1 }] },
+        { baz: [{ arr: 1 }], foo: "bar" }
+      ].map((obj) => JSON.stringify(obj, undefined, 4));
+
+      const positions = objs.map((obj) =>
+        findRegexPositionInString(obj, /\"foo\":\s*\"bar\"/)
+      );
+
+      expect(positions[0]).to.not.equal(undefined);
+      positions[0]?.line.should.equal(1);
+      positions[0]?.character.should.equal(4);
+
+      expect(positions[1]).to.not.equal(undefined);
+      positions[1]?.line.should.equal(6);
+      positions[1]?.character.should.equal(4);
     });
   });
 });

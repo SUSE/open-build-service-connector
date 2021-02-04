@@ -446,3 +446,38 @@ export async function safeUnlink(path?: string): Promise<void> {
     return fsPromises.unlink(path);
   }
 }
+
+/**
+ * Finds the first occurrence of `searchExpr` in `str` and calculates a position
+ * of the match.
+ *
+ * @param eol  End of line used in `str`, otherwise a general RegExp matching LF
+ *     and CLRF line ends is used.
+ *
+ * @return A [[vscode.Position]] if `searchExpr` was found in `str` or
+ *     `undefined` otherwise.
+ */
+export function findRegexPositionInString(
+  str: string,
+  searchExpr: string | RegExp,
+  eol?: string
+): vscode.Position | undefined {
+  const lineEnd = new RegExp(eol ?? "\r\n|\r|\n");
+  const matchPos = str.search(searchExpr);
+  if (matchPos === -1) {
+    return undefined;
+  }
+  // this is an array of all lines (excluding newline symbols) until the first
+  // match of searchExpr
+  const newLineMatches = str.slice(0, matchPos).split(lineEnd);
+  const linesBeforeApi = newLineMatches.length;
+  const lastNewlineBeforeMatch = newLineMatches
+    .slice(0, newLineMatches.length - 1)
+    // the +1 is there to account for the newlines that are gone due to the split()
+    .reduce((prev, cur) => prev + cur.length + 1, 0);
+
+  return new vscode.Position(
+    linesBeforeApi - 1,
+    matchPos - lastNewlineBeforeMatch
+  );
+}
