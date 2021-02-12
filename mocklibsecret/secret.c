@@ -19,6 +19,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #define _GNU_SOURCE
 #include <assert.h>
 #include <stdarg.h>
@@ -62,7 +63,7 @@ static gboolean get_ini_location(char **ini_path, GError **error) {
 }
 
 __attribute__((constructor)) void init() {
-  static const char* quark_str = "MOCKLIBSECRET_ERROR";
+  static const char *quark_str = "MOCKLIBSECRET_ERROR";
   quark = g_quark_from_static_string(quark_str);
 
   g_autofree gchar *ini_path;
@@ -88,6 +89,23 @@ static gboolean open_ini_file(GKeyFile *key_file, GError **error) {
 
   return TRUE;
 }
+
+#define RETURN_IF_SHOULD_FAIL()                                                \
+  char *_err_msg = secure_getenv("MOCKLIBSECRET_ERROR_MESSAGE");               \
+  if (_err_msg != NULL) {                                                      \
+    *error = g_error_new(quark, 0, "%s", _err_msg);                            \
+    return FALSE;                                                              \
+  }                                                                            \
+  g_autofree gchar *_error_file, *_error_message;                              \
+  gsize _length = 0;                                                           \
+  asprintf(&_error_file, "%s/mocklibsecret_error_message", g_get_tmp_dir());   \
+  /* don't care why reading failed */                                          \
+  if (g_file_get_contents(_error_file, &_error_message, &_length, NULL)) {     \
+    *error =                                                                   \
+        g_error_new(quark, 0, "%s",                                            \
+                    _length == 0 ? "libsecret call failed" : _error_message);  \
+    return FALSE;                                                              \
+  }
 
 static gboolean label_from_va_args(gchar **service, gchar **account,
                                    GError **error, va_list argp) {
@@ -127,6 +145,8 @@ gboolean secret_password_store_sync(const SecretSchema *schema,
   UNUSED(cancellable);
 
   *error = NULL;
+
+  RETURN_IF_SHOULD_FAIL()
 
   g_autoptr(GKeyFile) key_file = g_key_file_new();
   g_autofree gchar *ini_path;
@@ -172,6 +192,8 @@ gchar *secret_password_lookup_sync(const SecretSchema *schema,
 
   *error = NULL;
 
+  RETURN_IF_SHOULD_FAIL();
+
   g_autofree char *ini_path;
   if (!get_ini_location(&ini_path, error)) {
     return NULL;
@@ -212,6 +234,8 @@ gboolean secret_password_clear_sync(const SecretSchema *schema,
   UNUSED(cancellable);
 
   *error = NULL;
+
+  RETURN_IF_SHOULD_FAIL();
 
   g_autofree gchar *service;
   g_autofree gchar *account;
@@ -270,12 +294,13 @@ GList *secret_service_search_sync(SecretService *service,
 
   *error = NULL;
 
+  RETURN_IF_SHOULD_FAIL();
+
   if (flags !=
       (SECRET_SEARCH_ALL | SECRET_SEARCH_UNLOCK | SECRET_SEARCH_LOAD_SECRETS)) {
     *error = g_error_new(quark, 0, "got wrong flags from keytar: %d", flags);
     return NULL;
   }
-
 
   const gchar *service_name =
       g_hash_table_find(attributes, key_match_find, (gpointer) "service");
