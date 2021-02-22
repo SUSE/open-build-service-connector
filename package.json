@@ -63,7 +63,7 @@
     "compile": "tsc -p ./",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "format": "prettier --write \"src/**/*.ts\"",
-    "vscode:prepublish": "webpack --mode production"
+    "vscode:prepublish": "webpack --mode $([ \"${EXTENSION_DEBUG}\" = 1 ] && echo \"development\" || echo \"production\")"
   },
   "contributes": {
     "menus": {
