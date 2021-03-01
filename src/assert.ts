@@ -62,22 +62,27 @@ export function assert(condition: any, msg?: string): asserts condition {
     stack: new Error().stack,
     occurenceTime: new Date()
   })
-    .then(() => {
-      vscode.window
-        .showErrorMessage(
-          `An internal error occurred${
-            msg === undefined ? "" : ": ".concat(msg)
-          }. Would you like to open the Error Report page?`,
-          { modal: true },
-          "Yes",
-          "No"
-        )
-        .then((yesNo) => {
-          if (yesNo === "Yes") {
-            vscode.commands.executeCommand(OPEN_ERROR_REPORT_PAGE_COMMAND);
-          }
-        });
-    })
+    .then(
+      async (): Promise<void> =>
+        await vscode.window
+          .showErrorMessage(
+            `An internal error occurred${
+              msg === undefined ? "" : ": ".concat(msg)
+            }. Would you like to open the Error Report page?`,
+            { modal: true },
+            "Yes",
+            "No"
+          )
+          .then(
+            async (yesNo): Promise<void> => {
+              if (yesNo === "Yes") {
+                await vscode.commands.executeCommand(
+                  OPEN_ERROR_REPORT_PAGE_COMMAND
+                );
+              }
+            }
+          )
+    )
     .catch(() => {});
 
   throw new Error(`Assertion failed! ${msg ?? ""}`);
