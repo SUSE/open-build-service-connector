@@ -244,13 +244,10 @@ const isValidUrl = (potentialUrl: string) => {
   }
 };
 
-const getForceHttpsSetting = (
-  wsConfig?: vscode.WorkspaceConfiguration
-): boolean | undefined =>
-  (wsConfig === undefined
-    ? vscode.workspace.getConfiguration(CONFIGURATION_EXTENSION_NAME)
-    : wsConfig
-  ).get<boolean>(CONFIGURATION_FORCE_HTTPS);
+const getForceHttpsSetting = (): boolean | undefined =>
+  vscode.workspace
+    .getConfiguration(CONFIGURATION_EXTENSION_NAME)
+    .get<boolean>(CONFIGURATION_FORCE_HTTPS);
 
 /**
  * Ask the user to specify which account to use for an action with the given
@@ -388,7 +385,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
       CONFIGURATION_ACCOUNTS,
       []
     );
-    const forceHttps = getForceHttpsSetting(wsConfig);
+    const forceHttps = getForceHttpsSetting();
 
     const oldAccounts = [...this.apiAccountMap.values()].map(
       (inst) => inst.account
@@ -610,7 +607,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
       CONFIGURATION_EXTENSION_NAME
     );
     const accounts = wsConfig.get<AccountStorage[]>(CONFIGURATION_ACCOUNTS, []);
-    const forceHttps = getForceHttpsSetting(wsConfig);
+    const forceHttps = getForceHttpsSetting();
 
     this.logger.trace(
       "Loading the following accounts from the storage: %s",
