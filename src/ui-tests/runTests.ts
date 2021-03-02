@@ -153,6 +153,9 @@ class TestEnv {
     newSettingsJson["window.restoreFullscreen"] = true;
     newSettingsJson["workbench.enableExperiments"] = false;
 
+    // to get modal dialogs to work with vscode-extension-tester
+    newSettingsJson["window.dialogStyle"] = "custom";
+
     newSettingsJson["vscode-obs.logLevel"] = "trace";
     // the docker compose setup uses http
     newSettingsJson["vscode-obs.forceHttps"] = false;
