@@ -39,6 +39,7 @@ import {
   ActivityBar,
   EditorView,
   InputBox,
+  ModalDialog,
   Notification,
   NotificationsCenter,
   NotificationType,
@@ -632,4 +633,43 @@ export async function createAccountViaCommand(
   await enterTextIntoInputBox(acc.accountName);
   await enterTextIntoInputBox(acc.realname ?? "");
   await enterTextIntoInputBox(acc.email ?? "");
+}
+
+/**
+ * Removes an account from the extension by invoking the `removeAccount`
+ * command.
+ *
+ * @param accountName The `accountName` property of this account from the
+ *     settings.
+ * @param apiUrl  Url to the API of this account
+ */
+export async function deleteAccount(
+  accountName: string,
+  apiUrl: string
+): Promise<void> {
+  const bench = new Workbench();
+  await bench.executeCommand("vscodeObs.obsAccount.removeAccount");
+
+  // if there are multiple accounts defined, we'll get asked which one to remove
+  // if there is just one, the input will be skipped
+  // if there are none, then this function just fails :)
+  let accSelectionBox: InputBox | undefined;
+  try {
+    accSelectionBox = await InputBox.create();
+  } catch (_err) {
+    accSelectionBox = undefined;
+  }
+
+  if (accSelectionBox !== undefined) {
+    await accSelectionBox.setText(accountName);
+    await accSelectionBox.confirm();
+  }
+
+  const dialog = await waitForElement(() => new ModalDialog());
+  const msg = await dialog.getDetails();
+
+  msg.should.match(new RegExp(apiUrl));
+  msg.should.match(/the account for the api.*will be deleted, are you sure?/i);
+
+  await dialog.pushButton("Yes");
 }
