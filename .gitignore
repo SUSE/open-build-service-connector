@@ -15,6 +15,7 @@ mocklibsecret/.mypy_cache/*
 src/ui-tests/default/fakeHome/*
 src/ui-tests/default/settings.json
 dist/*
+test-home/*
 
 media/dark/endpoints_disconnected.svg
 media/light/endpoints_disconnected.svg

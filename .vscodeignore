@@ -36,5 +36,7 @@ node_modules
 out/
 src/
 webpack.config.js
+test-home/**
 scripts/**
 generate_icons.sh
+.dir-locals.el
