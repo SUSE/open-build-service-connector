@@ -44,6 +44,7 @@ import {
   NotificationsCenter,
   NotificationType,
   SideBarView,
+  TextEditor,
   TreeItem,
   until,
   ViewItem,
@@ -672,4 +673,46 @@ export async function deleteAccount(
   msg.should.match(/the account for the api.*will be deleted, are you sure?/i);
 
   await dialog.pushButton("Yes");
+}
+
+export const SETTINGS_JSON = "settings.json";
+
+/**
+ * Open the current global settings as json.
+ *
+ * @returns Object with the following properties:
+ *     - `editorView`: a [[EditorView]] that can be used to access the open editors
+ *     - `settingsJsonEditor`: [[TextEditor]] containing the settings.
+ */
+export async function openSettingsJson(): Promise<{
+  settingsJsonEditor: TextEditor;
+  editorView: EditorView;
+}> {
+  await new Workbench().executeCommand("workbench.action.openSettingsJson");
+
+  const editorView = new EditorView();
+  await editorView.openEditor(SETTINGS_JSON);
+  return { editorView, settingsJsonEditor: new TextEditor() };
+}
+
+/**
+ * Change the contents of `settings.json` by writing the result of
+ * `modifyCallback(currentSettings)` back to `settings.json`.
+ *
+ * @param modifyCallback  A callback that receives the current settings as an
+ *     object and returns the new settings (not converted to json). This
+ *     function must not be asynchronous.
+ */
+export async function modifySettingsJson(
+  modifyCallback: (settings: any) => any
+): Promise<void> {
+  const { editorView, settingsJsonEditor } = await openSettingsJson();
+  const settings = JSON.parse(await settingsJsonEditor.getText());
+
+  await settingsJsonEditor.setText(
+    JSON.stringify(modifyCallback(settings), undefined, 4)
+  );
+  await settingsJsonEditor.save();
+
+  await editorView.closeEditor(SETTINGS_JSON);
 }
