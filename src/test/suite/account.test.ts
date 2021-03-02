@@ -37,9 +37,14 @@ import {
   CONFIGURATION_EXTENSION_NAME,
   KEYTAR_SERVICE_NAME
 } from "../../accounts";
-import { fakeAccount1, fakeAccount2 } from "./test-data";
+import {
+  CA_CERT_ROOT_CERTIFICATE_RAW,
+  fakeAccount1,
+  fakeAccount2
+} from "./test-data";
 import {
   castToAsyncFunc,
+  createStubbedObsFetchers,
   createStubbedVscodeWindow,
   executeAndWaitForEvent,
   LoggingFixture,
@@ -83,9 +88,9 @@ class AccountManagerFixture extends LoggingFixture {
     keytar,
     "deletePassword"
   );
-  public readonly readAccountsFromOscrcMock = this.sandbox.stub();
 
   public readonly vscodeWindow = createStubbedVscodeWindow(this.sandbox);
+  public readonly obsFetchers = createStubbedObsFetchers(this.sandbox);
 
   public readonly accountChangeSpy = this.sandbox.spy();
 
@@ -121,12 +126,16 @@ class AccountManagerFixture extends LoggingFixture {
       );
     }
 
+    this.obsFetchers.checkConnection.resolves({
+      state: openBuildServiceApi.ConnectionState.Ok
+    });
+
     const mngr = await AccountManagerImpl.createAccountManager(
       testLogger,
       this.vscodeWindow,
       vscode.commands,
       vscode.workspace,
-      this.readAccountsFromOscrcMock
+      this.obsFetchers
     );
     mngr.onAccountChange(this.accountChangeSpy);
 
@@ -476,7 +485,7 @@ describe("AccountManager", function () {
           // ensure that everything that follows uses the normalized url
           apiUrl = openBuildServiceApi.normalizeUrl(apiUrl);
 
-          this.fixture.readAccountsFromOscrcMock.resolves([
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
             fakeNewOscrcAccount
           ]);
           this.fixture.keytarGetPasswordMock.resetHistory();
@@ -545,7 +554,9 @@ describe("AccountManager", function () {
           };
 
           const password = "SuperSecure!!";
-          this.fixture.readAccountsFromOscrcMock.resolves([fakeOscrcAccount]);
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
+            fakeOscrcAccount
+          ]);
           this.fixture.vscodeWindow.showInputBox.resolves(password);
 
           await executeAndWaitForEvent(
@@ -593,7 +604,9 @@ describe("AccountManager", function () {
             username: "barUser"
           };
 
-          this.fixture.readAccountsFromOscrcMock.resolves([fakeOscrcAccount]);
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
+            fakeOscrcAccount
+          ]);
           this.fixture.vscodeWindow.showInputBox.resolves(undefined);
 
           await mngr.importAccountsFromOsrc();
@@ -612,7 +625,7 @@ describe("AccountManager", function () {
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager([fakeAccount1]);
 
-          this.fixture.readAccountsFromOscrcMock.resolves([
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
             { ...fakeAccount1, aliases: [] }
           ]);
 
@@ -627,12 +640,12 @@ describe("AccountManager", function () {
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager([]);
 
-          this.fixture.readAccountsFromOscrcMock
+          this.fixture.obsFetchers.readAccountsFromOscrc
             .onCall(1)
             .resolves([
               { ...fakeAccount1, password: "fooPassword", aliases: [] }
             ]);
-          this.fixture.readAccountsFromOscrcMock.onCall(0).resolves([]);
+          this.fixture.obsFetchers.readAccountsFromOscrc.onCall(0).resolves([]);
 
           await executeAndWaitForEvent(
             () => mngr.importAccountsFromOsrc(),
@@ -660,7 +673,7 @@ describe("AccountManager", function () {
         await setCheckForUnimportedAccounts(true);
 
         this.fixture.sandbox.assert.notCalled(
-          this.fixture.readAccountsFromOscrcMock
+          this.fixture.obsFetchers.readAccountsFromOscrc
         );
       });
 
@@ -686,7 +699,9 @@ describe("AccountManager", function () {
             [fakeAccount1],
             [fakeAccount1.username]
           );
-          this.fixture.readAccountsFromOscrcMock.resolves([fakeAccount1]);
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
+            fakeAccount1
+          ]);
 
           await mngr.promptForUninmportedAccountsInOscrc();
 
@@ -694,7 +709,7 @@ describe("AccountManager", function () {
             this.fixture.vscodeWindow.showInformationMessage
           );
           this.fixture.sandbox.assert.calledOnce(
-            this.fixture.readAccountsFromOscrcMock
+            this.fixture.obsFetchers.readAccountsFromOscrc
           );
         })
       );
@@ -704,7 +719,7 @@ describe("AccountManager", function () {
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
-          this.fixture.readAccountsFromOscrcMock.resolves([
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
             fakeNewOscrcAccount
           ]);
           this.fixture.vscodeWindow.showInformationMessage.resolves();
@@ -722,7 +737,7 @@ describe("AccountManager", function () {
             "Never show this message again"
           );
           this.fixture.sandbox.assert.calledOnce(
-            this.fixture.readAccountsFromOscrcMock
+            this.fixture.obsFetchers.readAccountsFromOscrc
           );
           this.fixture.sandbox.assert.notCalled(
             this.fixture.keytarSetPasswordMock
@@ -735,7 +750,7 @@ describe("AccountManager", function () {
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
-          this.fixture.readAccountsFromOscrcMock.resolves([
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
             fakeNewOscrcAccount
           ]);
           this.fixture.vscodeWindow.showInformationMessage.resolves(
@@ -749,7 +764,7 @@ describe("AccountManager", function () {
           );
 
           this.fixture.sandbox.assert.calledOnce(
-            this.fixture.readAccountsFromOscrcMock
+            this.fixture.obsFetchers.readAccountsFromOscrc
           );
           this.fixture.sandbox.assert.notCalled(
             this.fixture.keytarSetPasswordMock
@@ -768,7 +783,7 @@ describe("AccountManager", function () {
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
 
-          this.fixture.readAccountsFromOscrcMock.resolves([
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
             fakeNewOscrcAccount
           ]);
           this.fixture.vscodeWindow.showInformationMessage.resolves("Not now");
@@ -780,7 +795,7 @@ describe("AccountManager", function () {
           );
 
           this.fixture.sandbox.assert.calledOnce(
-            this.fixture.readAccountsFromOscrcMock
+            this.fixture.obsFetchers.readAccountsFromOscrc
           );
           this.fixture.sandbox.assert.notCalled(
             this.fixture.keytarSetPasswordMock
@@ -799,7 +814,7 @@ describe("AccountManager", function () {
         "actually imports the account if the user wants to",
         castToAsyncFunc<FixtureContext>(async function () {
           const mngr = await this.fixture.createAccountManager();
-          this.fixture.readAccountsFromOscrcMock.resolves([
+          this.fixture.obsFetchers.readAccountsFromOscrc.resolves([
             fakeNewOscrcAccount
           ]);
           this.fixture.vscodeWindow.showInformationMessage.resolves(
@@ -813,7 +828,7 @@ describe("AccountManager", function () {
           );
 
           this.fixture.sandbox.assert.calledOnce(
-            this.fixture.readAccountsFromOscrcMock
+            this.fixture.obsFetchers.readAccountsFromOscrc
           );
           this.fixture.sandbox.assert.calledOnce(
             this.fixture.keytarSetPasswordMock
@@ -1332,15 +1347,28 @@ Gwc=
       const apiUrl = "https://api.opensuse.org/";
       const password = "foo";
 
+      const accStorage = {
+        accountName,
+        apiUrl,
+        email,
+        realname,
+        username
+      };
+
       beforeEach(function () {
         this.fixture.vscodeWindow.showQuickPick
           .onCall(0)
           .resolves("build.opensuse.org (OBS)");
         this.fixture.vscodeWindow.showInputBox.onCall(0).resolves(username);
-        this.fixture.vscodeWindow.showInputBox.onCall(1).resolves(accountName);
-        this.fixture.vscodeWindow.showInputBox.onCall(2).resolves(realname);
-        this.fixture.vscodeWindow.showInputBox.onCall(3).resolves(email);
-        this.fixture.vscodeWindow.showInputBox.onCall(4).resolves(password);
+        this.fixture.vscodeWindow.showInputBox.onCall(1).resolves(password);
+
+        // add this account anyway?
+        // it will be broken because the password is wrong
+        this.fixture.vscodeWindow.showErrorMessage.onCall(0).resolves("Yes");
+
+        this.fixture.vscodeWindow.showInputBox.onCall(2).resolves(accountName);
+        this.fixture.vscodeWindow.showInputBox.onCall(3).resolves(realname);
+        this.fixture.vscodeWindow.showInputBox.onCall(4).resolves(email);
       });
 
       it(
@@ -1359,28 +1387,18 @@ Gwc=
           );
 
           this.fixture.sandbox.assert.calledOnce(this.fixture.accountChangeSpy);
-          checkAccountAndCon(
-            mngr,
-            {
-              accountName: "OBS",
-              apiUrl,
-              email,
-              realname,
-              username
-            },
-            {
-              authSource: { password, username },
-              url: new URL(apiUrl)
-            }
-          );
+          checkAccountAndCon(mngr, accStorage, {
+            authSource: { password, username },
+            url: new URL(apiUrl)
+          });
         })
       );
 
       it(
         "creates a OBS account without a real name and email",
         castToAsyncFunc<FixtureContext>(async function () {
-          this.fixture.vscodeWindow.showInputBox.onCall(2).resolves(undefined);
-          this.fixture.vscodeWindow.showInputBox.onCall(3).resolves("");
+          this.fixture.vscodeWindow.showInputBox.onCall(3).resolves(undefined);
+          this.fixture.vscodeWindow.showInputBox.onCall(4).resolves("");
 
           const mngr = await this.fixture.createAccountManager();
 
@@ -1390,7 +1408,7 @@ Gwc=
           checkAccountAndCon(
             mngr,
             {
-              accountName: "OBS",
+              accountName,
               apiUrl,
               username
             },
@@ -1412,116 +1430,357 @@ Gwc=
       const password = "foo";
       const certPath = "/etc/custom_cert.pem";
 
+      const accStorage = {
+        accountName,
+        apiUrl,
+        email,
+        realname,
+        username
+      };
+
+      const FAKE_CERT = {
+        issuer: { O: "bar", CN: "baz" },
+        raw: CA_CERT_ROOT_CERTIFICATE_RAW,
+        fingerprint256: "DEADBEEF"
+      };
+
       beforeEach(function () {
         this.fixture.vscodeWindow.showQuickPick
           .onCall(0)
           .resolves("other (custom)");
         this.fixture.vscodeWindow.showInputBox.onCall(0).resolves(apiUrl);
         this.fixture.vscodeWindow.showInputBox.onCall(1).resolves(username);
-        this.fixture.vscodeWindow.showInputBox.onCall(2).resolves(accountName);
-        this.fixture.vscodeWindow.showInputBox.onCall(3).resolves(realname);
-        this.fixture.vscodeWindow.showInputBox.onCall(4).resolves(email);
+        this.fixture.vscodeWindow.showInputBox.onCall(2).resolves(password);
 
-        // add a custom cert?
-        this.fixture.vscodeWindow.showQuickPick.onCall(1).resolves("Yes");
+        // add a custom ssl certificate?
+        this.fixture.vscodeWindow.showErrorMessage.onCall(0).resolves("Yes");
+
+        this.fixture.vscodeWindow.showInputBox.onCall(3).resolves(accountName);
+        this.fixture.vscodeWindow.showInputBox.onCall(4).resolves(realname);
+        this.fixture.vscodeWindow.showInputBox.onCall(5).resolves(email);
+
         this.fixture.vscodeWindow.showOpenDialog
           .onCall(0)
           .resolves([vscode.Uri.file(certPath)]);
 
-        this.fixture.vscodeWindow.showInputBox.onCall(5).resolves(password);
+        this.fixture.obsFetchers.fetchServerCaCertificate
+          .onCall(0)
+          .resolves(FAKE_CERT);
       });
 
-      it(
-        "creates a new custom account",
-        castToAsyncFunc<FixtureContext>(async function () {
-          const mngr = await this.fixture.createAccountManager();
+      const checkWizardVscodeWindow = (
+        ctx: FixtureContext,
+        {
+          showQuickPickCallCount = 2,
+          showInputBoxCallCount = 6,
+          accountChangeSpyCalled = true
+        }: {
+          showQuickPickCallCount?: 1 | 2;
+          showInputBoxCallCount?: 3 | 6;
+          accountChangeSpyCalled?: boolean;
+        } = {}
+      ) => {
+        ctx.fixture.sandbox.assert.callCount(
+          ctx.fixture.vscodeWindow.showQuickPick,
+          showQuickPickCallCount
+        );
+        ctx.fixture.sandbox.assert.callCount(
+          ctx.fixture.vscodeWindow.showInputBox,
+          showInputBoxCallCount
+        );
+        (accountChangeSpyCalled
+          ? ctx.fixture.sandbox.assert.calledOnce
+          : ctx.fixture.sandbox.assert.notCalled)(ctx.fixture.accountChangeSpy);
+      };
 
-          this.readFileMock.resolves(
-            Buffer.from(caCertRootCertificate, "ascii")
-          );
+      describe("with SSL issues", () => {
+        beforeEach(function () {
+          this.fixture.obsFetchers.checkConnection.onCall(0).resolves({
+            state: openBuildServiceApi.ConnectionState.SslError
+          });
+          this.fixture.obsFetchers.checkConnection.onCall(1).resolves({
+            state: openBuildServiceApi.ConnectionState.Ok
+          });
 
-          await mngr.newAccountWizard();
+          // how should the cert be added?
+          this.fixture.vscodeWindow.showQuickPick
+            .onCall(1)
+            .resolves("From the file system");
+        });
 
-          this.fixture.sandbox.assert.calledTwice(
-            this.fixture.vscodeWindow.showQuickPick
-          );
-          this.fixture.sandbox.assert.callCount(
-            this.fixture.vscodeWindow.showInputBox,
-            6
-          );
+        it(
+          "creates a new custom account",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
 
-          this.fixture.sandbox.assert.calledOnce(this.fixture.accountChangeSpy);
+            this.readFileMock.resolves(
+              Buffer.from(caCertRootCertificate, "ascii")
+            );
 
-          checkAccountAndCon(
-            mngr,
-            {
-              accountName: "DOE",
-              apiUrl,
-              email,
-              realname,
-              serverCaCertificate: caCertRootCertificate,
-              username
-            },
-            {
-              serverCaCertificate: caCertRootCertificate,
-              url: new URL(apiUrl),
-              authSource: { password, username }
-            }
-          );
-        })
-      );
+            await mngr.newAccountWizard();
 
-      it(
-        "reports an error reading the certificate if the path is invalid",
-        castToAsyncFunc<FixtureContext>(async function () {
-          const mngr = await this.fixture.createAccountManager();
+            checkWizardVscodeWindow(this);
 
-          const errMsg = `ENOENT: no such file or directory, open ${certPath}`;
-          this.readFileMock.throws(Error(errMsg));
+            checkAccountAndCon(
+              mngr,
+              {
+                serverCaCertificate: caCertRootCertificate,
+                ...accStorage
+              },
+              {
+                serverCaCertificate: caCertRootCertificate,
+                url: new URL(apiUrl),
+                authSource: { password, username }
+              }
+            );
+          })
+        );
 
-          await mngr.newAccountWizard();
+        it(
+          "reports an error reading the certificate if the path is invalid",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
 
-          this.fixture.sandbox.assert.calledTwice(
-            this.fixture.vscodeWindow.showQuickPick
-          );
-          this.fixture.sandbox.assert.callCount(
-            this.fixture.vscodeWindow.showInputBox,
-            6
-          );
+            const errMsg = `ENOENT: no such file or directory, open ${certPath}`;
+            this.readFileMock.throws(Error(errMsg));
 
-          this.fixture.sandbox.assert.calledOnce(
-            this.fixture.vscodeWindow.showErrorMessage
-          );
-          this.fixture.sandbox.assert.calledWith(
-            this.fixture.vscodeWindow.showErrorMessage,
-            `Could not read the server certificate from the file '${certPath}', got the following error: Error: ${errMsg}. This is not a fatal error.`
-          );
+            await mngr.newAccountWizard();
 
-          this.fixture.sandbox.assert.calledOnce(this.fixture.accountChangeSpy);
+            checkWizardVscodeWindow(this);
 
-          checkAccountAndCon(
-            mngr,
-            {
-              accountName: "DOE",
-              apiUrl,
-              email,
-              realname,
-              username
-            },
-            {
+            this.fixture.sandbox.assert.calledTwice(
+              this.fixture.vscodeWindow.showErrorMessage
+            );
+            this.fixture.sandbox.assert.calledWith(
+              this.fixture.vscodeWindow.showErrorMessage,
+              `Could not read the server certificate from the file '${certPath}', got the following error: Error: ${errMsg}. This is not a fatal error.`
+            );
+
+            checkAccountAndCon(mngr, accStorage, {
               authSource: { password, username },
               url: new URL(apiUrl)
-            }
-          );
+            });
 
-          expect(
-            mngr.activeAccounts.getConfig(apiUrl)!.connection[
-              // tslint:disable-next-line: no-string-literal
-              "serverCaCertificate"
-            ]
-          ).to.equal(undefined);
-        })
-      );
+            expect(
+              mngr.activeAccounts.getConfig(apiUrl)!.connection[
+                "serverCaCertificate"
+              ]
+            ).to.equal(undefined);
+          })
+        );
+
+        it(
+          "does not add a ssl certificate if the user does not want to provide one",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
+            // add a custom ssl certificate?
+            this.fixture.vscodeWindow.showErrorMessage.onCall(0).resolves("No");
+
+            await mngr.newAccountWizard();
+            checkWizardVscodeWindow(this, { showQuickPickCallCount: 1 });
+
+            checkAccountAndCon(mngr, accStorage, {
+              authSource: { password, username },
+              url: new URL(apiUrl)
+            });
+          })
+        );
+
+        it(
+          "does nothing if the user does not enter a password",
+          castToAsyncFunc<FixtureContext>(async function () {
+            this.fixture.vscodeWindow.showInputBox
+              .onCall(2)
+              .resolves(undefined);
+
+            const mngr = await this.fixture.createAccountManager();
+            // add a custom ssl certificate?
+            this.fixture.vscodeWindow.showErrorMessage
+              .onCall(0)
+              .resolves(undefined);
+
+            await mngr.newAccountWizard();
+            checkWizardVscodeWindow(this, {
+              showQuickPickCallCount: 1,
+              showInputBoxCallCount: 3,
+              accountChangeSpyCalled: false
+            });
+
+            expect(mngr.activeAccounts.getAllApis()).to.have.length(0);
+          })
+        );
+
+        it(
+          "does not add an account if the user lets the prompt whether to add a ssl certificate time out",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
+            // add a custom ssl certificate?
+            this.fixture.vscodeWindow.showErrorMessage
+              .onCall(0)
+              .resolves(undefined);
+
+            await mngr.newAccountWizard();
+            checkWizardVscodeWindow(this, {
+              showQuickPickCallCount: 1,
+              showInputBoxCallCount: 3,
+              accountChangeSpyCalled: false
+            });
+
+            expect(mngr.activeAccounts.getAllApis()).to.have.length(0);
+          })
+        );
+
+        it(
+          "does not add an account if the user lets the prompt how to provide the SSL certificate time out",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
+
+            // how should the cert be added?
+            this.fixture.vscodeWindow.showQuickPick
+              .onCall(1)
+              .resolves(undefined);
+
+            await mngr.newAccountWizard();
+
+            checkWizardVscodeWindow(this, {
+              showInputBoxCallCount: 3,
+              accountChangeSpyCalled: false
+            });
+
+            expect(mngr.activeAccounts.getAllApis()).to.have.length(0);
+          })
+        );
+
+        it(
+          "fetches the CA certificate automatically if requested",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
+
+            // how should the cert be added?
+            this.fixture.vscodeWindow.showQuickPick
+              .onCall(1)
+              .resolves("Fetch automatically");
+
+            this.fixture.vscodeWindow.showInformationMessage
+              .onCall(0)
+              .resolves("Yes");
+
+            await mngr.newAccountWizard();
+
+            this.fixture.sandbox.assert.calledOnceWithMatch(
+              this.fixture.vscodeWindow.showInformationMessage,
+              new RegExp(
+                `got the ca certificate for ${apiUrl}: issuer common name: ${FAKE_CERT.issuer.CN}, issuer organization: ${FAKE_CERT.issuer.O}, sha256 fingerprint: ${FAKE_CERT.fingerprint256}. add this certificate?`,
+                "i"
+              )
+            );
+
+            checkWizardVscodeWindow(this);
+
+            checkAccountAndCon(
+              mngr,
+              {
+                serverCaCertificate: caCertRootCertificate,
+                ...accStorage
+              },
+              {
+                serverCaCertificate: caCertRootCertificate,
+                url: new URL(apiUrl),
+                authSource: { password, username }
+              }
+            );
+          })
+        );
+
+        it(
+          "fetches the CA certificate automatically if requested, but does not add it if the user declines",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
+
+            // how should the cert be added?
+            this.fixture.vscodeWindow.showQuickPick
+              .onCall(1)
+              .resolves("Fetch automatically");
+
+            this.fixture.vscodeWindow.showInformationMessage
+              .onCall(0)
+              .resolves("No");
+
+            await mngr.newAccountWizard();
+
+            this.fixture.sandbox.assert.calledOnce(
+              this.fixture.vscodeWindow.showInformationMessage
+            );
+
+            checkWizardVscodeWindow(this);
+
+            checkAccountAndCon(mngr, accStorage, {
+              url: new URL(apiUrl),
+              authSource: { password, username }
+            });
+          })
+        );
+
+        it(
+          "fetches the CA certificate automatically if requested, but does not add the account if the user cancels the prompt",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
+
+            // how should the cert be added?
+            this.fixture.vscodeWindow.showQuickPick
+              .onCall(1)
+              .resolves("Fetch automatically");
+
+            this.fixture.vscodeWindow.showInformationMessage
+              .onCall(0)
+              .resolves(undefined);
+
+            await mngr.newAccountWizard();
+
+            this.fixture.sandbox.assert.calledOnce(
+              this.fixture.vscodeWindow.showInformationMessage
+            );
+
+            checkWizardVscodeWindow(this, {
+              showInputBoxCallCount: 3,
+              accountChangeSpyCalled: false
+            });
+
+            mngr.activeAccounts.getAllApis().length.should.equal(0);
+          })
+        );
+      });
+
+      describe("other connection issues", () => {
+        it(
+          "asks the user whether they want to add a broken account and adds it",
+          castToAsyncFunc<FixtureContext>(async function () {
+            const mngr = await this.fixture.createAccountManager();
+
+            this.fixture.obsFetchers.checkConnection.onCall(0).resolves({
+              state: openBuildServiceApi.ConnectionState.ApiBroken
+            });
+
+            // add anyway?
+            this.fixture.vscodeWindow.showErrorMessage
+              .onCall(0)
+              .resolves("Yes");
+
+            await mngr.newAccountWizard();
+
+            this.fixture.sandbox.assert.calledOnce(
+              this.fixture.vscodeWindow.showErrorMessage
+            );
+
+            checkWizardVscodeWindow(this, { showQuickPickCallCount: 1 });
+
+            checkAccountAndCon(mngr, accStorage, {
+              url: new URL(apiUrl),
+              authSource: { password, username }
+            });
+          })
+        );
+      });
     });
   });
 });

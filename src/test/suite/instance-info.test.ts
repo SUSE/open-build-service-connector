@@ -278,7 +278,14 @@ describe("ObsServerInformation", () => {
 
         const serverInfo = await this.fixture.createObsServerInformation([
           [fakeAccount1.apiUrl, fakeApi1ValidAcc],
-          [thirdAccount.apiUrl, { account: thirdAccount, connection: thirdCon }]
+          [
+            thirdAccount.apiUrl,
+            {
+              account: thirdAccount,
+              connection: thirdCon,
+              state: openBuildServiceApi.ConnectionState.Ok
+            }
+          ]
         ]);
 
         this.fixture.sandbox.assert.calledTwice(
