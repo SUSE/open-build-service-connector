@@ -557,3 +557,10 @@ export async function ensureFileNotPresent(path: string): Promise<boolean> {
   }
   return false;
 }
+
+/** Enters `text` into a existing Input Box and confirms it */
+export async function enterTextIntoInputBox(text: string): Promise<void> {
+  const input = await InputBox.create();
+  await input.setText(text);
+  await input.confirm();
+}
