@@ -53,7 +53,7 @@
     "webpack-dev": "webpack --mode development --watch",
     "test-compile": "tsc -p ./",
     "cleandeps": "rm -rf node_modules/",
-    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources/ ./mocklibsecret/build/ ./.vscode-test/ ./src/ui-tests/repositoryTreeView/fakeHome/",
+    "clean": "rm -rf ./out ./coverage *vsix ./nyc_output ./documentation ./test-resources/ ./mocklibsecret/build/ ./.vscode-test/ ./test-home/ ./.log/ ./dist ./src/ui-tests/default/fakeHome/ ./src/ui-tests/accounts/fakeHome/",
     "coverage": "COVERAGE=1 ./runTests.sh && echo \"COVERAGE: $(cat coverage/coverage-summary.json | jq .total.lines.pct) %\"",
     "test:ui": "./runUiTests.sh",
     "mocklibsecret": "[ -e ./mocklibsecret/build/libsecret.so ] || (cd mocklibsecret && meson build && meson compile -C build)",
