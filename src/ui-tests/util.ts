@@ -29,6 +29,8 @@ import {
   createProject,
   Package,
   PackageFile,
+  pathExists,
+  PathType,
   Project,
   ProjectMeta
 } from "open-build-service-api";
@@ -540,4 +542,18 @@ export function waitForEditorWindow(title: string, timeoutMs: number = 5000) {
  */
 export function createTestTempDir(): Promise<string> {
   return fsPromises.mkdtemp(join(getTmpPrefix(), "obs-connector"));
+}
+
+/**
+ * Ensure that the file with the given `path` is deleted.
+ * This function does nothing if `path` is not present or not a file.
+ *
+ * @return `true` when the file was removed or `false` if it did not exist.
+ */
+export async function ensureFileNotPresent(path: string): Promise<boolean> {
+  if ((await pathExists(path, PathType.File)) !== undefined) {
+    await fsPromises.unlink(path);
+    return true;
+  }
+  return false;
 }
