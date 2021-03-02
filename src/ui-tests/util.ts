@@ -50,6 +50,7 @@ import {
   ViewSection,
   Workbench
 } from "vscode-extension-tester";
+import { AccountStorage } from "../accounts";
 import { getTmpPrefix } from "../test/suite/utilities";
 import { testUser } from "./testEnv";
 
@@ -563,4 +564,72 @@ export async function enterTextIntoInputBox(text: string): Promise<void> {
   const input = await InputBox.create();
   await input.setText(text);
   await input.confirm();
+}
+
+/**
+ * Create a new account by executing the command `newAccountWizard` and entering
+ * all properties into the input boxes & quick picks.
+ *
+ * @param acc  The account to be added
+ * @param password  The account's password
+ * @param stopAfterPasswordEntry  When set to `true`, then this function will
+ *     stop after entering the password (and thus not finish the actual account
+ *     creation).
+ * @param acceptHostUnreachable  If the API belonging to `acc` is not reachable,
+ *     then this account will still be accepted and added.
+ */
+export async function createAccountViaCommand(
+  acc: AccountStorage,
+  password: string,
+  {
+    stopAfterPasswordEntry = false,
+    acceptHostUnreachable = false
+  }: { stopAfterPasswordEntry?: boolean; acceptHostUnreachable?: boolean } = {}
+): Promise<void> {
+  const bench = new Workbench();
+  await bench.executeCommand(
+    "Add an existing account from the Open Build Service to the extension"
+  );
+
+  const typeSelectBox = await InputBox.create();
+
+  // account type? OBS => no API url required, other => enter API url
+  if (acc.apiUrl.match(new RegExp("api.opensuse.org")) === null) {
+    const item = await typeSelectBox.findQuickPick("other (custom)");
+    expect(item).to.not.equal(undefined);
+    await item?.select();
+    await typeSelectBox.confirm();
+
+    await enterTextIntoInputBox(acc.apiUrl);
+  } else {
+    const item = await typeSelectBox.findQuickPick("build.opensuse.org (OBS)");
+    expect(item).to.not.equal(undefined);
+    await item?.select();
+    await typeSelectBox.confirm();
+  }
+
+  await enterTextIntoInputBox(acc.username);
+  await enterTextIntoInputBox(password);
+
+  if (stopAfterPasswordEntry) {
+    return;
+  }
+
+  // host is unreachable => notification will be displayed nagging about that
+  // => find the correct one, press "Yes" and continue
+  if (acceptHostUnreachable) {
+    const notif = await waitForNotifications();
+    const warningNotificationIndex = (
+      await Promise.all(notif.map((n) => n.getMessage()))
+    ).findIndex((msg) => msg.match(/add this account anyway/) !== null);
+    warningNotificationIndex.should.not.equal(-1);
+    await notif[warningNotificationIndex].takeAction("Yes");
+    await bench
+      .getDriver()
+      .wait(until.stalenessOf(notif[warningNotificationIndex]));
+  }
+
+  await enterTextIntoInputBox(acc.accountName);
+  await enterTextIntoInputBox(acc.realname ?? "");
+  await enterTextIntoInputBox(acc.email ?? "");
 }
