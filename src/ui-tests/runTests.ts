@@ -123,6 +123,12 @@ class TestEnv {
       }
     }
 
+    if (
+      (await pathExists(this.fakeHomeDir, PathType.Directory)) === undefined
+    ) {
+      await fsPromises.mkdir(this.fakeHomeDir);
+    }
+
     await fsPromises.writeFile(
       join(this.fakeHomeDir, "passwords.ini"),
       // nasty hack: copy-pasta the service name from accounts.ts, because we
