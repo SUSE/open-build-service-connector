@@ -24,7 +24,7 @@ import { promises as fsPromises } from "fs";
 import { pathExists, PathType } from "open-build-service-api";
 import * as path from "path";
 import { join } from "path";
-import { ExTester } from "vscode-extension-tester";
+import { ExTester, VSBrowserLogLevel } from "vscode-extension-tester";
 import { ReleaseQuality } from "vscode-extension-tester/out/util/codeUtil";
 import { testUser } from "./testEnv";
 
@@ -235,14 +235,14 @@ async function main() {
       releaseType
     );
     await exTester.setupAndRunTests(
-      vscodeVersion === "insider" ? "latest" : vscodeVersion,
       `${testDir}/!(flycheck_)**.js`,
-      path.join(testSrcDir, "settings.json"),
-      /* useYarn */ true,
-      /* cleanup */ true,
-      /* config */ undefined,
-      /* install dependencies */ true,
-      /* logLevel */ "all"
+      vscodeVersion === "insider" ? "latest" : vscodeVersion,
+      { useYarn: true, installDependencies: true },
+      {
+        settings: path.join(testSrcDir, "settings.json"),
+        cleanup: true,
+        logLevel: VSBrowserLogLevel.All
+      }
     );
   } catch (err) {
     console.error(`Tests ${dir} failed with: ${err.toString()}`);

@@ -31,7 +31,7 @@
     "typedoc": ">=0.17",
     "typescript": ">=3.8",
     "vsce": "^1.74",
-    "vscode-extension-tester": "^3",
+    "vscode-extension-tester": "^4",
     "vscode-extension-tester-native": "^3",
     "vscode-test": "^1",
     "webpack": "^5.9.0",
