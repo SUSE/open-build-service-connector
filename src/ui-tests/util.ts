@@ -332,6 +332,51 @@ export function promiseWithTimeout<T>(
   // .finally(finalizer);
 }
 
+/**
+ * Try for `timeoutMs` milliseconds to locate the OBS instance with the name
+ * `instanceName` in the bookmarked projects view.
+ */
+export function waitForObsInstance(
+  instanceName: string,
+  {
+    timeoutMs = 5000
+  }: {
+    timeoutMs?: number;
+  } = {}
+): Promise<TreeItem> {
+  return promiseWithTimeout(
+    async () => {
+      const bookmarkSection = await focusOnSection(
+        BOOKMARKED_PROJECTS_SECTION_NAME
+      );
+      while (true) {
+        if ((await bookmarkSection.findWelcomeContent()) === undefined) {
+          const myBookmarksItem = await bookmarkSection.findItem(
+            "My bookmarks"
+          );
+          if (myBookmarksItem !== undefined) {
+            const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
+            const childLabels = await Promise.all(
+              bookmarkChildren.map((c) => c.getLabel())
+            );
+            const instanceIndex = childLabels.findIndex(
+              (lbl) => lbl === instanceName
+            );
+            if (instanceIndex !== -1) {
+              return bookmarkChildren[instanceIndex];
+            }
+          }
+        }
+        await bookmarkSection.getDriver().sleep(500);
+      }
+    },
+    timeoutMs,
+    {
+      errorMsg: `Did not find a OBS instance with the alias ${instanceName} in ${timeoutMs}ms`
+    }
+  );
+}
+
 export function waitForProjectBookmark(
   projectName: string,
   {
