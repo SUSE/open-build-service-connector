@@ -21,9 +21,12 @@
 
 import {
   branchPackage,
+  checkConnection,
   fetchFileContents,
   fetchPackage,
   fetchProject,
+  fetchServerCaCertificate,
+  readAccountsFromOscrc,
   submitPackage
 } from "open-build-service-api";
 import { readInUnifiedPackage } from "open-build-service-api/lib/package";
@@ -65,6 +68,9 @@ export interface ObsFetchers {
   readonly branchPackage: typeof branchPackage;
   readonly readInUnifiedPackage: typeof readInUnifiedPackage;
   readonly submitPackage: typeof submitPackage;
+  readonly checkConnection: typeof checkConnection;
+  readonly readAccountsFromOscrc: typeof readAccountsFromOscrc;
+  readonly fetchServerCaCertificate: typeof fetchServerCaCertificate;
 }
 
 export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
@@ -73,5 +79,8 @@ export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
   fetchPackage,
   branchPackage,
   readInUnifiedPackage,
-  submitPackage
+  submitPackage,
+  checkConnection,
+  readAccountsFromOscrc,
+  fetchServerCaCertificate
 };

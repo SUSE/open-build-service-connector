@@ -66,6 +66,7 @@ export async function activate(
         .get<pino.Level>("logLevel", "error")
     };
   }
+
   await fsPromises.mkdir(context.logUri.fsPath, { recursive: true });
   const logger = pino(options, pino.destination(logFile));
 
@@ -158,7 +159,6 @@ export async function activate(
     context.subscriptions.push(oscBuildTaskProvider);
   }
 
-  await accountManager.promptForUninmportedAccountsInOscrc();
   await accountManager.promptForNotPresentAccountPasswords();
 }
 

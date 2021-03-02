@@ -128,6 +128,40 @@ the changes back via a submitrequest:
 ![submit_package.gif](screenshots/submit_package.gif)
 
 
+### Accounts
+
+The extension provides two buttons in the Bookmarked Projects section if no
+accounts are saved:
+
+![accounts_welcome_content.png](screenshots/accounts_welcome_content.png)
+
+The upper button launches an interactive wizard to import an account into the
+extension, the lower one imports accounts from your `~/.config/osc/oscrc` or
+`~/.oscrc` into the extension. The accounts are stored in your `setings.json`
+and can be modified via that file. For convenience, the extension provides the
+option to open `settings.json` at the correct position via an entry in the
+server's context menu:
+
+![open_settings_of_account.png](screenshots/open_settings_of_account.png)
+
+For further details concerning the account settings, please refer to the
+[Extension Settings](#extension_settings) section.
+
+
+#### SSL Certificates
+
+If your instance of the Open Build Service uses a custom SSL certificate that is
+not stored in Visual Studio Code's certificate storage, then you will have to
+add the CA certificate to extension. The most convenient way is via the
+interactive account import wizard, which can be launched via the command `Add an
+existing account from the Open Build Service to the extension`. It will check
+whether it can establish a secure connection and if not prompt you to either
+provide the CA certificate file yourself or it can automatically import it for
+you. Beware that in the later case, you **must** verify that the extension
+downloaded the correct certificate (it will present you with the fingerprint of
+the certificate during the import process).
+
+
 ## Requirements
 
 You need an account on an instance of the Open Build Service

@@ -15,6 +15,9 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Revamp the creation of new accounts and improve handling of custom SSL
+  certificates
+
 ### Removed
 
 

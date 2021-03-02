@@ -19,24 +19,30 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
 import { promises as fsPromises } from "fs";
 import * as keytar from "keytar";
 import {
   Account,
+  certificateToPem,
   Connection,
-  normalizeUrl,
-  readAccountsFromOscrc
+  ConnectionState,
+  normalizeUrl
 } from "open-build-service-api";
+import { withoutUndefinedMembers } from "open-build-service-api/lib/util";
 import { basename } from "path";
 import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
+import { assert } from "./assert";
 import { LoggingBase } from "./base-components";
 import { ObsServerTreeElement } from "./bookmark-tree-view";
 import { cmdPrefix, ignoreFocusOut } from "./constants";
 import { logAndReportExceptions } from "./decorators";
-import { VscodeWindow } from "./dependency-injection";
+import {
+  DEFAULT_OBS_FETCHERS,
+  ObsFetchers,
+  VscodeWindow
+} from "./dependency-injection";
 import { findRegexPositionInString, setDifference } from "./util";
 
 /**
@@ -90,6 +96,11 @@ export const CONFIGURATION_FORCE_HTTPS = "forceHttps";
 export const configurationAccountsFullName = `${CONFIGURATION_EXTENSION_NAME}.${CONFIGURATION_ACCOUNTS}`;
 
 /**
+ * Context set by the extension indicating whether any accounts are configured
+ */
+export const ACCOUNTS_PRESENT_CONTEXT = `${CONFIGURATION_EXTENSION_NAME}:accountsPresent`;
+
+/**
  * Key under which the setting is stored whether the extension should check for
  * unimported Accounts on launch.
  */
@@ -108,6 +119,8 @@ export const SET_ACCOUNT_PASSWORD_COMMAND = `${cmdPrefix}.${cmdId}.setAccountPas
 export const REMOVE_ACCOUNT_COMMAND = `${cmdPrefix}.${cmdId}.removeAccount`;
 
 export const NEW_ACCOUNT_WIZARD_COMMAND = `${cmdPrefix}.${cmdId}.newAccountWizard`;
+
+export const CHECK_CONNECTION_STATE_COMMAND = `${cmdPrefix}.${cmdId}.checkConnectionState`;
 
 export const OPEN_SETTINGS_JSON_OF_ACCOUNT_COMMAND = `${cmdPrefix}.${cmdId}.openSettingsJsonOfAccount`;
 
@@ -155,7 +168,38 @@ export interface AccountStorage {
 /** A well configured account available to other components. */
 export interface ValidAccount {
   readonly account: AccountStorage;
+  /** A connection that can be used to connect to the build service instance */
   readonly connection: Connection;
+  /** State of this account */
+  readonly state: ConnectionState;
+}
+
+/**
+ * Converts a [[ConnectionState]] to a message that can be presented to the
+ * user.
+ *
+ * @param state  The connection state to be converted into a string.
+ * @param apiUrl  Url to the API to which this ConnectionState belongs. It is
+ *     included in some messages.
+ */
+export function connectionStateToMessage(
+  state: ConnectionState,
+  apiUrl: string
+): string {
+  switch (state) {
+    case ConnectionState.ApiBroken:
+      return `${apiUrl} does not appear to be OBS`;
+    case ConnectionState.AuthError:
+      return "Could not authenticate with the supplied username & password";
+    case ConnectionState.Unreachable:
+      return `The host serving ${apiUrl} is unreachable`;
+    case ConnectionState.SslError:
+      return `Connecting to ${apiUrl} resulted in a SSL error`;
+    case ConnectionState.Ok:
+      return `${apiUrl} appears to be running fine`;
+    default:
+      assert(false, `Got an invalid ConnectionState: ${state}`);
+  }
 }
 
 export interface ActiveAccounts {
@@ -193,7 +237,6 @@ class ActiveAccountsImpl implements ActiveAccounts {
 /** Verify that `potentialUrl` is a valid URL. */
 const isValidUrl = (potentialUrl: string) => {
   try {
-    // tslint:disable-next-line: no-unused-expression
     new URL(potentialUrl);
     return true;
   } catch (err) {
@@ -307,7 +350,10 @@ class RuntimeAccountConfiguration extends LoggingBase {
     ValidAccount
   >();
 
-  constructor(logger: Logger) {
+  constructor(
+    logger: Logger,
+    private readonly checkConnection: typeof DEFAULT_OBS_FETCHERS.checkConnection
+  ) {
     super(logger);
     this.activeAccounts = new ActiveAccountsImpl(this.apiAccountMap);
   }
@@ -411,31 +457,26 @@ class RuntimeAccountConfiguration extends LoggingBase {
         const existingValidAcc = this.apiAccountMap.get(newAcc.apiUrl);
         if (existingValidAcc !== undefined) {
           configModified = true;
-          const { account, connection } = existingValidAcc;
+          const { account, connection, state } = existingValidAcc;
 
           if (
             account.username !== newAcc.username ||
             account.serverCaCertificate !== newAcc.serverCaCertificate
           ) {
-            this.apiAccountMap.set(newAcc.apiUrl, {
-              account: newAcc,
-              connection: connection.clone({
-                forceHttps,
-                serverCaCertificate: newAcc.serverCaCertificate,
-                username: newAcc.username
-              })
+            const newCon = connection.clone({
+              forceHttps,
+              serverCaCertificate: newAcc.serverCaCertificate,
+              username: newAcc.username
             });
+            await this.insertAccountIntoMap(newAcc, newCon);
           } else {
-            this.apiAccountMap.set(newAcc.apiUrl, {
-              account: newAcc,
-              connection
-            });
+            await this.insertAccountIntoMap(newAcc, connection, state);
           }
         } else {
           // This *really* shouldn't occur, but it is theoretically possible in
           // case there is a data race.
           // However, we do not want to assert() this, as this function is
-          // called intransparently to the user and the error could be swallowed.
+          // called in-transparently to the user and the error could be swallowed.
           this.logger.error(
             "Expected the account '%s' to be present in the apiAccountMap, but it is absent.",
             newAcc.apiUrl
@@ -469,9 +510,16 @@ class RuntimeAccountConfiguration extends LoggingBase {
 
     // try to set the password first, if that fails, we'll get an exception and
     // won't leave the system in a dirty state
-    await keytar.setPassword(KEYTAR_SERVICE_NAME, account.apiUrl, password);
+    const connectionStatusAndVoid = await Promise.all([
+      this.checkConnection(connection),
+      keytar.setPassword(KEYTAR_SERVICE_NAME, account.apiUrl, password)
+    ]);
 
-    this.apiAccountMap.set(account.apiUrl, { account, connection });
+    await this.insertAccountIntoMap(
+      account,
+      connection,
+      connectionStatusAndVoid[0].state
+    );
   }
 
   /**
@@ -482,10 +530,26 @@ class RuntimeAccountConfiguration extends LoggingBase {
    *     it does not exist).
    */
   public async removeAccount(apiUrl: ApiUrl): Promise<boolean> {
-    if (!(await keytar.deletePassword(KEYTAR_SERVICE_NAME, apiUrl))) {
+    try {
+      if (!(await keytar.deletePassword(KEYTAR_SERVICE_NAME, apiUrl))) {
+        this.logger.error(
+          "Did not delete the password of the account %s",
+          apiUrl
+        );
+      }
+    } catch (err) {
       this.logger.error(
-        "Failed to delete the password of the account %s",
-        apiUrl
+        "Did not delete the password of the account %s, got the error: %s",
+        apiUrl,
+        err.toString()
+      );
+    }
+
+    if (this.apiAccountMap.size === 1) {
+      await vscode.commands.executeCommand(
+        "setContext",
+        ACCOUNTS_PRESENT_CONTEXT,
+        false
       );
     }
     return this.apiAccountMap.delete(apiUrl);
@@ -503,6 +567,30 @@ class RuntimeAccountConfiguration extends LoggingBase {
       ),
       vscode.ConfigurationTarget.Global
     );
+  }
+
+  /**
+   * Checks the state of the connection belonging to `apiUrl`.
+   *
+   * @return
+   *     - `undefined` if no connection exists for the specified `apiUrl`
+   *     - `true` if the state changed or `false` otherwise
+   */
+  public async checkConnectionState(
+    apiUrl: string
+  ): Promise<boolean | undefined> {
+    const acc = this.apiAccountMap.get(apiUrl);
+    if (acc === undefined) {
+      this.logger.error(
+        "was prompted to check the account belonging to %s, but no account is known for this API",
+        apiUrl
+      );
+      return undefined;
+    }
+
+    const state = (await this.checkConnection(acc.connection)).state;
+    await this.insertAccountIntoMap(acc.account, acc.connection, state);
+    return state !== acc.state;
   }
 
   /**
@@ -547,6 +635,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
         continue;
       }
 
+      /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
       assert(account.apiUrl !== "" && account.accountName !== undefined);
       const password = await keytar.getPassword(
         KEYTAR_SERVICE_NAME,
@@ -564,14 +653,12 @@ class RuntimeAccountConfiguration extends LoggingBase {
         accountsWithoutPw.push(account);
       } else {
         addedAccounts++;
-        this.apiAccountMap.set(account.apiUrl, {
-          account,
-          connection: new Connection(account.username, password, {
-            forceHttps,
-            serverCaCertificate: account.serverCaCertificate,
-            url: account.apiUrl
-          })
+        const connection = new Connection(account.username, password, {
+          forceHttps,
+          serverCaCertificate: account.serverCaCertificate,
+          url: account.apiUrl
         });
+        await this.insertAccountIntoMap(account, connection);
         this.logger.trace("Account %s was added", account.accountName);
       }
     }
@@ -582,6 +669,25 @@ class RuntimeAccountConfiguration extends LoggingBase {
     );
 
     return [accountsWithoutPw, errorMessages];
+  }
+
+  private async insertAccountIntoMap(
+    account: AccountStorage,
+    connection: Connection,
+    state?: ConnectionState
+  ): Promise<void> {
+    if (this.apiAccountMap.size === 0) {
+      await vscode.commands.executeCommand(
+        "setContext",
+        ACCOUNTS_PRESENT_CONTEXT,
+        true
+      );
+    }
+    this.apiAccountMap.set(account.apiUrl, {
+      account,
+      connection,
+      state: state ?? (await this.checkConnection(connection)).state
+    });
   }
 
   /**
@@ -602,7 +708,6 @@ class RuntimeAccountConfiguration extends LoggingBase {
     try {
       // just create a connection for the side effect of a potential error being
       // thrown
-      // tslint:disable-next-line: no-unused-expression
       new Connection(account.username, "irrelevant", {
         forceHttps,
         serverCaCertificate: account.serverCaCertificate,
@@ -626,6 +731,11 @@ export interface AccountManager extends vscode.Disposable {
 
   /** Currently active accounts with a valid password */
   readonly activeAccounts: ActiveAccounts;
+}
+
+interface ConnectionConstructionOptions {
+  password: string;
+  serverCaCertificate?: string;
 }
 
 /**
@@ -652,13 +762,13 @@ export class AccountManagerImpl extends LoggingBase {
     vscodeWindow: VscodeWindow = vscode.window,
     vscodeCommands: typeof vscode.commands = vscode.commands,
     vscodeWorkspace: typeof vscode.workspace = vscode.workspace,
-    obsReadAccountsFromOscrc: typeof readAccountsFromOscrc = readAccountsFromOscrc
+    obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ): Promise<AccountManagerImpl> {
     const mngr = new AccountManagerImpl(
       logger,
       vscodeWindow,
       vscodeWorkspace,
-      obsReadAccountsFromOscrc
+      obsFetchers
     );
     mngr.logger.trace("initializing the AccountManager");
 
@@ -694,6 +804,11 @@ export class AccountManagerImpl extends LoggingBase {
         mngr
       ),
       vscode.commands.registerCommand(
+        CHECK_CONNECTION_STATE_COMMAND,
+        mngr.checkConnectionState,
+        mngr
+      ),
+      vscode.commands.registerCommand(
         OPEN_SETTINGS_JSON_OF_ACCOUNT_COMMAND,
         mngr.openSettingsJsonAtApiUrl,
         mngr
@@ -701,6 +816,12 @@ export class AccountManagerImpl extends LoggingBase {
     );
 
     await mngr.displayConfigurationLoadingFailedError(errMsgs);
+
+    await vscode.commands.executeCommand(
+      "setContext",
+      ACCOUNTS_PRESENT_CONTEXT,
+      mngr.runtimeAccountConfig.activeAccounts.getAllApis().length > 0
+    );
 
     return mngr;
   }
@@ -725,7 +846,8 @@ export class AccountManagerImpl extends LoggingBase {
   > = new vscode.EventEmitter<ApiUrl[]>();
 
   private runtimeAccountConfig: RuntimeAccountConfiguration = new RuntimeAccountConfiguration(
-    this.logger
+    this.logger,
+    this.obsFetchers.checkConnection
   );
 
   private accountsWithOutPw: AccountStorage[] = [];
@@ -737,7 +859,7 @@ export class AccountManagerImpl extends LoggingBase {
     logger: Logger,
     private readonly vscodeWindow: VscodeWindow,
     private readonly vscodeWorkspace: typeof vscode.workspace = vscode.workspace,
-    private readonly obsReadAccountsFromOscrc: typeof readAccountsFromOscrc = readAccountsFromOscrc
+    private readonly obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ) {
     super(logger);
 
@@ -892,7 +1014,7 @@ export class AccountManagerImpl extends LoggingBase {
 
     const apiUrlPosition = findRegexPositionInString(
       contents,
-      new RegExp(`\"apiUrl\":\\s*\"${accountApiUrl}\"`),
+      new RegExp(`"apiUrl":\\s*"${accountApiUrl}"`),
       getEol(settingsEditor.document.eol)
     );
     if (apiUrlPosition === undefined) {
@@ -908,7 +1030,49 @@ export class AccountManagerImpl extends LoggingBase {
       apiUrlPosition
     );
   }
-  /** */
+
+  public async checkConnectionState(
+    treeElement?: ObsServerTreeElement
+  ): Promise<void> {
+    if (this.activeAccounts.getAllApis().length === 0) {
+      this.logger.debug(
+        "checkConnectionState called with no accounts being defined"
+      );
+      return;
+    }
+    const apiUrl =
+      treeElement?.account.account.apiUrl ??
+      (await promptUserForAccount(
+        this.activeAccounts,
+        "Select the account which should be rechecked",
+        this.vscodeWindow
+      ));
+    if (apiUrl === undefined) {
+      this.logger.error("Failed to get a apiUrl from the user");
+      return;
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        cancellable: false,
+        title: `Checking the connection to ${apiUrl}`
+      },
+      async () => {
+        const changed = await this.runtimeAccountConfig.checkConnectionState(
+          apiUrl
+        );
+        if (changed !== undefined && changed) {
+          this.notifyOffAccountChange();
+        }
+      }
+    );
+  }
+
+  /**
+   * Interactive wizard to add a new account to the extension.
+   */
+  @logAndReportExceptions()
   public async newAccountWizard(): Promise<void> {
     const OBS = "build.opensuse.org (OBS)";
     const CUSTOM = "other (custom)";
@@ -977,6 +1141,12 @@ export class AccountManagerImpl extends LoggingBase {
       return;
     }
 
+    const conInfo = await this.passwordAndSslCertWizard(apiUrl, username);
+    if (conInfo === undefined) {
+      return;
+    }
+    const { password, serverCaCertificate } = conInfo;
+
     const accountName = await this.vscodeWindow.showInputBox({
       ignoreFocusOut,
       prompt: "Enter the name of this account.",
@@ -1004,65 +1174,19 @@ export class AccountManagerImpl extends LoggingBase {
       email = undefined;
     }
 
-    let serverCaCertificate: string | undefined;
-
-    if (serverChoice === CUSTOM && new URL(apiUrl).protocol === "https:") {
-      const provideServerCert = await this.vscodeWindow.showQuickPick(
-        ["Yes", "No"],
-        {
-          canPickMany: false,
-          ignoreFocusOut,
-          placeHolder:
-            "Optional: Provide a custom server certificate (in the PEM format)?"
-        }
-      );
-      if (provideServerCert === "Yes") {
-        const serverCertFileUri = await this.vscodeWindow.showOpenDialog({
-          canSelectFiles: true,
-          canSelectFolders: false,
-          canSelectMany: false,
-          filters: { Certificates: ["pem", "crt"] }
-        });
-        if (serverCertFileUri !== undefined) {
-          assert(serverCertFileUri.length === 1);
-          const certPath = serverCertFileUri[0].fsPath;
-          try {
-            serverCaCertificate = (
-              await fsPromises.readFile(certPath)
-            ).toString("ascii");
-          } catch (err) {
-            const errMsg = `Could not read the server certificate from the file '${certPath}', got the following error: ${(err as Error).toString()}`;
-            this.logger.error(errMsg);
-            await this.vscodeWindow.showErrorMessage(
-              errMsg.concat(". This is not a fatal error.")
-            );
-          }
-        }
-      }
-    }
-
     assert(apiUrl !== undefined);
     apiUrl = normalizeUrl(apiUrl);
 
-    const pw = await this.promptForAccountPassword(apiUrl);
-    if (pw === undefined) {
-      return;
-    }
-
-    const accountStorage: AccountStorage = {
+    const accountStorage = withoutUndefinedMembers({
       accountName,
       apiUrl,
       email,
       realname,
       serverCaCertificate,
       username
-    };
-    Object.keys(accountStorage).forEach((key) => {
-      if (accountStorage[key as keyof AccountStorage] === undefined) {
-        delete accountStorage[key as keyof AccountStorage];
-      }
     });
-    await this.runtimeAccountConfig.addAccount(accountStorage, pw);
+
+    await this.runtimeAccountConfig.addAccount(accountStorage, password);
     await this.saveAccountsToStorage();
   }
 
@@ -1120,6 +1244,7 @@ export class AccountManagerImpl extends LoggingBase {
    * Imports all not yet present accounts from the user's `oscrc` into VSCode's
    * settings.
    */
+  @logAndReportExceptions()
   public async importAccountsFromOsrc(
     oscrcAccounts?: Account[]
   ): Promise<void> {
@@ -1165,7 +1290,7 @@ export class AccountManagerImpl extends LoggingBase {
    * @param apiUrl  URL to the API, the user is prompted for this parameter if
    *     omitted.
    */
-  @logAndReportExceptions(false)
+  @logAndReportExceptions(true)
   public async setAccountPasswordInteractive(apiUrl?: ApiUrl): Promise<void> {
     if (apiUrl === undefined) {
       apiUrl = await promptUserForAccount(
@@ -1210,12 +1335,166 @@ export class AccountManagerImpl extends LoggingBase {
     this.notifyOffAccountChange();
   }
 
+  /**
+   * Check the supplied [[Connection]] `con` whether the API behind it is
+   * healthy.
+   * If the API is (somehow) broken and `askUser` is `true`, then the user will
+   * be prompted whether they are fine with adding a broken API. If the API is
+   * broken and `askUser` is `false`, then `false` is returned.
+   */
+  private async canUseThisConnection(
+    con: Connection,
+    askUser: boolean = true
+  ): Promise<boolean> {
+    const conState = await this.obsFetchers.checkConnection(con);
+    if (conState.state === ConnectionState.Ok) {
+      return true;
+    }
+    if (!askUser) {
+      return false;
+    }
+
+    const msg = connectionStateToMessage(conState.state, con.url.href);
+    const useAnyway = await this.vscodeWindow.showErrorMessage(
+      msg.concat(". Would you like to add this account anyway?"),
+      "Yes",
+      "No"
+    );
+
+    return useAnyway === "Yes";
+  }
+
+  /**
+   * Interactive wizard that prompts the user for their password, checks the
+   * connection status to the API with the supplied `apiUrl` and if there is a
+   * SSL issue, it provides the user with the option to either let the extension
+   * fetch the SSL CA certificate or upload their own.
+   *
+   * @return An object that has the property `password` and optionally the
+   *     `serverCaCertificate` as well (if the user supplied one). Or
+   *     `undefined` is returned, if the user canceled the input or decided that
+   *     they do not want to proceed.
+   */
+  private async passwordAndSslCertWizard(
+    apiUrl: string,
+    username: string
+  ): Promise<ConnectionConstructionOptions | undefined> {
+    const password = await this.promptForAccountPassword(apiUrl);
+    if (password === undefined) {
+      return;
+    }
+    assert(password !== "", "password must not be empty");
+
+    let testCon = new Connection(username, password, {
+      url: apiUrl,
+      forceHttps: getForceHttpsSetting()
+    });
+
+    const conState = await this.obsFetchers.checkConnection(testCon);
+    if (conState.state === ConnectionState.Ok) {
+      return { password };
+    }
+
+    if (conState.state === ConnectionState.SslError) {
+      const msg = `Tried to connect to ${apiUrl} but got a SSL error`.concat(
+        conState.err !== undefined ? `: ${conState.err.toString()}` : "",
+        ". Would you like to add a custom CA certificate?"
+      );
+
+      const addCert = await this.vscodeWindow.showErrorMessage(
+        msg,
+        "Yes",
+        "No"
+      );
+
+      if (addCert === undefined) {
+        return undefined;
+      } else if (addCert === "No") {
+        return { password };
+      }
+
+      let serverCaCertificate: string | undefined;
+
+      const fromFile = "From the file system";
+      const autoFetch = "Fetch automatically";
+      const provideServerCertSource = await this.vscodeWindow.showQuickPick(
+        [fromFile, autoFetch],
+        {
+          canPickMany: false,
+          ignoreFocusOut,
+          placeHolder: "How do you want to provide the CA certificate?"
+        }
+      );
+
+      if (provideServerCertSource === undefined) {
+        return undefined;
+      } else if (provideServerCertSource === fromFile) {
+        const serverCertFileUri = await this.vscodeWindow.showOpenDialog({
+          canSelectFiles: true,
+          canSelectFolders: false,
+          canSelectMany: false,
+          filters: { Certificates: ["pem", "crt"] }
+        });
+        if (serverCertFileUri !== undefined) {
+          assert(serverCertFileUri.length === 1);
+          const certPath = serverCertFileUri[0].fsPath;
+          try {
+            serverCaCertificate = (
+              await fsPromises.readFile(certPath)
+            ).toString("ascii");
+          } catch (err) {
+            const errMsg = `Could not read the server certificate from the file '${certPath}', got the following error: ${(err as Error).toString()}`;
+            this.logger.error(errMsg);
+            await this.vscodeWindow.showErrorMessage(
+              errMsg.concat(". This is not a fatal error.")
+            );
+          }
+        }
+      } else {
+        const cert = await this.obsFetchers.fetchServerCaCertificate(testCon);
+        const useThisCert = await this.vscodeWindow.showInformationMessage(
+          `Got the CA certificate for ${apiUrl}: Issuer common name: ${cert.issuer.CN}, Issuer organization: ${cert.issuer.O}, sha256 fingerprint: ${cert.fingerprint256}. Add this certificate?`,
+          "Yes",
+          "No"
+        );
+        if (useThisCert === "No") {
+          return { password };
+        } else if (useThisCert === undefined) {
+          return undefined;
+        } else {
+          assert(useThisCert === "Yes");
+          serverCaCertificate = certificateToPem(cert);
+        }
+      }
+
+      testCon = new Connection(username, password, {
+        url: apiUrl,
+        forceHttps: getForceHttpsSetting(),
+        serverCaCertificate
+      });
+
+      return (await this.canUseThisConnection(testCon, true))
+        ? withoutUndefinedMembers({ password, serverCaCertificate })
+        : undefined;
+    }
+
+    const msg = connectionStateToMessage(conState.state, apiUrl);
+    const useAnyway = await this.vscodeWindow.showErrorMessage(
+      msg.concat(". Would you like to add this account anyway?"),
+      "Yes",
+      "No"
+    );
+    return useAnyway === undefined || useAnyway === "No"
+      ? undefined
+      : { password };
+  }
+
   private async readAccountsFromOscConfigs(): Promise<Account[]> {
-    const defaultAccounts = await this.obsReadAccountsFromOscrc();
+    const defaultAccounts = await this.obsFetchers.readAccountsFromOscrc();
 
     const res =
       defaultAccounts.length === 0
-        ? await this.obsReadAccountsFromOscrc("~/.oscrc")
+        ? await this.obsFetchers.readAccountsFromOscrc("~/.oscrc")
         : defaultAccounts;
     this.logger.trace(
       "Read the following accounts from osc's config file: %o",

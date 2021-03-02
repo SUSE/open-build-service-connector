@@ -111,6 +111,10 @@
           "command": "vscodeObs.obsProject.checkOutProject"
         },
         {
+          "when": "view == bookmarkedProjectsTree && viewItem == BrokenObsServer",
+          "command": "vscodeObs.obsAccount.checkConnectionState"
+        },
+        {
           "when": "view == bookmarkedProjectsTree && viewItem =~ /ObsServer/",
           "command": "vscodeObs.obsAccount.openSettingsJsonOfAccount"
         },
@@ -226,6 +230,10 @@
       {
         "title": "Add an existing account from the Open Build Service to the extension",
         "command": "vscodeObs.obsAccount.newAccountWizard"
+      },
+      {
+        "title": "(Re)check the state of a connection to the Open Build Service",
+        "command": "vscodeObs.obsAccount.checkConnectionState"
       },
       {
         "title": "Open the settings of a account in the Open Build Service",
@@ -398,6 +406,18 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "bookmarkedProjectsTree",
+        "contents": "You don't appear to have any Accounts configured.\n[Add a new Account](command:vscodeObs.obsAccount.newAccountWizard)\n[Import accounts from osc](command:vscodeObs.obsAccount.importAccountsFromOsrc)",
+        "when": "vscode-obs:accountsPresent == false"
+      },
+      {
+        "view": "repositoryTree",
+        "contents": "Your package appears to have no repository configured.\n[Add a repository from a Distribution](command:vscodeObs.obsRepository.addRepositoryFromDistro)",
+        "when": "false"
+      }
+    ],
     "configuration": {
       "properties": {
         "vscode-obs.logLevel": {
