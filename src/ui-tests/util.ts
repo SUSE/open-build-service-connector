@@ -141,6 +141,40 @@ export async function waitForNotifications(
 }
 
 /**
+ * Wait for `timeoutMs` milliseconds for a element to appear in the DOM.
+ *
+ * @param construct  A function that tries to find the element in the DOM and
+ *     returns it. It can return a promise resolving to the object or the object
+ *     directly or `undefined`. Returning `undefined` indicates that the element
+ *     was not found and will try to look for the element again.
+ *
+ * @throw `Error` when `construct()` does not return in the specified timeout
+ */
+export async function waitForElement<T>(
+  construct: () => T | undefined | Promise<T | undefined>,
+  timeoutMs: number = 2000
+): Promise<T> {
+  return promiseWithTimeout(
+    async () => {
+      let elem: T | undefined = undefined;
+      while (elem === undefined) {
+        try {
+          elem = await construct();
+          if (elem !== undefined) {
+            return elem;
+          }
+        } catch (err) {
+          await new Workbench().getDriver().sleep(500);
+        }
+      }
+      return elem;
+    },
+    timeoutMs,
+    { errorMsg: `Did not find a new element in ${timeoutMs} ms` }
+  );
+}
+
+/**
  * Focus on the section with the supplied `sectionName` in the Side Bar.
  */
 export async function focusOnSection(
