@@ -36,3 +36,5 @@ node_modules
 out/
 src/
 webpack.config.js
+scripts/**
+generate_icons.sh
