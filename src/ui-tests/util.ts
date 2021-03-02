@@ -38,6 +38,7 @@ import {
   EditorView,
   InputBox,
   Notification,
+  NotificationsCenter,
   NotificationType,
   SideBarView,
   TreeItem,
@@ -98,20 +99,36 @@ export async function dismissAllNotifications(
   return notif;
 }
 
-export async function waitForNotifications({
-  notificationType = NotificationType.Any,
-  timeoutMs = 10000
-}: { notificationType?: NotificationType; timeoutMs?: number } = {}): Promise<
-  Notification[]
-> {
+export interface WaitForNotificationsOptions {
+  notificationType?: NotificationType;
+  timeoutMs?: number;
+  bench?: Workbench;
+}
+
+export const WAIT_FOR_NOTIFICATIONS_OPTIONS_DEFAULT = {
+  notificationType: NotificationType.Any,
+  timeoutMs: 10000,
+  bench: undefined
+};
+
+export async function waitForNotifications(
+  options: WaitForNotificationsOptions = WAIT_FOR_NOTIFICATIONS_OPTIONS_DEFAULT
+): Promise<Notification[]> {
+  const timeoutMs =
+    options?.timeoutMs ?? WAIT_FOR_NOTIFICATIONS_OPTIONS_DEFAULT.timeoutMs;
   return promiseWithTimeout(
     async () => {
-      const center = await new Workbench().openNotificationsCenter();
+      const center = await (
+        options?.bench ?? new Workbench()
+      ).openNotificationsCenter();
       let notifications: Notification[] = [];
 
       while (notifications.length === 0) {
         await center.getDriver().sleep(500);
-        notifications = await center.getNotifications(notificationType);
+        notifications = await center.getNotifications(
+          options?.notificationType ??
+            WAIT_FOR_NOTIFICATIONS_OPTIONS_DEFAULT.notificationType
+        );
       }
 
       return notifications;
