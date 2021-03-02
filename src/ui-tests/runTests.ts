@@ -20,6 +20,9 @@
  */
 
 import * as assert from "assert";
+import { should, use } from "chai";
+import * as chaiAsPromised from "chai-as-promised";
+import * as chaiThings from "chai-things";
 import { promises as fsPromises } from "fs";
 import { pathExists, PathType } from "open-build-service-api";
 import * as path from "path";
@@ -27,6 +30,10 @@ import { join } from "path";
 import { ExTester, VSBrowserLogLevel } from "vscode-extension-tester";
 import { ReleaseQuality } from "vscode-extension-tester/out/util/codeUtil";
 import { testUser } from "./testEnv";
+
+use(chaiAsPromised);
+use(chaiThings);
+should();
 
 async function getDirectoryNames(
   sourceDir: string,

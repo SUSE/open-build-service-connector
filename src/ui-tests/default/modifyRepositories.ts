@@ -19,9 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { expect, should, use } from "chai";
-import * as chaiAsPromised from "chai-as-promised";
-import * as chaiThings from "chai-things";
+import { expect } from "chai";
 import { promises as fsPromises } from "fs";
 import {
   Arch,
@@ -63,10 +61,6 @@ import {
   waitForPackageBookmark,
   waitForProjectBookmark
 } from "../util";
-
-use(chaiAsPromised);
-use(chaiThings);
-should();
 
 const apiUrl = testUser.apiUrl;
 const repository = [
