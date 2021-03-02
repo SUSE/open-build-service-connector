@@ -41,6 +41,7 @@ import {
   NotificationType,
   SideBarView,
   TreeItem,
+  until,
   ViewItem,
   ViewItemAction,
   ViewSection,
@@ -80,12 +81,20 @@ export async function dismissMsTelemetryNotification(
 export async function dismissAllNotifications(
   notifications?: Notification[]
 ): Promise<Notification[]> {
-  const notif =
-    notifications ??
-    (await (await new Workbench().openNotificationsCenter()).getNotifications(
-      NotificationType.Any
-    ));
-  await Promise.all(notif.map((n) => n.dismiss()));
+  const bench = new Workbench();
+  let notif: Notification[];
+  let center: NotificationsCenter | undefined;
+  if (notifications === undefined) {
+    center = await bench.openNotificationsCenter();
+    notif = await center.getNotifications(NotificationType.Any);
+  } else {
+    notif = notifications;
+  }
+  for (let n of notif) {
+    await n.dismiss();
+    await bench.getDriver().wait(until.stalenessOf(n));
+  }
+
   return notif;
 }
 
