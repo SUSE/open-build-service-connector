@@ -318,7 +318,7 @@ ${msg}
       });
       for (const dentry of dentries) {
         const re = RegExp(".changes$");
-        if (dentry.isFile && re.exec(dentry.name) !== null) {
+        if (dentry.isFile() && re.exec(dentry.name) !== null) {
           changesFile = join(this.currentPackage.path, dentry.name);
           this.logger.debug("Using non-standard changes file: %s", changesFile);
           break;
