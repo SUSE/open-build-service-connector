@@ -24,14 +24,13 @@ import { afterEach, beforeEach, Context, describe, it, xit } from "mocha";
 import * as obs_api from "open-build-service-api";
 import { match } from "sinon";
 import * as vscode from "vscode";
-import { ApiUrl } from "../../accounts";
+import { ApiUrl, ValidAccount } from "../../accounts";
 import { BaseProject } from "../../base-components";
 import {
   AddBookmarkElement,
   BookmarkedPackageTreeElement,
   BookmarkedProjectsTreeProvider,
   BookmarkedProjectTreeElement,
-  isBookmarkedProjectTreeElement,
   MyBookmarksElement,
   ObsServerTreeElement,
   UPDATE_PROJECT_COMMAND
@@ -51,6 +50,7 @@ import {
   isPackageTreeElement,
   ProjectTreeElement
 } from "../../project-view";
+import { makeThemedIconPath } from "../../util";
 import { AccountMapInitializer } from "./fakes";
 import {
   ProjectBookmarkManagerFixture,
@@ -117,9 +117,21 @@ describe("BookmarkedProjectsTreeProvider", () => {
   describe("#getChildren", () => {
     describe("children of the top level element", () => {
       it(
-        "returns a AddBookmark and MyBookmarks element",
+        "return undefined if no accounts are present",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider();
+          await projectTree
+            .getChildren(undefined)
+            .should.eventually.equal(undefined);
+        })
+      );
+
+      it(
+        "returns a AddBookmark and MyBookmarks element when at least a single account is present",
+        castToAsyncFunc<FixtureContext>(async function () {
+          const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
+          );
           const children = await projectTree.getChildren(undefined);
 
           expect(children).to.deep.equal([
@@ -130,21 +142,35 @@ describe("BookmarkedProjectsTreeProvider", () => {
       );
     });
 
-    describe("children of MyBookmarksElement", () => {
+    describe("children of the AddBookmarkElement", () => {
       it(
-        "returns no children, if no Accounts are present",
+        "returns no children even with accounts present",
+        castToAsyncFunc<FixtureContext>(async function () {
+          const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
+            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
+          );
+          await projectTree
+            .getChildren(new AddBookmarkElement())
+            .should.eventually.equal(undefined);
+        })
+      );
+    });
+
+    describe("children of the MyBookmarksElement", () => {
+      it(
+        "returns undefined if no account is present",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider();
           const myBookmarksElement = new MyBookmarksElement();
 
           await projectTree
             .getChildren(myBookmarksElement)
-            .should.eventually.deep.equal([]);
+            .should.eventually.equal(undefined);
         })
       );
 
       it(
-        "returns an empty array when no projects are bookmarked and only one account is present",
+        "returns a OBS server tree element",
         castToAsyncFunc<FixtureContext>(async function () {
           const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
             [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]]
@@ -153,51 +179,9 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(myBookmarksElement)
-            .should.eventually.deep.equal([]);
-        })
-      );
-
-      it(
-        "returns an array of project bookmarks if only one account is present",
-        castToAsyncFunc<FixtureContext>(async function () {
-          const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
-            [[td.fakeAccount1.apiUrl, td.fakeApi1ValidAcc]],
-            [[td.fakeAccount1.apiUrl, [td.fooProj]]]
-          );
-
-          setupFetchProjectMocks(
-            td.fooProjWithPackages,
-            this.fixture.obsFetchers
-          );
-
-          this.fixture.obsFetchers.fetchProject.resolves(
-            td.fooProjWithPackages
-          );
-          const myBookmarksElement = new MyBookmarksElement();
-
-          const treeElem = await projectTree.getChildren(myBookmarksElement);
-          expect(treeElem).to.be.an("array").and.have.length(1);
-
-          expect(isBookmarkedProjectTreeElement(treeElem[0])).to.equal(true);
-          (treeElem[0] as BookmarkedProjectTreeElement).project.should.deep.include(
-            td.fooProj
-          );
-          // FIXME: we changed the attribute .project to a BaseProject so that
-          //        comparing works, which makes this test obsolete
-          //        => reintroduce it or drop this entirely?
-          // expect(
-          //   (treeElem[0] as BookmarkedProjectTreeElement).project.meta
-          // ).to.not.equal(undefined);
-          // .should.eventually.deep.equal([
-          //             new BookmarkedProjectTreeElement(
-          //     projectBookmarkFromProject({ ...td.fooProj, packages: [] })
-          //   )
-          // ]);
-
-          this.fixture.obsFetchers.fetchProject.should.have.been.calledOnceWith(
-            td.fakeApi1ValidAcc.connection,
-            td.fooProj.name
-          );
+            .should.eventually.deep.equal([
+              new ObsServerTreeElement(td.fakeApi1ValidAcc)
+            ]);
         })
       );
 
@@ -214,21 +198,85 @@ describe("BookmarkedProjectsTreeProvider", () => {
           const myBookmarksElement = new MyBookmarksElement();
 
           const children = await projectTree.getChildren(myBookmarksElement);
-          children.should.contain.a.thing.that.deep.equals({
-            account: td.fakeAccount1,
+          children!.should.contain.a.thing.that.deep.equals({
+            account: td.fakeApi1ValidAcc,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             contextValue: "ObsServer",
             iconPath: new vscode.ThemeIcon("server"),
-            label: td.fakeAccount1.accountName
+            label: td.fakeAccount1.accountName,
+            tooltip: td.fakeAccount1.accountName
           });
-          children.should.contain.a.thing.that.deep.equals({
-            account: td.fakeAccount2,
+          children!.should.contain.a.thing.that.deep.equals({
+            account: td.fakeApi2ValidAcc,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             contextValue: "ObsServer",
             iconPath: new vscode.ThemeIcon("server"),
-            label: td.fakeAccount2.accountName
+            label: td.fakeAccount2.accountName,
+            tooltip: td.fakeAccount2.accountName
           });
           expect(children).to.be.an("array").and.have.length(2);
+        })
+      );
+
+      it(
+        "returns a ObsServerTreeElements with a different tooltip for broken connections",
+        castToAsyncFunc<FixtureContext>(async function () {
+          const {
+            account: account1,
+            connection: connection1
+          } = td.fakeApi1ValidAcc;
+          const brokenValidAccount1: ValidAccount = {
+            account: account1,
+            state: obs_api.ConnectionState.AuthError,
+            connection: connection1
+          };
+
+          const {
+            account: account2,
+            connection: connection2
+          } = td.fakeApi2ValidAcc;
+          const brokenValidAccount2: ValidAccount = {
+            account: account2,
+            state: obs_api.ConnectionState.ApiBroken,
+            connection: connection2
+          };
+
+          const projectTree = await this.fixture.createBookmarkedProjectsTreeProvider(
+            [
+              [td.fakeAccount1.apiUrl, brokenValidAccount1],
+              [td.fakeAccount2.apiUrl, brokenValidAccount2]
+            ]
+          );
+
+          const myBookmarksElement = new MyBookmarksElement();
+
+          await projectTree
+            .getChildren(myBookmarksElement)
+            .should.eventually.deep.equal(
+              [
+                {
+                  account: brokenValidAccount1,
+                  label: td.fakeAccount1.accountName,
+                  tooltip:
+                    "Could not authenticate with the supplied username & password"
+                },
+                {
+                  account: brokenValidAccount2,
+                  label: td.fakeAccount2.accountName,
+                  tooltip: td.fakeAccount2.apiUrl.concat(
+                    " does not appear to be OBS"
+                  )
+                }
+              ].map((e) => ({
+                ...e,
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                contextValue: "BrokenObsServer",
+                iconPath: makeThemedIconPath(
+                  "endpoints_disconnected.svg",
+                  false
+                )
+              }))
+            );
         })
       );
     });
@@ -259,14 +307,16 @@ describe("BookmarkedProjectsTreeProvider", () => {
             this.fixture.obsFetchers
           );
 
-          const obsServer1Element = new ObsServerTreeElement(td.fakeAccount1);
+          const obsServer1Element = new ObsServerTreeElement(
+            td.fakeApi1ValidAcc
+          );
           const bookmarks = await projectTree.getChildren(obsServer1Element);
           expect(bookmarks).to.be.an("array").and.have.length(2);
           expect(
-            (bookmarks[0] as BookmarkedProjectTreeElement).project
+            (bookmarks![0] as BookmarkedProjectTreeElement).project
           ).to.deep.include(td.fooProj);
           expect(
-            (bookmarks[1] as BookmarkedProjectTreeElement).project
+            (bookmarks![1] as BookmarkedProjectTreeElement).project
           ).to.deep.include(td.barProj);
 
           // .should.eventually.deep.equal([
@@ -293,15 +343,17 @@ describe("BookmarkedProjectsTreeProvider", () => {
           this.fixture.obsFetchers.fetchProject.reset();
 
           setupFetchProjectMocks(td.bazProj, this.fixture.obsFetchers);
-          const obsServer2Element = new ObsServerTreeElement(td.fakeAccount2);
+          const obsServer2Element = new ObsServerTreeElement(
+            td.fakeApi2ValidAcc
+          );
           const children = await projectTree.getChildren(obsServer2Element);
           expect(children).to.be.an("array").and.have.length(1);
-          children[0].should.deep.include({
+          children![0].should.deep.include({
             collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
             contextValue,
             label: td.bazProj.name
           });
-          (children[0] as BookmarkedProjectTreeElement).project.should.deep.include(
+          (children![0] as BookmarkedProjectTreeElement).project.should.deep.include(
             td.bazProj
           );
 
@@ -400,7 +452,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           // the project bookmarks should have been updated
           // => no more fetching is necessary
           const children2 = await projectTree.getChildren(projElemen);
-          children2.map((child: any, i: number) => {
+          children2!.map((child: any, i: number) => {
             child.should.deep.include({
               ...commonPackageEntries,
               label: td.packages[i].name
@@ -425,7 +477,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(projElement)
-            .should.eventually.be.deep.equal([]);
+            .should.eventually.equal(undefined);
 
           this.fixture.sandbox.assert.notCalled(
             this.fixture.obsFetchers.fetchProject
@@ -486,7 +538,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
 
           await projectTree
             .getChildren(pkgElement)
-            .should.eventually.deep.equal([]);
+            .should.eventually.equal(undefined);
 
           this.fixture.obsFetchers.fetchProject.should.have.callCount(0);
         })
@@ -619,7 +671,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
         const myBookmarks = new MyBookmarksElement();
         projectTree.getTreeItem(myBookmarks).should.deep.equal(myBookmarks);
 
-        const obsServer = new ObsServerTreeElement(td.fakeAccount1);
+        const obsServer = new ObsServerTreeElement(td.fakeApi1ValidAcc);
         projectTree.getTreeItem(obsServer).should.deep.equal(obsServer);
 
         const addBookmark = new AddBookmarkElement();
@@ -1149,7 +1201,7 @@ describe("BookmarkedProjectsTreeProvider", () => {
           .to.be.an("array")
           .and.have.length(td.fooProjWithPackages.packages!.length);
 
-        pkgElems.forEach((elem, i) => {
+        pkgElems!.forEach((elem, i) => {
           isPackageTreeElement(elem).should.be.true;
           elem.should.deep.include({
             label: td.fooProjWithPackages.packages![i].name,

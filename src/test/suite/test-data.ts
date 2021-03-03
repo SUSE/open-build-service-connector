@@ -28,35 +28,35 @@ import {
 } from "open-build-service-api";
 import { AccountStorage, ValidAccount } from "../../accounts";
 
-export const fakeAccount1: AccountStorage = {
+export const fakeAccount1: AccountStorage = Object.freeze({
   accountName: "foo",
   apiUrl: "https://api.baz.org/",
   username: "fooUser"
-};
+});
 
-export const fakeAccount2: AccountStorage = {
+export const fakeAccount2: AccountStorage = Object.freeze({
   accountName: "bar",
   apiUrl: "https://api.obs.xyz/",
   username: "barUser"
-};
+});
 
 const state = ConnectionState.Ok;
 
-export const fakeApi1ValidAcc: ValidAccount = {
+export const fakeApi1ValidAcc: ValidAccount = Object.freeze({
   account: fakeAccount1,
   connection: new Connection(fakeAccount1.username, fakeAccount1.username, {
     url: fakeAccount1.apiUrl
   }),
   state
-};
+});
 
-export const fakeApi2ValidAcc: ValidAccount = {
+export const fakeApi2ValidAcc: ValidAccount = Object.freeze({
   account: fakeAccount2,
   connection: new Connection(fakeAccount2.username, fakeAccount2.username, {
     url: fakeAccount2.apiUrl
   }),
   state
-};
+});
 
 export const fooProj: Project = {
   apiUrl: fakeAccount1.apiUrl,

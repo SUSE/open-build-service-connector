@@ -19,10 +19,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
 import {
   checkOutPackage,
   checkOutProject,
+  ConnectionState,
   Package,
   Project
 } from "open-build-service-api";
@@ -31,10 +31,12 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import {
   AccountManager,
-  AccountStorage,
   ApiUrl,
-  promptUserForAccount
+  connectionStateToMessage,
+  promptUserForAccount,
+  ValidAccount
 } from "./accounts";
+import { assert } from "./assert";
 import {
   BasePackage,
   BaseProject,
@@ -78,6 +80,7 @@ import {
   dropUndefined,
   isUri,
   logException,
+  makeThemedIconPath,
   promptUserForPackage,
   promptUserForProjectName
 } from "./util";
@@ -179,12 +182,33 @@ function isBookmarkedPackageTreeElement(
   );
 }
 
+/**
+ * An element in the package tree that symbolizes a OBS instance.
+ *
+ * It uses the `server` codicon as its default icon if the server is healthy. If
+ * the server is broken, then the `endpoints_disconnected` icon from the EOS
+ * icons is used and the reason is displayed as the tooltip.
+ */
 export class ObsServerTreeElement extends vscode.TreeItem {
-  public readonly contextValue = "ObsServer";
-  public readonly iconPath = new vscode.ThemeIcon("server");
-
-  constructor(public account: AccountStorage) {
-    super(account.accountName, vscode.TreeItemCollapsibleState.Expanded);
+  constructor(public readonly account: ValidAccount) {
+    super(
+      account.account.accountName,
+      account.state === ConnectionState.Ok
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.None
+    );
+    if (account.state === ConnectionState.Ok) {
+      this.iconPath = new vscode.ThemeIcon("server");
+      this.contextValue = "ObsServer";
+      this.tooltip = account.account.accountName;
+    } else {
+      this.iconPath = makeThemedIconPath("endpoints_disconnected.svg", false);
+      this.tooltip = connectionStateToMessage(
+        account.state,
+        account.account.apiUrl
+      );
+      this.contextValue = "BrokenObsServer";
+    }
   }
 }
 
@@ -233,10 +257,7 @@ function isMyBookmarksElement(
 
 const BOOKMARK_ICON = new vscode.ThemeIcon("bookmark");
 
-const BROKEN_BOOKMARK_ICON = {
-  dark: join(__dirname, "..", "media", "dark", "broken_image.svg"),
-  light: join(__dirname, "..", "media", "light", "broken_image.svg")
-};
+const BROKEN_BOOKMARK_ICON = makeThemedIconPath("broken_image.svg", false);
 
 function getChildrenOfBookmaredProjectTreeItem(
   rootProject: ProjectBookmark,
@@ -585,20 +606,21 @@ export class BookmarkedProjectsTreeProvider
 
   public async getChildren(
     element?: BookmarkTreeItem
-  ): Promise<BookmarkTreeItem[]> {
+  ): Promise<BookmarkTreeItem[] | undefined> {
+    if (this.activeAccounts.getAllApis().length === 0) {
+      return undefined;
+    }
+
     // bookmark & current project
     if (element === undefined) {
       return [new AddBookmarkElement(), new MyBookmarksElement()];
     }
-
-    // FIXME: what should we do if *no* accounts are configured?
-    if (
-      isMyBookmarksElement(element) &&
-      this.activeAccounts.getAllApis().length > 1
-    ) {
+    if (isAddBookmarkElement(element)) {
+      return undefined;
+    } else if (isMyBookmarksElement(element)) {
       return dropUndefined(
         this.activeAccounts.getAllApis().map((apiUrl) => {
-          const acc = this.activeAccounts.getConfig(apiUrl)?.account;
+          const acc = this.activeAccounts.getConfig(apiUrl);
           if (acc === undefined) {
             this.logger.error(
               "Tried to get the account of the API '%s' but got undefined",
@@ -609,15 +631,11 @@ export class BookmarkedProjectsTreeProvider
           return new ObsServerTreeElement(acc);
         })
       );
-    } else if (
-      (isMyBookmarksElement(element) &&
-        this.activeAccounts.getAllApis().length === 1) ||
-      isObsServerTreeElement(element)
-    ) {
+    } else if (isObsServerTreeElement(element)) {
       const apiUrl =
         this.activeAccounts.getAllApis().length === 1
           ? this.activeAccounts.getAllApis()[0]
-          : (element as ObsServerTreeElement).account.apiUrl;
+          : (element as ObsServerTreeElement).account.account.apiUrl;
 
       const projects = await this.bookmarkMngr.getAllBookmarkedProjects(apiUrl);
       return ([] as BookmarkTreeItem[]).concat(
