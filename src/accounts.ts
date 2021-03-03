@@ -93,7 +93,7 @@ export const CONFIGURATION_ACCOUNTS = "accounts";
 export const CONFIGURATION_FORCE_HTTPS = "forceHttps";
 
 /** Full key under which the AccountStorage array is stored */
-export const configurationAccountsFullName = `${CONFIGURATION_EXTENSION_NAME}.${CONFIGURATION_ACCOUNTS}`;
+export const CONFIGURATION_ACCOUNTS_FULL_NAME = `${CONFIGURATION_EXTENSION_NAME}.${CONFIGURATION_ACCOUNTS}`;
 
 /**
  * Context set by the extension indicating whether any accounts are configured
@@ -108,7 +108,7 @@ export const CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS =
   "checkUnimportedAccounts";
 
 /** Service name under which the passwords are stored in the OS' keyring */
-export const KEYTAR_SERVICE_NAME = configurationAccountsFullName;
+export const KEYTAR_SERVICE_NAME = CONFIGURATION_ACCOUNTS_FULL_NAME;
 
 const cmdId = "obsAccount";
 
@@ -998,13 +998,13 @@ export class AccountManagerImpl extends LoggingBase {
     const contents = settingsEditor.document.getText();
     const settings = JSON.parse(contents);
     if (
-      settings[configurationAccountsFullName] === undefined ||
-      !Array.isArray(settings[configurationAccountsFullName]) ||
-      settings[configurationAccountsFullName].length === 0
+      settings[CONFIGURATION_ACCOUNTS_FULL_NAME] === undefined ||
+      !Array.isArray(settings[CONFIGURATION_ACCOUNTS_FULL_NAME]) ||
+      settings[CONFIGURATION_ACCOUNTS_FULL_NAME].length === 0
     ) {
       this.logger.error(
         "Did not find the setting %s in the settings.json or it is not an arroy or it has no entries.",
-        configurationAccountsFullName
+        CONFIGURATION_ACCOUNTS_FULL_NAME
       );
       return;
     }
@@ -1528,7 +1528,9 @@ export class AccountManagerImpl extends LoggingBase {
   private async configurationChangeListener(
     confChangeEvent: vscode.ConfigurationChangeEvent
   ): Promise<void> {
-    if (!confChangeEvent.affectsConfiguration(configurationAccountsFullName)) {
+    if (
+      !confChangeEvent.affectsConfiguration(CONFIGURATION_ACCOUNTS_FULL_NAME)
+    ) {
       return undefined;
     }
 
