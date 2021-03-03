@@ -255,12 +255,8 @@ export class PackageScm
       this.logger.info("changelog entry requested with an empty message");
     }
 
-    const fmtOptions = {
-      locale: "en-US",
-      calendar: "gregory",
-      numberingSystem: "latn",
+    const fmtOptions: Intl.DateTimeFormatOptions = {
       timeZone: "UTC",
-      hourCycle: "h24",
       hour12: false,
       weekday: "short",
       year: "numeric",
