@@ -98,7 +98,13 @@ static gboolean open_ini_file(GKeyFile *key_file, GError **error) {
   }                                                                            \
   g_autofree gchar *_error_file, *_error_message;                              \
   gsize _length = 0;                                                           \
-  asprintf(&_error_file, "%s/mocklibsecret_error_message", g_get_tmp_dir());   \
+  const gboolean _asprintf_err = asprintf(                                     \
+      &_error_file, "%s/mocklibsecret_error_message", g_get_tmp_dir());        \
+  if (_asprintf_err) {                                                         \
+    *error = g_error_new(quark, 0,                                             \
+                         "could not create string with the path to "           \
+                         "TMPDIR/mocklibsecret_error_message");                \
+  }                                                                            \
   /* don't care why reading failed */                                          \
   if (g_file_get_contents(_error_file, &_error_message, &_length, NULL)) {     \
     *error =                                                                   \
