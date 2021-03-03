@@ -299,7 +299,7 @@ export async function ensureExtensionOpen() {
   // open the extension beforehands and wait for a bit so that everything can
   // initialize in the background
   const activityBar = new ActivityBar();
-  await activityBar.getViewControl("Open Build Service").openView();
+  await (await activityBar.getViewControl("Open Build Service"))!.openView();
   return activityBar;
 }
 

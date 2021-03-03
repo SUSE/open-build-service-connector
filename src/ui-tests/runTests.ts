@@ -27,7 +27,7 @@ import { promises as fsPromises } from "fs";
 import { pathExists, PathType } from "open-build-service-api";
 import * as path from "path";
 import { join } from "path";
-import { ExTester, VSBrowserLogLevel } from "vscode-extension-tester";
+import { ExTester, logging } from "vscode-extension-tester";
 import { ReleaseQuality } from "vscode-extension-tester/out/util/codeUtil";
 import { testUser } from "./testEnv";
 
@@ -257,7 +257,7 @@ async function main() {
       {
         settings: path.join(testSrcDir, "settings.json"),
         cleanup: true,
-        logLevel: VSBrowserLogLevel.All
+        logLevel: logging.Level.ALL
       }
     );
   } catch (err) {
