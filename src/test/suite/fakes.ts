@@ -270,9 +270,7 @@ export class FakeCurrentPackageWatcher implements CurrentPackageWatcher {
     this._allLocalPackages = Array.isArray(pkgs) ? new Map(pkgs) : pkgs;
   }
 
-  public readonly onDidChangeCurrentPackageEmitter = makeFakeEventEmitter<
-    CurrentPackage
-  >();
+  public readonly onDidChangeCurrentPackageEmitter = makeFakeEventEmitter<CurrentPackage>();
 
   public reloadCurrentPackage(): Promise<void> {
     return this.onDidChangeCurrentPackageEmitter.fire(this.currentPackage);

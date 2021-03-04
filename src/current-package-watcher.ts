@@ -19,7 +19,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
 import {
   Connection,
   isProjectWithMeta,
@@ -37,6 +36,7 @@ import { basename, dirname, join, relative } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
+import { assert } from "./assert";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import {
   isPackageBookmark,

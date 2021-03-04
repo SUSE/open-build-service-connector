@@ -26,7 +26,6 @@ import {
   Package,
   Project
 } from "open-build-service-api";
-import { join } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import {
