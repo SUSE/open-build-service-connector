@@ -62,7 +62,7 @@ export class PackageTreeElement extends vscode.TreeItem {
 }
 
 export function isPackageTreeElement(
-  treeItem: any
+  treeItem: vscode.TreeItem
 ): treeItem is PackageTreeElement {
   return treeItem.contextValue === "package";
 }
@@ -100,7 +100,9 @@ export type ProjectTreeItem =
   | PackageTreeElement
   | FileTreeElement;
 
-export function isProjectTreeItem(obj: any): obj is ProjectTreeItem {
+export function isProjectTreeItem(
+  obj: vscode.TreeItem
+): obj is ProjectTreeItem {
   return (
     isProjectTreeElement(obj) ||
     isPackageTreeElement(obj) ||

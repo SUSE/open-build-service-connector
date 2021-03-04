@@ -52,7 +52,7 @@ export const ERROR_PAGE_URI = vscode.Uri.parse(
  * Custom assert that will asynchronously open the error reporting page with
  * additional information for error reporting.
  */
-export function assert(condition: any, msg?: string): asserts condition {
+export function assert(condition: boolean, msg?: string): asserts condition {
   if (condition) {
     return;
   }
