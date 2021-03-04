@@ -187,7 +187,7 @@ export class PackageScm
 
   public provideTextDocumentContent(
     uri: vscode.Uri,
-    token: vscode.CancellationToken
+    token?: vscode.CancellationToken
   ): Promise<string | undefined> {
     if (uri.scheme !== OBS_FILE_AT_HEAD_SCHEME) {
       throw new Error(
@@ -516,8 +516,7 @@ ${msg}
           );
         } else {
           const origContent = await this.provideTextDocumentContent(
-            resourceState.resourceUri.with({ scheme: OBS_FILE_AT_HEAD_SCHEME }),
-            { isCancellationRequested: false } as vscode.CancellationToken
+            resourceState.resourceUri.with({ scheme: OBS_FILE_AT_HEAD_SCHEME })
           );
           if (origContent === undefined) {
             this.logger.error(
