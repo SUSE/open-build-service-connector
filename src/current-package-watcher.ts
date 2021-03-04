@@ -748,7 +748,7 @@ export class CurrentPackageWatcherImpl
       this.logger.error(
         "Changing the active editor to '%s' resulted in the following error: %s",
         editor?.document.fileName ?? "undefined",
-        err.toString()
+        (err as Error).toString()
       );
       this.fireCurrentPackageEvent(EMPTY_CURRENT_PACKAGE);
     }
@@ -977,7 +977,7 @@ export class CurrentPackageWatcherImpl
           this.logger.trace(
             "Got the following error while reading in a project from %s: %s",
             projPath,
-            err.toString()
+            (err as Error).toString()
           );
           proj = undefined;
         }

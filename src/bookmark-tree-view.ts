@@ -968,7 +968,8 @@ export class BookmarkedProjectsTreeProvider
           fetchPackageList: true
         }
       );
-    } catch (err) {
+    } catch (e) {
+      const err = e as Error;
       this.logger.trace(
         "Tried fetching %s from %s, but got %s, prompting the user whether to add anyway",
         projectName,

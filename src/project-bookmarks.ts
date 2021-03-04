@@ -326,7 +326,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
           pkgFile.packageName,
           pkgFile.name,
           fileContentsPath,
-          err.toString()
+          (err as Error).toString()
         );
       }
     }
@@ -454,7 +454,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         this.logger.error(
           "Tried to read file %s, but got the error %s",
           projJson,
-          err.toString()
+          (err as Error).toString()
         );
 
         await this.unlinkFile(projJson);
@@ -469,7 +469,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
           "Could not decode the project %s from %s, got the error: %s",
           proj.name,
           proj.apiUrl,
-          err.toString()
+          (err as Error).toString()
         );
         await this.unlinkFile(projJson);
       }
@@ -623,7 +623,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         "Tried to fetch the project %s from %s, but got an error: %s",
         proj.name,
         proj.apiUrl,
-        err.toString()
+        (err as Error).toString()
       );
       return {
         ...proj,
@@ -649,7 +649,11 @@ class MetadataCache extends ConnectionListenerLoggerBase {
     try {
       await fsPromises.unlink(path);
     } catch (err) {
-      this.logger.error("Failed to remove %s due to: %s", path, err.toString());
+      this.logger.error(
+        "Failed to remove %s due to: %s",
+        path,
+        (err as Error).toString()
+      );
     }
   }
 

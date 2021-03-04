@@ -128,7 +128,7 @@ export class ErrorPageDocumentProvider
       this.logger.error(
         "Tried to read the logfile from %s but got %s",
         logFilePath,
-        err.toString()
+        (err as Error).toString()
       );
     }
 

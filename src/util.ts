@@ -94,7 +94,7 @@ export function deepCopyProperties<T>(obj: T): T;
 
 /** Create a deep copy of `obj` omitting **all** functions. */
 export function deepCopyProperties<T>(obj?: T): T | undefined {
-  return obj === undefined ? undefined : JSON.parse(JSON.stringify(obj));
+  return obj === undefined ? undefined : (JSON.parse(JSON.stringify(obj)) as T);
 }
 
 /**

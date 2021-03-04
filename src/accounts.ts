@@ -540,7 +540,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
       this.logger.error(
         "Did not delete the password of the account %s, got the error: %s",
         apiUrl,
-        err.toString()
+        (err as Error).toString()
       );
     }
 
@@ -999,7 +999,7 @@ export class AccountManagerImpl extends LoggingBase {
     }
 
     const contents = settingsEditor.document.getText();
-    const settings = JSON.parse(contents);
+    const settings: any = JSON.parse(contents);
     if (
       settings[CONFIGURATION_ACCOUNTS_FULL_NAME] === undefined ||
       !Array.isArray(settings[CONFIGURATION_ACCOUNTS_FULL_NAME]) ||

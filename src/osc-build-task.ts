@@ -220,7 +220,9 @@ export class OscBuildTask extends vscode.Task {
       folder,
       typeof pkgOrTaskName === "string"
         ? pkgOrTaskName
-        : `Build ${pkgOrTaskName.name} for ${taskDef.repository} for ${taskDef.arch}`,
+        : `Build ${pkgOrTaskName.name} for ${
+            (taskDef as OscTaskDefinition).repository
+          } for ${(taskDef as OscTaskDefinition).arch}`,
       "osc",
       new vscode.ProcessExecution(
         taskDef.oscBinaryPath ?? "osc",
@@ -234,7 +236,7 @@ export class OscBuildTask extends vscode.Task {
             taskDef.arch
           ].concat(taskDef.extraOscArgs)
         ),
-        { cwd: taskDef.pkgPath }
+        { cwd: (taskDef as OscTaskDefinition).pkgPath }
       )
     );
     if (!isOscTaskDefinition(taskDef)) {
