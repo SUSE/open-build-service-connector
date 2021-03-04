@@ -157,6 +157,10 @@ ${this.lastError.stack}
 ${logfile}
 \`\`\`
 `
+        : logFilePath === undefined
+        ? `
+## Could not get the path of the logfile
+`
         : `
 ## Could not read logfile from ${logFilePath}
 `

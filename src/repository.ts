@@ -144,7 +144,11 @@ class RepositoryPathTreeElement extends vscode.TreeItem {
     const pathIndex = indexOfPathInRepository(path, repository);
     assert(
       pathIndex !== -1,
-      `expected to find the repository ${path.project}/${path.repository} in ${repository.path}`
+      `expected to find the repository ${path.project}/${
+        path.repository
+      } in: ${repository.path
+        .map(({ project, repository }) => project.concat("/", repository))
+        .join(", ")}`
     );
     if (repository.path.length === 1) {
       this.contextValue = "immovableRepositoryPath";
@@ -629,7 +633,7 @@ export class RepositoryTreeProvider
       if (property === "arch") {
         assert(
           isRepositoryArchElement(element),
-          `Element ${element} must be a RepositoryArchElement, but its contextValue is: '${element.contextValue}'`
+          `got an element that must be a RepositoryArchElement, but its contextValue is: '${element.contextValue}'`
         );
         matchingRepo.arch = matchingRepo.arch?.filter(
           (arch) => arch !== element.architecture
@@ -637,7 +641,7 @@ export class RepositoryTreeProvider
       } else {
         assert(
           isRepositoryPathElement(element),
-          `Element ${element} must be a RepositoryPathElement, but its contextValue is: '${element.contextValue}'`
+          `got an element that must be a RepositoryPathElement, but its contextValue is: '${element.contextValue}'`
         );
         matchingRepo.path = matchingRepo.path?.filter(
           (path) =>

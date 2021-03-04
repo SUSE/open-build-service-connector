@@ -543,7 +543,7 @@ export class BookmarkedProjectsTreeProvider
           if (changedObject === ChangedObject.Project) {
             assert(
               isProjectBookmark(element),
-              `Must receive a Project via the onBookmarkUpdate event when a project is modified, but got something else instead: ${element}`
+              `Must receive a Project via the onBookmarkUpdate event when a project is modified, but got something else instead: ${element.toString()}`
             );
             _treeItem = new BookmarkedProjectTreeElement(element);
           } else {
@@ -554,7 +554,7 @@ export class BookmarkedProjectsTreeProvider
             );
             assert(
               isPackageBookmark(element),
-              `Must receive a PackageBookmark via the onBookmarkUpdate event when a Package is modified, but got something else instead: ${element}`
+              `Must receive a PackageBookmark via the onBookmarkUpdate event when a Package is modified, but got something else instead: ${element.toString()}`
             );
             _treeItem = new BookmarkedPackageTreeElement(element);
           }
@@ -657,7 +657,9 @@ export class BookmarkedProjectsTreeProvider
       !isMyBookmarksElement(element) &&
         !isObsServerTreeElement(element) &&
         !isAddBookmarkElement(element),
-      `Invalid element: ${element.contextValue}. Must not be a MyBookmarksElement, ObsServerTreeElement or a AddBookmarkElement`
+      `Invalid element: ${
+        element.contextValue ?? "no context value"
+      }. Must not be a MyBookmarksElement, ObsServerTreeElement or a AddBookmarkElement`
     );
 
     const projTreeItem:
@@ -807,7 +809,7 @@ export class BookmarkedProjectsTreeProvider
       "Created request ".concat(
         webUiUrl === undefined
           ? req.id.toString()
-          : `[${req.id}](${webUiUrl}request/show/${req.id})`
+          : `[${req.id}](${webUiUrl.href}request/show/${req.id})`
       )
     );
   }
@@ -977,7 +979,9 @@ export class BookmarkedProjectsTreeProvider
         err.toString()
       );
       const selected = await this.vscodeWindow.showErrorMessage(
-        `Adding a bookmark for the project ${projectName} using the account ${accountConfig.account.accountName} failed with: ${err}.`,
+        `Adding a bookmark for the project ${projectName} using the account ${
+          accountConfig.account.accountName
+        } failed with: ${err.toString()}.`,
         "Add anyway",
         "Cancel"
       );
@@ -1009,7 +1013,13 @@ export class BookmarkedProjectsTreeProvider
     if (proj !== undefined) {
       assert(
         proj.packages !== undefined && proj.apiUrl === apiUrl,
-        `received Project is invalid: packages are undefined (${proj.packages}) or the apiUrl does not match the provided value (${proj.apiUrl} vs ${apiUrl})`
+        `received Project is invalid: packages are undefined (${
+          proj.packages === undefined
+            ? "packages are undefined"
+            : "packages are not undefined"
+        }) or the apiUrl does not match the provided value (${
+          proj.apiUrl
+        } vs ${apiUrl})`
       );
 
       const pkgs = await this.vscodeWindow.showQuickPick(

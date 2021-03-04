@@ -67,7 +67,9 @@ export class RemotePackageFileContentProvider
 
     if (projNamepkgNameAndFname.length !== 3) {
       throw new Error(
-        `Got an invalid file URI: ${uri}. Expected the path to contain 2 elements, but got ${projNamepkgNameAndFname.length}`
+        `Got an invalid file URI: ${uri.toString()}. Expected the path to contain 2 elements, but got ${
+          projNamepkgNameAndFname.length
+        }`
       );
     }
 
