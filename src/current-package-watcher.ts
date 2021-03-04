@@ -431,10 +431,10 @@ export class CurrentPackageWatcherImpl
           currentPackage = newCurrentPackage;
         } else {
           this.localPackages.set(normalizePath(currentPackage.path), {
-            project: localPkg?.project,
+            project: localPkg.project,
             pkg: currentPackage,
-            projectCheckedOut: localPkg?.projectCheckedOut,
-            packageWatcher: localPkg?.packageWatcher
+            projectCheckedOut: localPkg.projectCheckedOut,
+            packageWatcher: localPkg.packageWatcher
           });
         }
         this.fireCurrentPackageEvent({
@@ -659,7 +659,7 @@ export class CurrentPackageWatcherImpl
     );
 
     const currentFilename =
-      editor !== undefined ? basename(editor?.document.fileName) : undefined;
+      editor !== undefined ? basename(editor.document.fileName) : undefined;
 
     try {
       const newCurPkg = await (async (): Promise<CurrentPackage> => {

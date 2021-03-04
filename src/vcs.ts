@@ -196,7 +196,7 @@ export class PackageScm
     }
 
     const path = this.getPathOfOriginalResource(uri);
-    return token.isCancellationRequested
+    return token?.isCancellationRequested
       ? Promise.resolve(undefined)
       : fsPromises.readFile(path, { encoding: "utf-8" });
   }
@@ -475,7 +475,7 @@ ${msg}
           );
           return;
         }
-        const matchingPkgFile = this.currentPackage?.filesInWorkdir.find(
+        const matchingPkgFile = this.currentPackage.filesInWorkdir.find(
           (f) => f.name === fname
         );
         if (matchingPkgFile === undefined) {
@@ -523,8 +523,8 @@ ${msg}
             this.logger.error(
               "could not get original content for the file %s from %s/%s",
               resourceState.resourceUri.fsPath,
-              this.currentPackage?.projectName,
-              this.currentPackage?.name
+              this.currentPackage.projectName,
+              this.currentPackage.name
             );
             return;
           }
