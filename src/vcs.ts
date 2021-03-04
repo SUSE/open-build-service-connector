@@ -227,7 +227,6 @@ export class PackageScm
         return;
       }
     }
-    assert(msg !== undefined);
 
     await this.addChangelogEntry(msg);
   }
@@ -248,10 +247,6 @@ export class PackageScm
       throw new Error(
         `Cannot add a changelog entry, need a properly configured account (with email and real name)`
       );
-    }
-
-    if (msg === undefined) {
-      this.logger.info("changelog entry requested with an empty message");
     }
 
     const fmtOptions: Intl.DateTimeFormatOptions = {

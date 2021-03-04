@@ -305,10 +305,7 @@ export class CurrentPackageWatcherImpl
         this
       ),
       onBookmarkUpdate(async (bookmarkUpdate) => {
-        if (
-          this.currentPackage === undefined ||
-          this.currentPackage.currentPackage === undefined
-        ) {
+        if (this.currentPackage.currentPackage === undefined) {
           return;
         }
         if (bookmarkUpdate.changedObject === ChangedObject.Project) {

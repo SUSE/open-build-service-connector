@@ -682,9 +682,6 @@ export class RepositoryTreeProvider
         }
 
         const projToAddMeta = await fetchProjectMeta(activeCon, projToAdd);
-        if (projToAddMeta === undefined) {
-          return;
-        }
 
         if (
           projToAddMeta.repository === undefined ||

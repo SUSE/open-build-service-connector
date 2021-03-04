@@ -161,8 +161,7 @@ export class CurrentProjectTreeProvider
       return elem;
     };
 
-    return this.currentPackage.currentProject === undefined ||
-      this.currentPackage.properties?.checkedOutPath === undefined
+    return this.currentPackage.properties?.checkedOutPath === undefined
       ? children
       : children.map(transformCheckedOut);
   }

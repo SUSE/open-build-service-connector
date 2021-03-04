@@ -375,8 +375,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         pkg.apiUrl,
         refreshBehavior === RefreshBehavior.Always
           ? "refresh forced"
-          : refreshBehavior === RefreshBehavior.FetchWhenMissing &&
-            (cachedPkg.files === undefined || uncachedFilesPresent)
+          : cachedPkg.files === undefined || uncachedFilesPresent
           ? "files need to get refetched"
           : /* eslint-disable-next-line @typescript-eslint/no-confusing-void-expression */
             assert(false, "this branch must be unreachable")
