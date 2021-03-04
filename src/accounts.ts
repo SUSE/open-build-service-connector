@@ -235,7 +235,7 @@ class ActiveAccountsImpl implements ActiveAccounts {
 }
 
 /** Verify that `potentialUrl` is a valid URL. */
-const isValidUrl = (potentialUrl: string) => {
+const isValidUrl = (potentialUrl: string): boolean => {
   try {
     new URL(potentialUrl);
     return true;

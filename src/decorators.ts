@@ -52,8 +52,14 @@ import * as assert from "assert";
  * `.toString()` or with the `summary` entry if the error is a status_reply xml
  * element returned by OBS.
  */
-export function logAndReportExceptions(reportToUser: boolean = true) {
-  const reportFunc = async (decoratedObj: any, err: any) => {
+export function logAndReportExceptions(
+  reportToUser: boolean = true
+): (
+  target: any,
+  key: string | symbol,
+  descriptor: PropertyDescriptor | undefined
+) => PropertyDescriptor {
+  const reportFunc = async (decoratedObj: any, err: any): Promise<void> => {
     const errMsg =
       err.status !== undefined && err.status.summary !== undefined
         ? "Error performing API call: ".concat(err.status.summary)
@@ -68,7 +74,7 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
     target: any,
     key: string | symbol,
     descriptor: PropertyDescriptor | undefined
-  ) => {
+  ): PropertyDescriptor => {
     // save a reference to the original method this way we keep the values
     // currently in the descriptor and don't overwrite what another decorator
     // might have done to the descriptor.
@@ -114,7 +120,7 @@ export function logAndReportExceptions(reportToUser: boolean = true) {
 function decorate(
   decorator: (fn: (...args: any[]) => void, key: string) => void
 ): (_target: any, key: string, descriptor: any) => void {
-  return (_target: any, key: string, descriptor: any) => {
+  return (_target: any, key: string, descriptor: any): void => {
     let fnKey: string | null = null;
     let fn: ((...args: any[]) => void) | null = null;
 
@@ -145,7 +151,7 @@ export function debounce(
   return decorate((fn, key) => {
     const timerKey = `$debounce$${key}`;
 
-    return function (this: any, ...args: any[]) {
+    return function (this: any, ...args: any[]): void {
       clearTimeout(this[timerKey]);
       this[timerKey] = setTimeout(() => fn.apply(this, args), delayMs);
     };

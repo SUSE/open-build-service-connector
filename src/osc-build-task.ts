@@ -185,7 +185,7 @@ export class CustomExecutionTerminal
     this.disposables.push(this.onDidWriteEmitter, this.onDidCloseEmitter);
   }
 
-  public dispose() {
+  public dispose(): void {
     this.close();
     super.dispose();
   }

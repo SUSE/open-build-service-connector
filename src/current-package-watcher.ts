@@ -658,7 +658,7 @@ export class CurrentPackageWatcherImpl
       editor !== undefined ? basename(editor?.document.fileName) : undefined;
 
     try {
-      const newCurPkg = await (async () => {
+      const newCurPkg = await (async (): Promise<CurrentPackage> => {
         if (editor === undefined) {
           this.logger.trace("No editor is active");
           return EMPTY_CURRENT_PACKAGE;

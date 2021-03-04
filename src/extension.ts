@@ -162,6 +162,6 @@ export async function activate(
   await accountManager.promptForNotPresentAccountPasswords();
 }
 
-export function deactivate() {
+export function deactivate(): void {
   // NOP
 }

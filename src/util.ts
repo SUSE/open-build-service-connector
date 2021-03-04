@@ -195,7 +195,7 @@ export function logAndReportExceptionsWrapper<RT>(
   func: (...args: any[]) => Promise<RT>,
   ...args: any[]
 ): () => Promise<RT | undefined> {
-  const reportFunc = async (err: any) => {
+  const reportFunc = async (err: any): Promise<void> => {
     const errMsg =
       err.status !== undefined && err.status.summary !== undefined
         ? "Error performing API call: ".concat(err.status.summary)
@@ -390,15 +390,15 @@ export function createItemInserter<T>(
   insertBeforeIndex?: number
 ): (newItems: T[] | readonly T[]) => T[] | readonly T[] {
   if (insertBeforeIndex === undefined) {
-    return (newItems) => items.concat(newItems);
+    return (newItems): T[] => items.concat(newItems);
   } else if (insertBeforeIndex === 0) {
-    return (newItems) => newItems.concat(items);
+    return (newItems): T[] => newItems.concat(items);
   } else {
     const [firstPart, secondPart] = [
       items.slice(0, insertBeforeIndex),
       items.slice(insertBeforeIndex)
     ];
-    return (newItems) => firstPart.concat(newItems, secondPart);
+    return (newItems): T[] => firstPart.concat(newItems, secondPart);
   }
 }
 
