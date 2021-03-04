@@ -299,12 +299,9 @@ class MetadataCache extends ConnectionListenerLoggerBase {
 
     if (
       refreshBehavior === RefreshBehavior.Always ||
-      (file.contents === undefined && RefreshBehavior.FetchWhenMissing)
+      (file.contents === undefined &&
+        refreshBehavior === RefreshBehavior.FetchWhenMissing)
     ) {
-      assert(
-        refreshBehavior !== RefreshBehavior.Never,
-        "Must not try to fetch the package contents when refreshBehavior is set to Never"
-      );
       const account = this.activeAccounts.getConfig(apiUrl);
 
       if (account === undefined) {
