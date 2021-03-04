@@ -41,6 +41,7 @@ export function isProjectTreeElement(
 ): treeItem is ProjectTreeElement {
   // do not identify the ProjectTreeElement by the contextValue as we do it with
   // other elements, we want to identify the LocalProjectTreeElement as well
+  /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
   return (treeItem as ProjectTreeElement).project !== undefined;
 }
 

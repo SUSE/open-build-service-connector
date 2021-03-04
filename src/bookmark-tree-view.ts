@@ -548,6 +548,7 @@ export class BookmarkedProjectsTreeProvider
             treeItem = new BookmarkedProjectTreeElement(element);
           } else {
             assert(
+              /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
               changedObject === ChangedObject.Package,
               `changeObject must be a package, but got ${changedObject} instead`
             );

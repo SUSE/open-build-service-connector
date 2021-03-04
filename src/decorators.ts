@@ -18,6 +18,7 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/restrict-template-expressions */
 
 import * as assert from "assert";
 
@@ -90,6 +91,8 @@ export function logAndReportExceptions(
     );
     const originalMethod = descriptor.value;
 
+    // cannot get the return type of the following function
+    /* eslint-disable-next-line @typescript-eslint/explicit-function-return-type */
     descriptor.value = async function () {
       const args = [];
 
@@ -100,8 +103,10 @@ export function logAndReportExceptions(
       try {
         const res = originalMethod.apply(this, args);
         if (res.then !== undefined) {
+          /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
           return await res;
         } else {
+          /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
           return res;
         }
       } catch (err) {
@@ -136,6 +141,9 @@ function decorate(
       throw new Error("not supported");
     }
 
+    // eslint is complaining here, that we call decorator or fn directly, but
+    // that's actually what we want to do…
+    /* eslint-disable-next-line @typescript-eslint/no-confusing-void-expression */
     descriptor[fnKey] = decorator(fn, key);
   };
 }

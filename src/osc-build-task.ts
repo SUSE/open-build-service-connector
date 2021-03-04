@@ -143,6 +143,7 @@ export class CustomExecutionTerminal
       cwd: this.cwd,
       shell: true
     });
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
     child.stdout.on("data", (data) => {
       const line = data.toString().concat("\n");
       this.stdout = this.stdout.concat(line);
@@ -157,6 +158,7 @@ export class CustomExecutionTerminal
       this.onDidCloseEmitter.fire(code === null ? undefined : code)
     );
 
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
     this.child = child;
   }
 

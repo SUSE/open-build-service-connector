@@ -545,6 +545,9 @@ ${msg}
       })
     );
 
+    // typescript does not realize that packageChange is modified inside the
+    // closure
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     if (packageChange) {
       await this.currentPackageWatcher.reloadCurrentPackage();
     }

@@ -198,6 +198,7 @@ export function connectionStateToMessage(
     case ConnectionState.Ok:
       return `${apiUrl} appears to be running fine`;
     default:
+      /* eslint-disable-next-line @typescript-eslint/restrict-template-expressions */
       assert(false, `Got an invalid ConnectionState: ${state}`);
   }
 }
@@ -329,6 +330,7 @@ const getEol = (eol: vscode.EndOfLine): string => {
     case vscode.EndOfLine.CRLF:
       return "\r\n";
     default:
+      /* eslint-disable-next-line @typescript-eslint/restrict-template-expressions */
       assert(false, `Got an invalid end of line: ${eol}`);
   }
 };
@@ -947,6 +949,7 @@ export class AccountManagerImpl extends LoggingBase {
     }
 
     assert(
+      /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
       apiUrl !== undefined,
       "The parameter apiUrl must be defined at this point"
     );
@@ -1171,6 +1174,7 @@ export class AccountManagerImpl extends LoggingBase {
       email = undefined;
     }
 
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     assert(apiUrl !== undefined);
     apiUrl = normalizeUrl(apiUrl);
 

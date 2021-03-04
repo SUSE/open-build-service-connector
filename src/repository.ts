@@ -317,6 +317,7 @@ export class RepositoryTreeProvider
       meta = await fetchProjectMeta(con, this.currentProject!.name);
     }
     assert(
+      /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
       meta !== undefined,
       "The project meta must be defined at this point"
     );

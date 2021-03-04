@@ -19,6 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-unsafe-call */
+
 import { promises as fsPromises } from "fs";
 import { fetchProject } from "open-build-service-api";
 import { pathExists, PathType, zip } from "open-build-service-api/lib/util";
@@ -196,6 +198,7 @@ export function logAndReportExceptionsWrapper<RT>(
   ...args: any[]
 ): () => Promise<RT | undefined> {
   const reportFunc = async (err: any): Promise<void> => {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */
     const errMsg =
       err.status !== undefined && err.status.summary !== undefined
         ? "Error performing API call: ".concat(err.status.summary)

@@ -378,7 +378,8 @@ class MetadataCache extends ConnectionListenerLoggerBase {
           : refreshBehavior === RefreshBehavior.FetchWhenMissing &&
             (cachedPkg.files === undefined || uncachedFilesPresent)
           ? "files need to get refetched"
-          : assert(false, "this branch must be unreachable")
+          : /* eslint-disable-next-line @typescript-eslint/no-confusing-void-expression */
+            assert(false, "this branch must be unreachable")
       );
 
       const account = this.activeAccounts.getConfig(pkg.apiUrl);
@@ -397,6 +398,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
           { retrieveFileContents: false, expandLinks: true }
         );
         assert(
+          /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
           newPkg.files !== undefined && Array.isArray(newPkg.files),
           `fetchPackage must return a list of files for the package ${
             pkg.projectName
@@ -536,7 +538,8 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         ? "need to refetch metadata"
         : needFetchPackages
         ? `need to refetch the packages (${pkgRefetchReason})`
-        : assert(false, "this branch must be unreachable")
+        : /* eslint-disable-next-line @typescript-eslint/no-confusing-void-expression */
+          assert(false, "this branch must be unreachable")
     );
 
     const account = this.activeAccounts.getConfig(proj.apiUrl);
@@ -566,6 +569,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
         )} instead`
       );
       assert(
+        /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
         restOfFreshProj.meta !== undefined,
         `meta of ${restOfFreshProj.name} is undefined but it must be defined`
       );

@@ -123,8 +123,10 @@ export function isModifiedPackage(
   pkg: Package | PackageBookmark | ModifiedPackage
 ): pkg is ModifiedPackage {
   return (
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     (pkg as ModifiedPackage).path !== undefined &&
     typeof (pkg as ModifiedPackage).path === "string" &&
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     (pkg as ModifiedPackage).filesInWorkdir !== undefined &&
     Array.isArray((pkg as ModifiedPackage).filesInWorkdir)
   );
@@ -138,6 +140,7 @@ function isCheckedOutProject(
   proj: Project | CheckedOutProject
 ): proj is CheckedOutProject {
   return (
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     (proj as CheckedOutProject).checkoutPath !== undefined &&
     typeof (proj as CheckedOutProject).checkoutPath === "string"
   );
@@ -329,6 +332,7 @@ export class CurrentPackageWatcherImpl
             }
           }
         } else {
+          /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
           assert(bookmarkUpdate.changedObject === ChangedObject.Package);
           if (
             this.currentPackage.currentPackage.name ===

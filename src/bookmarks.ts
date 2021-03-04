@@ -113,6 +113,7 @@ export function packageBookmarkFromPackage(
   };
 }
 
+/* eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types */
 export function isPackageBookmark(pkg: any): pkg is PackageBookmark {
   return pkg.state !== undefined && typeof pkg.state === "number";
 }
@@ -231,6 +232,7 @@ export function isMetadataBroken(state: number): boolean {
   );
 }
 
+/* eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types */
 export function isProjectBookmark(proj: any): proj is ProjectBookmark {
   return proj.state !== undefined && typeof proj.state === "number";
 }
