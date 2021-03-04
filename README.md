@@ -175,7 +175,7 @@ you can sign up for an account on https://build.opensuse.org/
 
 Your account(s) are stored in the `settings.json` as follows:
 ```json
-  "vscode-obs": [
+  "vscode-obs.accounts": [
     {
       "accountName": "Alias for this account",
       "apiUrl": "http://api.foo.com",
