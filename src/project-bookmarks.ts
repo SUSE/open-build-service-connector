@@ -459,6 +459,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
 
     if (projectJsonContents !== undefined) {
       try {
+        // FIXME: we should verify that this is actually the correct thing
         projectFromCache = JSON.parse(projectJsonContents);
       } catch (err) {
         this.logger.error(

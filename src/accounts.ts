@@ -271,6 +271,7 @@ const getForceHttpsSetting = (): boolean | undefined =>
  * @param vscodeWindow  Interface containing the user facing functions.
  *     This parameter is only useful for dependency injection for testing.
  */
+// FIXME: maybe don't throw when no accounts are defined?
 export async function promptUserForAccount(
   activeAccounts: ActiveAccounts,
   actionDescription: string = "Pick which account to use",

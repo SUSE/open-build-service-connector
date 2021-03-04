@@ -155,6 +155,7 @@ export class CurrentProjectTreeProvider
       } else if (isFileTreeElement(elem)) {
         return new LocalFileTreeElement(
           elem,
+          // FIXME: is this path really defined?
           join(checkedOutPath!, elem.fileName)
         );
       }
