@@ -644,7 +644,7 @@ export class BookmarkedProjectsTreeProvider
       const apiUrl =
         this.activeAccounts.getAllApis().length === 1
           ? this.activeAccounts.getAllApis()[0]
-          : (element as ObsServerTreeElement).account.account.apiUrl;
+          : element.account.account.apiUrl;
 
       const projects = await this.bookmarkMngr.getAllBookmarkedProjects(apiUrl);
       return ([] as BookmarkTreeItem[]).concat(
