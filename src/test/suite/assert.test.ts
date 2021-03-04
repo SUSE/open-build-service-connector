@@ -196,16 +196,19 @@ describe("ErrorPageDocumentProvider", () => {
           () => undefined
         );
 
-        const page = await this.fixture.errorPageProvider.provideTextDocumentContent(
-          ERROR_PAGE_URI
-        );
-
-        disp.dispose();
+        let page: string;
+        try {
+          page = await this.fixture.errorPageProvider.provideTextDocumentContent(
+            ERROR_PAGE_URI
+          );
+        } finally {
+          disp.dispose();
+        }
 
         page.should.match(/message: no error/i);
         page.should.not.match(/stack:/);
         page.should.not.match(/recorded on:/);
-        page.should.match(/could not read logfile/i);
+        page.should.match(/Could not get the path of the logfile/i);
       })
     );
 
