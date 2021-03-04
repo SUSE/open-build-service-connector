@@ -84,7 +84,7 @@ export function assert(condition: boolean, msg?: string): asserts condition {
           );
       }
     )
-    .catch(() => {});
+    .catch();
 
   throw new Error(`Assertion failed! ${msg ?? ""}`);
 }

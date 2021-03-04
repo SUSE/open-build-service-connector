@@ -731,7 +731,9 @@ export class RepositoryTreeProvider
         ) {
           await updateCheckedOutProject(this.currentProject!, projFolder);
         }
-      } catch {}
+      } catch {
+        // NOP
+      }
     }
 
     this.refresh();
