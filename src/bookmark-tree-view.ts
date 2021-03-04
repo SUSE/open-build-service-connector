@@ -226,10 +226,11 @@ export class AddBookmarkElement extends vscode.TreeItem {
   constructor() {
     super("Bookmark a Project", vscode.TreeItemCollapsibleState.None);
 
+    assert(this.label !== undefined);
     this.command = {
       arguments: [this],
       command: BOOKMARK_PROJECT_COMMAND,
-      title: typeof this.label! === "string" ? this.label! : this.label!.label
+      title: typeof this.label === "string" ? this.label : this.label.label
     };
   }
 }
@@ -442,7 +443,9 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
       return undefined;
     }
 
-    const con = this.activeAccounts.getConfig(pkg.apiUrl)?.connection;
+    const pkgToCheckOut = pkg;
+
+    const con = this.activeAccounts.getConfig(pkgToCheckOut.apiUrl)?.connection;
     assert(
       con !== undefined,
       "Connection must not be undefined at this point, as the user previously selected a valid API"
@@ -465,11 +468,16 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     await this.vscodeWindow.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Checking out ${pkg.projectName}/${pkg.name} to ${dest[0].fsPath}`,
+        title: `Checking out ${pkgToCheckOut.projectName}/${pkgToCheckOut.name} to ${dest[0].fsPath}`,
         cancellable: false
       },
       async () =>
-        checkOutPackage(con, pkg!.projectName, pkg!.name, dest[0].fsPath)
+        checkOutPackage(
+          con,
+          pkgToCheckOut.projectName,
+          pkgToCheckOut.name,
+          dest[0].fsPath
+        )
     );
 
     const openPkg = await this.vscodeWindow.showInformationMessage(
