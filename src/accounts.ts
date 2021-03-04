@@ -1501,7 +1501,7 @@ export class AccountManagerImpl extends LoggingBase {
       "Read the following accounts from osc's config file: %o",
       res.map((acc) => {
         // ensure that the password does not end up in the log
-        const { password, ...rest } = acc;
+        const { password: _ignoreMe, ...rest } = acc;
         return rest;
       })
     );

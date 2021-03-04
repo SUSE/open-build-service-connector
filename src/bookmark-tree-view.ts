@@ -539,13 +539,13 @@ export class BookmarkedProjectsTreeProvider
       bookmarkMngr.onBookmarkUpdate(
         ({ changeType, changedObject, element }) => {
           // FIXME: this does not work reliably
-          let treeItem: BookmarkTreeItem;
+          let _treeItem: BookmarkTreeItem;
           if (changedObject === ChangedObject.Project) {
             assert(
               isProjectBookmark(element),
               `Must receive a Project via the onBookmarkUpdate event when a project is modified, but got something else instead: ${element}`
             );
-            treeItem = new BookmarkedProjectTreeElement(element);
+            _treeItem = new BookmarkedProjectTreeElement(element);
           } else {
             assert(
               /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
@@ -556,7 +556,7 @@ export class BookmarkedProjectsTreeProvider
               isPackageBookmark(element),
               `Must receive a PackageBookmark via the onBookmarkUpdate event when a Package is modified, but got something else instead: ${element}`
             );
-            treeItem = new BookmarkedPackageTreeElement(element);
+            _treeItem = new BookmarkedPackageTreeElement(element);
           }
 
           if (changeType === ChangeType.Modify) {
