@@ -775,7 +775,7 @@ export class BookmarkedProjectsTreeProvider
       return;
     }
 
-    let target = {
+    const target = {
       projectName: pkg.sourceLink?.project,
       packageName: pkg.sourceLink?.package ?? pkg.name
     };
