@@ -139,7 +139,7 @@ export class ProjectBookmarkImpl implements ProjectBookmark {
   public readonly checkoutPath?: string;
   public readonly meta?: ProjectMeta;
 
-  static async createProjectBookmark(
+  public static async createProjectBookmark(
     con: Connection,
     project: Project
   ): Promise<ProjectBookmark> {

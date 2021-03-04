@@ -195,7 +195,7 @@ export class CustomExecutionTerminal
 
 /** A [[Task]] that runs `osc build $repo $arch` */
 export class OscBuildTask extends vscode.Task {
-  readonly definition: OscTaskDefinition;
+  public readonly definition: OscTaskDefinition;
 
   /** Create a new from a task definition, a workspace folder and a task name */
   constructor(
@@ -251,7 +251,7 @@ export class OscBuildTask extends vscode.Task {
   }
 
   /** Creates a new task from an existing one recreating its execution. */
-  static from(
+  public static from(
     task: vscode.Task,
     folder: vscode.WorkspaceFolder
   ): OscBuildTask | undefined {
