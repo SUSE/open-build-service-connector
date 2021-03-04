@@ -289,7 +289,7 @@ export async function promptUserForAccount(
       }
     });
     const accountName = await vscodeWindow.showQuickPick(
-      apiUrlAccountNames.map(([_apiUrl, accName]) => accName),
+      apiUrlAccountNames.map(([, accName]): string => accName),
       {
         canPickMany: false,
         placeHolder: actionDescription
@@ -300,7 +300,7 @@ export async function promptUserForAccount(
     }
 
     return apiUrlAccountNames.find(
-      ([_apiUrl, accName]) => accName === accountName
+      ([, accName]) => accName === accountName
     )?.[0];
   }
 }

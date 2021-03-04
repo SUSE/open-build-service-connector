@@ -130,8 +130,7 @@ export class PackageScm
 
     this.disposables.push(
       this.currentPackageWatcher.onDidChangeCurrentPackage(function (
-        this: PackageScm,
-        _modPkg
+        this: PackageScm
       ) {
         this.updateScm();
       },

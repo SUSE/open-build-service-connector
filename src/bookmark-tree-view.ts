@@ -568,7 +568,7 @@ export class BookmarkedProjectsTreeProvider
         this
       ),
       this.onDidChangeTreeDataEmitter,
-      this.onAccountChange((_apiUrls) => {
+      this.onAccountChange(() => {
         this.refresh();
       }, this)
     );

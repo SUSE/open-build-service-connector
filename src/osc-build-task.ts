@@ -138,7 +138,7 @@ export class CustomExecutionTerminal
   public readonly onDidWrite = this.onDidWriteEmitter.event;
   public readonly onDidClose = this.onDidCloseEmitter.event;
 
-  public open(_initialDimensions: vscode.TerminalDimensions | undefined): void {
+  public open(): void {
     const child = spawn(this.command, this.args, {
       cwd: this.cwd,
       shell: true
@@ -342,9 +342,7 @@ export class OscBuildTaskProvider
    *
    * Packages for which no account is configured are skipped.
    */
-  public async provideTasks(
-    _token?: vscode.CancellationToken
-  ): Promise<OscBuildTask[]> {
+  public async provideTasks(): Promise<OscBuildTask[]> {
     if (this.oscPath === undefined) {
       this.logger.error("provideTasks called although oscPath is undefined");
       return [];
@@ -407,10 +405,7 @@ export class OscBuildTaskProvider
    *     `task` is not a [[OscBuildTask]] or the current task's WorkspaceFolder
    *     cannot be determined.
    */
-  public resolveTask(
-    task: vscode.Task,
-    _token?: vscode.CancellationToken
-  ): OscBuildTask | undefined {
+  public resolveTask(task: vscode.Task): OscBuildTask | undefined {
     if (this.oscPath === undefined) {
       this.logger.error("resolveTask called although oscPath is undefined");
       return undefined;

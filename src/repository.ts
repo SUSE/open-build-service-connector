@@ -252,7 +252,7 @@ export class RepositoryTreeProvider
         );
         this.refresh();
       }, this),
-      this.onAccountChange((_apiUrls) => {
+      this.onAccountChange(() => {
         this.refresh();
       }, this),
       vscode.commands.registerCommand(

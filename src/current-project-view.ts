@@ -117,7 +117,7 @@ export class CurrentProjectTreeProvider
         this.refresh();
       }, this),
       this.onDidChangeTreeDataEmitter,
-      this.onAccountChange((_apiUrls) => {
+      this.onAccountChange(() => {
         this.refresh();
       })
     );
