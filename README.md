@@ -4,6 +4,7 @@
 [![Open VSX Registry](https://img.shields.io/open-vsx/v/SUSE/open-build-service-connector)](https://open-vsx.org/extension/SUSE/open-build-service-connector)
 [![CI](https://img.shields.io/github/workflow/status/SUSE/open-build-service-connector/CI)](https://github.com/SUSE/open-build-service-connector/actions?query=workflow%3ACI)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://github.com/SUSE/open-build-service-connector/blob/master/LICENSE)
+[![styled with prettier](https://img.shields.io/badge/styled_with-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 
 Visual Studio Code extension for integration with the [Open Build
 Service](https://openbuildservice.org/): it allows you to view existing packages
