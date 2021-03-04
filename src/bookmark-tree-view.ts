@@ -644,13 +644,6 @@ export class BookmarkedProjectsTreeProvider
           getChildrenOfBookmaredProjectTreeItem(bookmark, undefined)
         )
       );
-    } else if (isMyBookmarksElement(element)) {
-      const accountCount = this.activeAccounts.getAllApis().length;
-      assert(
-        accountCount === 0,
-        `Must have no accounts configured, but got ${accountCount}`
-      );
-      return [];
     }
 
     assert(
