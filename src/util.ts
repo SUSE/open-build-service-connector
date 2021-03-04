@@ -407,7 +407,10 @@ export function createItemInserter<T>(
 
 const MEDIA_DIR = resolve(__dirname, "..", "media");
 
-export type IconPath = { readonly light: string; readonly dark: string };
+export interface IconPath {
+  readonly light: string;
+  readonly dark: string;
+}
 
 /**
  * Creates a decoration object for a Source Control Resource from the provided
