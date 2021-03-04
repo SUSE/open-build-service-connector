@@ -25,10 +25,8 @@ import * as pino from "pino";
 import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
 import { ErrorPageDocumentProvider } from "./assert";
-import {
-  BookmarkedProjectsTreeProvider,
-  CheckOutHandler
-} from "./bookmark-tree-view";
+import { BookmarkedProjectsTreeProvider } from "./bookmark-tree-view";
+import { CheckOutHandler } from "./check-out-handler";
 import { cmdPrefix } from "./constants";
 import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
