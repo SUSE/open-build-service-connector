@@ -161,7 +161,9 @@ export function debounce(
 
     return function (this: any, ...args: any[]): void {
       clearTimeout(this[timerKey]);
-      this[timerKey] = setTimeout(() => fn.apply(this, args), delayMs);
+      this[timerKey] = setTimeout(() => {
+        fn.apply(this, args);
+      }, delayMs);
     };
   });
 }

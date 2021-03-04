@@ -154,9 +154,9 @@ export class CustomExecutionTerminal
       this.stderr = this.stdout.concat(line);
       this.onDidWriteEmitter.fire(line);
     });
-    child.on("close", (code) =>
-      this.onDidCloseEmitter.fire(code === null ? undefined : code)
-    );
+    child.on("close", (code) => {
+      this.onDidCloseEmitter.fire(code === null ? undefined : code);
+    });
 
     /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
     this.child = child;

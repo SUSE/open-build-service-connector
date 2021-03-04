@@ -63,7 +63,7 @@ export function assert(condition: boolean, msg?: string): asserts condition {
     occurenceTime: new Date()
   })
     .then(
-      async (): Promise<void> =>
+      async (): Promise<void> => {
         await vscode.window
           .showErrorMessage(
             `An internal error occurred${
@@ -81,7 +81,8 @@ export function assert(condition: boolean, msg?: string): asserts condition {
                 );
               }
             }
-          )
+          );
+      }
     )
     .catch(() => {});
 

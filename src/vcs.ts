@@ -531,12 +531,12 @@ ${msg}
 
           await Promise.all(
             matchingEditors.map(async (editor) => {
-              await editor.edit((builder) =>
+              await editor.edit((builder) => {
                 builder.replace(
                   new vscode.Range(0, 0, editor.document.lineCount, 0),
                   origContent
-                )
-              );
+                );
+              });
               await editor.document.save();
             })
           );
@@ -618,7 +618,7 @@ ${msg}
 
     let success: boolean;
     if (isAddition) {
-      success = await matchingEditor.edit((editBuilder) =>
+      success = await matchingEditor.edit((editBuilder) => {
         editBuilder.delete(
           new vscode.Range(
             change.modifiedStartLineNumber - 1,
@@ -627,8 +627,8 @@ ${msg}
             change.modifiedEndLineNumber,
             0
           )
-        )
-      );
+        );
+      });
     } else {
       const origUri = this.getUriOfOriginalResource(uri);
       assert(
@@ -646,7 +646,7 @@ ${msg}
         )
       );
 
-      success = await matchingEditor.edit((editBuilder) =>
+      success = await matchingEditor.edit((editBuilder) => {
         isDeletion
           ? editBuilder.insert(
               // for deletions change.modifiedStartLineNumber is the line
@@ -662,8 +662,8 @@ ${msg}
                 0
               ),
               origContent
-            )
-      );
+            );
+      });
     }
 
     if (!success) {
