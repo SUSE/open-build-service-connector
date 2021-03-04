@@ -57,7 +57,7 @@ export function assert(condition: boolean, msg?: string): asserts condition {
     return;
   }
 
-  ErrorPageDocumentProvider.setLastErrorCommand({
+  void ErrorPageDocumentProvider.setLastErrorCommand({
     msg: msg ?? "Assertion failed",
     stack: new Error().stack,
     occurenceTime: new Date()
