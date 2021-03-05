@@ -19,7 +19,14 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { checkOutPackage, checkOutProject } from "open-build-service-api";
+import { promises as fsPromises } from "fs";
+import {
+  checkOutPackage,
+  checkOutProject,
+  pathExists,
+  rmRf
+} from "open-build-service-api";
+import { join } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, promptUserForAccount } from "./accounts";
@@ -71,6 +78,37 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     );
   }
 
+  private async createDirectoryForCheckOut(
+    dirName: string,
+    objectLabel: string,
+    openLabel?: string
+  ): Promise<string | undefined> {
+    const dest = await this.vscodeWindow.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel
+    });
+    if (dest === undefined || dest.length > 1) {
+      this.logger.error(
+        "User either did not select a destination or somehow selected multiple folders, got the following folders: %o",
+        dest
+      );
+      return;
+    }
+
+    const checkOutPath = join(dest[0].fsPath, dirName);
+    if ((await pathExists(checkOutPath)) !== undefined) {
+      const msg = `Cannot check out ${objectLabel} to ${dest[0].fsPath}: already contains ${dirName}`;
+      this.logger.error(msg);
+      await this.vscodeWindow.showErrorMessage(msg);
+      return undefined;
+    } else {
+      await fsPromises.mkdir(checkOutPath);
+      return checkOutPath;
+    }
+  }
+
   private async checkOutProject(elem?: BookmarkTreeItem): Promise<void> {
     let apiUrl: string;
     let projectName: string;
@@ -107,18 +145,6 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
       projectName = elem.project.name;
     }
 
-    const dest = await this.vscodeWindow.showOpenDialog({
-      canSelectFiles: false,
-      canSelectFolders: true,
-      canSelectMany: false
-    });
-    if (dest === undefined || dest.length > 1) {
-      this.logger.error(
-        "User either did not select a destination or somehow selected multiple folders"
-      );
-      return;
-    }
-
     const con = this.activeAccounts.getConfig(apiUrl)?.connection;
     if (con === undefined) {
       this.logger.error(
@@ -128,26 +154,40 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
       return;
     }
 
+    const checkOutPath = await this.createDirectoryForCheckOut(
+      projectName,
+      projectName,
+      "Folder where the project should be checked out"
+    );
+    if (checkOutPath === undefined) {
+      return;
+    }
+
+    let cancelled: boolean = false;
     await this.vscodeWindow.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Checking out ${projectName} to ${dest[0].fsPath}`,
+        title: `Checking out ${projectName} to ${checkOutPath}`,
         cancellable: true
       },
       async (progress, cancellationToken) => {
-        let finishedPkgs = 0;
-        await checkOutProject(con, projectName, dest[0].fsPath, {
+        await checkOutProject(con, projectName, checkOutPath, {
           callback: (pkgName, _index, allPackages) => {
-            finishedPkgs++;
             progress.report({
               message: `Checked out package ${pkgName}`,
-              increment: Math.floor((100 * finishedPkgs) / allPackages.length)
+              increment: 100 / allPackages.length
             });
           },
           cancellationToken
         });
+        cancelled = cancellationToken.isCancellationRequested;
       }
     );
+
+    if (cancelled) {
+      await rmRf(checkOutPath);
+      return;
+    }
 
     const openProj = await this.vscodeWindow.showInformationMessage(
       "Open the checked out project now?",
@@ -156,7 +196,10 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     );
 
     if (openProj === "Yes") {
-      await vscode.commands.executeCommand("vscode.openFolder", dest[0]);
+      await vscode.commands.executeCommand(
+        "vscode.openFolder",
+        vscode.Uri.file(checkOutPath)
+      );
     }
   }
 
@@ -206,24 +249,19 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
       "Connection must not be undefined at this point, as the user previously selected a valid API"
     );
 
-    const dest = await this.vscodeWindow.showOpenDialog({
-      canSelectFiles: false,
-      canSelectFolders: true,
-      canSelectMany: false,
-      openLabel: "Folder to which the package should be checked out"
-    });
-    if (dest === undefined || dest.length > 1) {
-      this.logger.error(
-        "User either did not select a destination or somehow selected multiple folders, got the following folders: %o",
-        dest
-      );
+    const checkOutPath = await this.createDirectoryForCheckOut(
+      pkgToCheckOut.name,
+      `${pkgToCheckOut.projectName}/${pkgToCheckOut.name}`,
+      "Folder where the package should be checked out"
+    );
+    if (checkOutPath === undefined) {
       return;
     }
 
     await this.vscodeWindow.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Checking out ${pkgToCheckOut.projectName}/${pkgToCheckOut.name} to ${dest[0].fsPath}`,
+        title: `Checking out ${pkgToCheckOut.projectName}/${pkgToCheckOut.name} to ${checkOutPath}`,
         cancellable: false
       },
       async () =>
@@ -231,7 +269,7 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
           con,
           pkgToCheckOut.projectName,
           pkgToCheckOut.name,
-          dest[0].fsPath
+          checkOutPath
         )
     );
 
@@ -242,7 +280,10 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     );
 
     if (openPkg === "Yes") {
-      await vscode.commands.executeCommand("vscode.openFolder", dest[0]);
+      await vscode.commands.executeCommand(
+        "vscode.openFolder",
+        vscode.Uri.file(checkOutPath)
+      );
     }
   }
 }
