@@ -19,9 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { expect, use } from "chai";
-import * as chaiAsPromised from "chai-as-promised";
-import * as chaiThings from "chai-things";
+import { expect } from "chai";
 import { before, describe, it } from "mocha";
 import {
   createPackage,
@@ -56,9 +54,6 @@ import {
   waitForNotifications,
   waitForPackageBookmark
 } from "../util";
-
-use(chaiAsPromised);
-use(chaiThings);
 
 const projName = "openSUSE.org:utilities";
 const pkgName = "jtc";
