@@ -230,7 +230,11 @@ export async function getLabelsOfTreeItems(
       .map((i) => typeof (i as any).getLabel === "function")
       .filter((hasGetLabelFunc) => !hasGetLabelFunc).length === 0
   );
-  return Promise.all((items as TreeItem[]).map((item) => item.getLabel()));
+  const labels: string[] = [];
+  for (const item of items) {
+    labels.push(await (item as TreeItem).getLabel());
+  }
+  return labels;
 }
 
 /**
