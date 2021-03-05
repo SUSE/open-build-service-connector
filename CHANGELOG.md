@@ -17,6 +17,7 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Revamp the creation of new accounts and improve handling of custom SSL
   certificates
+- Packages and Projects are checked out into new subdirectories
 
 ### Removed
 
