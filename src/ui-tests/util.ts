@@ -315,10 +315,7 @@ export async function ensureExtensionOpen() {
 export function promiseWithTimeout<T>(
   promise: () => Promise<T>,
   timeoutMs: number,
-  {
-    errorMsg,
-    finalizer
-  }: { errorMsg?: string; finalizer?: () => Promise<void> } = {}
+  { errorMsg }: { errorMsg?: string } = {}
 ): Promise<T> {
   let tmout: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
@@ -328,13 +325,10 @@ export function promiseWithTimeout<T>(
     );
   });
 
-  finalizer;
-
   return Promise.race([promise(), timeoutPromise]).then(async (result) => {
     clearTimeout(tmout);
     return result;
   });
-  // .finally(finalizer);
 }
 
 /**
