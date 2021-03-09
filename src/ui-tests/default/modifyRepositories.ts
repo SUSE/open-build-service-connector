@@ -63,6 +63,7 @@ import {
 } from "../util";
 
 const apiUrl = testUser.apiUrl;
+const instanceName = testUser.accountName;
 const repository = [
   {
     name: "openSUSE_Tumbleweed",
@@ -682,7 +683,7 @@ describe("RepositoryTreeProvider", function () {
       await this.openSpecFile();
 
       // give the CurrentPackageWatcher a bit of time to read in the project
-      await waitForPackageBookmark(testProj.name, pkg.name, {
+      await waitForPackageBookmark(instanceName, testProj.name, pkg.name, {
         section: "Current Project"
       });
     });
@@ -720,13 +721,16 @@ describe("RepositoryTreeProvider", function () {
       await (await sec.findItem(fooSpec.name))!.select();
 
       // give the CurrentPackageWatcher a bit of time to read in the project
-      await waitForPackageBookmark(testProj.name, pkg.name, {
+      await waitForPackageBookmark(instanceName, testProj.name, pkg.name, {
         section: "Current Project"
       });
     });
 
     after(async () => {
-      const projElem = await waitForProjectBookmark(pkg.projectName);
+      const projElem = await waitForProjectBookmark(
+        instanceName,
+        pkg.projectName
+      );
       await (await (await projElem.openContextMenu()).getItem(
         "Remove this Bookmark"
       ))!.select();
