@@ -480,7 +480,10 @@ export async function addProjectBookmark(
   const bookmarkSection = await focusOnSection(
     BOOKMARKED_PROJECTS_SECTION_NAME
   );
-  const addBookmarkItem = await bookmarkSection.findItem("Bookmark a Project");
+  const addBookmarkItem = await bookmarkSection.findItem(
+    "Bookmark a Project",
+    1
+  );
   expect(addBookmarkItem).to.not.be.undefined;
 
   await addBookmarkItem!.click();
