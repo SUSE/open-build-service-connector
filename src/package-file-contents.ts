@@ -84,7 +84,7 @@ export class RemotePackageFileContentProvider
   // (this fires when the text document contents change, i.e. if we pull a new version)
   // onDidChange?: Event<Uri>;
 
-  private static packageFileToUri(
+  public static packageFileToUri(
     apiUrl: string,
     packageFile: PackageFile,
     revision?: string
