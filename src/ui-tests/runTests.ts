@@ -161,12 +161,9 @@ class TestEnv {
     newSettingsJson["vscode-obs.forceHttps"] = false;
 
     if (this.injectTestUserIntoSettings) {
+      const { accountName, apiUrl, username } = testUser;
       newSettingsJson["vscode-obs.accounts"] = [
-        {
-          accountName: "miniObs",
-          apiUrl: testUser.apiUrl,
-          username: testUser.username
-        }
+        { accountName, apiUrl, username }
       ];
     }
 
