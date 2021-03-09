@@ -20,12 +20,7 @@
  */
 
 import { promises as fsPromises } from "fs";
-import {
-  checkOutPackage,
-  checkOutProject,
-  pathExists,
-  rmRf
-} from "open-build-service-api";
+import { pathExists, rmRf } from "open-build-service-api";
 import { join } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
@@ -36,14 +31,18 @@ import {
   BookmarkTreeItem,
   CHECK_OUT_PACKAGE_COMMAND,
   CHECK_OUT_PROJECT_COMMAND,
-  isBookmarkedPackageTreeElement
+  isBookmarkedPackageTreeElement,
+  isBookmarkedProjectTreeElement
 } from "./bookmark-tree-view";
-import { VscodeWindow } from "./dependency-injection";
+import {
+  DEFAULT_OBS_FETCHERS,
+  ObsFetchers,
+  VscodeWindow
+} from "./dependency-injection";
 import {
   OBS_PACKAGE_FILE_URI_SCHEME,
   RemotePackageFileContentProvider
 } from "./package-file-contents";
-import { isProjectTreeElement } from "./project-view";
 import { isUri, promptUserForPackage, promptUserForProjectName } from "./util";
 
 export class CheckOutHandler extends ConnectionListenerLoggerBase {
@@ -60,19 +59,22 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
   constructor(
     accountManager: AccountManager,
     logger: Logger,
-    private readonly vscodeWindow: VscodeWindow = vscode.window
+    private readonly vscodeWindow: VscodeWindow = vscode.window,
+    private readonly obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS,
+    private readonly executeCommand: typeof vscode.commands.executeCommand = vscode
+      .commands.executeCommand
   ) {
     super(accountManager, logger);
 
     this.disposables.push(
       vscode.commands.registerCommand(
         CHECK_OUT_PROJECT_COMMAND,
-        this.checkOutProject,
+        this.checkOutProjectInteractively,
         this
       ),
       vscode.commands.registerCommand(
         CHECK_OUT_PACKAGE_COMMAND,
-        this.checkOutPackage,
+        this.checkOutPackageInteractively,
         this
       )
     );
@@ -109,15 +111,23 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     }
   }
 
-  private async checkOutProject(elem?: BookmarkTreeItem): Promise<void> {
+  /**
+   * Interactive wizard to check out a project to the file system.
+   *
+   * @return The path where the folder was checked out or `undefined` if the
+   *     process got canceled at some point and no checkout got created.
+   */
+  public async checkOutProjectInteractively(
+    elem?: BookmarkTreeItem
+  ): Promise<string | undefined> {
     let apiUrl: string;
     let projectName: string;
-    if (elem !== undefined && !isProjectTreeElement(elem)) {
+    if (elem !== undefined && !isBookmarkedProjectTreeElement(elem)) {
       this.logger.trace(
         "checkOutProject called on the wrong element, expected a project but got: %s",
         elem.contextValue
       );
-      return;
+      return undefined;
     }
     if (elem === undefined) {
       const apiUrlCandidate = await promptUserForAccount(
@@ -126,7 +136,7 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
         this.vscodeWindow
       );
       if (apiUrlCandidate === undefined) {
-        return;
+        return undefined;
       }
       apiUrl = apiUrlCandidate;
 
@@ -136,11 +146,11 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
         this.vscodeWindow
       );
       if (projectNameCandidate === undefined) {
-        return;
+        return undefined;
       }
       projectName = projectNameCandidate;
     } else {
-      assert(isProjectTreeElement(elem));
+      assert(isBookmarkedProjectTreeElement(elem));
       apiUrl = elem.project.apiUrl;
       projectName = elem.project.name;
     }
@@ -151,7 +161,7 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
         "Could not get a connection for the api %s although the user selected it previously",
         apiUrl
       );
-      return;
+      return undefined;
     }
 
     const checkOutPath = await this.createDirectoryForCheckOut(
@@ -160,7 +170,7 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
       "Folder where the project should be checked out"
     );
     if (checkOutPath === undefined) {
-      return;
+      return undefined;
     }
 
     let cancelled: boolean = false;
@@ -171,22 +181,28 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
         cancellable: true
       },
       async (progress, cancellationToken) => {
-        await checkOutProject(con, projectName, checkOutPath, {
-          callback: (pkgName, _index, allPackages) => {
-            progress.report({
-              message: `Checked out package ${pkgName}`,
-              increment: 100 / allPackages.length
-            });
-          },
-          cancellationToken
-        });
-        cancelled = cancellationToken.isCancellationRequested;
+        const success = await this.obsFetchers.checkOutProject(
+          con,
+          projectName,
+          checkOutPath,
+          {
+            callback: (pkgName, _index, allPackages) => {
+              progress.report({
+                message: `Checked out package ${pkgName}`,
+                increment: 100 / allPackages.length
+              });
+            },
+            cancellationToken
+          }
+        );
+        cancelled = !success;
       }
     );
 
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     if (cancelled) {
       await rmRf(checkOutPath);
-      return;
+      return undefined;
     }
 
     const openProj = await this.vscodeWindow.showInformationMessage(
@@ -196,16 +212,27 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     );
 
     if (openProj === "Yes") {
-      await vscode.commands.executeCommand(
+      await this.executeCommand(
         "vscode.openFolder",
         vscode.Uri.file(checkOutPath)
       );
     }
+
+    return checkOutPath;
   }
 
-  private async checkOutPackage(
+  /**
+   * Interactively checks out a package to the file system, prompting the user
+   * for the target directory and optionally for the package that should be
+   * checked out.
+   *
+   * @return The path to which the package was checked out on success or
+   *     `undefined` if there was a failure or the user did not provide input at
+   *     some point and the check out was thus canceled.
+   */
+  public async checkOutPackageInteractively(
     elemOrEditor?: BookmarkTreeItem | vscode.Uri
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     let pkg: BasePackage | undefined;
 
     if (
@@ -244,10 +271,12 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     const pkgToCheckOut = pkg;
 
     const con = this.activeAccounts.getConfig(pkgToCheckOut.apiUrl)?.connection;
-    assert(
-      con !== undefined,
-      "Connection must not be undefined at this point, as the user previously selected a valid API"
-    );
+    if (con === undefined) {
+      const msg = `no account configured to download the package ${pkgToCheckOut.projectName}/${pkgToCheckOut.name} from ${pkgToCheckOut.apiUrl}`;
+      this.logger.error(msg);
+      await this.vscodeWindow.showErrorMessage("You have ".concat(msg));
+      return undefined;
+    }
 
     const checkOutPath = await this.createDirectoryForCheckOut(
       pkgToCheckOut.name,
@@ -265,7 +294,7 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
         cancellable: false
       },
       async () =>
-        checkOutPackage(
+        this.obsFetchers.checkOutPackage(
           con,
           pkgToCheckOut.projectName,
           pkgToCheckOut.name,
@@ -280,10 +309,12 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
     );
 
     if (openPkg === "Yes") {
-      await vscode.commands.executeCommand(
+      await this.executeCommand(
         "vscode.openFolder",
         vscode.Uri.file(checkOutPath)
       );
     }
+
+    return checkOutPath;
   }
 }
