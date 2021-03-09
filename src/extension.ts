@@ -25,10 +25,8 @@ import * as pino from "pino";
 import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
 import { ErrorPageDocumentProvider } from "./assert";
-import {
-  BookmarkedProjectsTreeProvider,
-  CheckOutHandler
-} from "./bookmark-tree-view";
+import { BookmarkedProjectsTreeProvider } from "./bookmark-tree-view";
+import { CheckOutHandler } from "./check-out-handler";
 import { cmdPrefix } from "./constants";
 import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
@@ -42,6 +40,10 @@ import { PackageScmHistoryTree } from "./scm-history";
 import { PackageScm } from "./vcs";
 
 export const GET_LOGFILE_PATH_COMMAND = `${cmdPrefix}.logging.getLogfilePath`;
+
+let logger: pino.Logger | undefined;
+
+export const getGlobalLogger = (): pino.Logger | undefined => logger;
 
 export async function activate(
   context: vscode.ExtensionContext
@@ -68,7 +70,7 @@ export async function activate(
   }
 
   await fsPromises.mkdir(context.logUri.fsPath, { recursive: true });
-  const logger = pino(options, pino.destination(logFile));
+  logger = pino(options, pino.destination(logFile));
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 

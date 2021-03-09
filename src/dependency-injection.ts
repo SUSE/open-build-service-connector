@@ -22,14 +22,16 @@
 import {
   branchPackage,
   checkConnection,
+  checkOutPackage,
+  checkOutProject,
   fetchFileContents,
   fetchPackage,
   fetchProject,
   fetchServerCaCertificate,
   readAccountsFromOscrc,
+  readInUnifiedPackage,
   submitPackage
 } from "open-build-service-api";
-import { readInUnifiedPackage } from "open-build-service-api/lib/package";
 import * as vscode from "vscode";
 
 /** Dependency injection type to be able to unit test UI elements */
@@ -71,6 +73,8 @@ export interface ObsFetchers {
   readonly checkConnection: typeof checkConnection;
   readonly readAccountsFromOscrc: typeof readAccountsFromOscrc;
   readonly fetchServerCaCertificate: typeof fetchServerCaCertificate;
+  readonly checkOutPackage: typeof checkOutPackage;
+  readonly checkOutProject: typeof checkOutProject;
 }
 
 export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
@@ -82,5 +86,7 @@ export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
   submitPackage,
   checkConnection,
   readAccountsFromOscrc,
-  fetchServerCaCertificate
+  fetchServerCaCertificate,
+  checkOutPackage,
+  checkOutProject
 };

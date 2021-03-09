@@ -24,7 +24,7 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import { LoggingDisposableBase } from "./base-components";
 import { cmdPrefix } from "./constants";
-import { GET_LOGFILE_PATH_COMMAND } from "./extension";
+import { getGlobalLogger, GET_LOGFILE_PATH_COMMAND } from "./extension";
 
 const cmdId = "assert";
 
@@ -84,7 +84,13 @@ export function assert(condition: boolean, msg?: string): asserts condition {
           );
       }
     )
-    .catch();
+    .catch((err) => {
+      getGlobalLogger()?.error(
+        "Tried to open the error reporting page for the error with the message '%', but got the error: %s",
+        msg,
+        (err as Error).toString()
+      );
+    });
 
   throw new Error(`Assertion failed! ${msg ?? ""}`);
 }
