@@ -489,7 +489,9 @@ export async function addProjectBookmark(
   await addBookmarkItem!.click();
   await bookmarkSection.getDriver().sleep(100);
 
-  await dismissAllNotifications();
+  await (
+    await new Workbench().openNotificationsCenter()
+  ).clearAllNotifications();
 
   const projectNameInput = await InputBox.create();
   await projectNameInput.setText(projectName);
