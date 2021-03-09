@@ -261,9 +261,7 @@ const getForceHttpsSetting = (): boolean | undefined =>
  *       existing accounts to choose from.
  *
  * @return The API URL for the selected account or undefined if the user did not
- *     provide one.
- *
- * @throw An `Error` if no accounts are specified in the `activeAccounts`.
+ *     provide one or if no accounts are present.
  *
  * @param apiAccountMap  The accounts to be considered for the selection.
  * @param actionDescription  A string that will be shown to the user in the
@@ -271,7 +269,6 @@ const getForceHttpsSetting = (): boolean | undefined =>
  * @param vscodeWindow  Interface containing the user facing functions.
  *     This parameter is only useful for dependency injection for testing.
  */
-// FIXME: maybe don't throw when no accounts are defined?
 export async function promptUserForAccount(
   activeAccounts: ActiveAccounts,
   actionDescription: string = "Pick which account to use",
@@ -279,7 +276,10 @@ export async function promptUserForAccount(
 ): Promise<ApiUrl | undefined> {
   const apiUrls = activeAccounts.getAllApis();
   if (apiUrls.length === 0) {
-    throw new Error("No accounts are known to this extension");
+    await vscodeWindow.showInformationMessage(
+      "You have no accounts configured"
+    );
+    return undefined;
   } else if (apiUrls.length === 1) {
     return apiUrls[0];
   } else {
