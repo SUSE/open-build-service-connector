@@ -32,20 +32,18 @@ import {
 } from "open-build-service-api";
 import {
   EditorView,
-  NotificationType,
   TextEditor,
   TreeItem,
   Workbench
 } from "vscode-extension-tester";
 import { DialogHandler } from "vscode-extension-tester-native";
 import { safeRmRf, swallowException } from "../../test/suite/utilities";
-import { testCon } from "../testEnv";
+import { testCon, testUser } from "../testEnv";
 import {
   addProjectBookmark,
   BOOKMARKED_PROJECTS_SECTION_NAME,
   createTestTempDir,
   dismissAllNotifications,
-  dismissMsTelemetryNotification,
   ensureExtensionOpen,
   findAndClickButtonOnTreeItem,
   focusOnSection,
@@ -57,8 +55,9 @@ import {
 
 const projName = "openSUSE.org:utilities";
 const pkgName = "jtc";
+const instanceName = testUser.accountName;
 
-const focusOnCurrentProjectSection = async () => {
+const focusOnCurrentProjectSection = async (): Promise<TreeItem> => {
   const curProjSect = await focusOnSection("Current Project");
 
   let projElement = await curProjSect.findItem(projName);
@@ -86,11 +85,10 @@ describe("Bookmarked Projects", function () {
 
   before(async () => {
     const center = await new Workbench().openNotificationsCenter();
+    await center.clearAllNotifications();
 
     tmpPath = await createTestTempDir();
     await ensureExtensionOpen();
-    let notifications = await center.getNotifications(NotificationType.Any);
-    await dismissMsTelemetryNotification(notifications);
   });
 
   after(
@@ -107,31 +105,38 @@ describe("Bookmarked Projects", function () {
     );
     const elements = await bookmarkSection.getVisibleItems();
 
-    // only 2 elements are expected to exist
-    expect(elements).to.be.an("array").and.to.have.length(2);
-
-    expect(await getLabelsOfTreeItems(elements)).to.deep.equal([
-      "Bookmark a Project",
-      "My bookmarks"
-    ]);
+    const labelsOfBookmarkSection = await getLabelsOfTreeItems(elements);
+    ["Bookmark a Project", "My bookmarks"].forEach((lbl) =>
+      expect(labelsOfBookmarkSection).to.deep.include(lbl)
+    );
 
     // nothing is bookmarked => no children should exist
     expect(await (elements[1] as TreeItem).getChildren())
       .to.be.an("array")
-      .and.have.length(0);
+      .and.have.length(1);
   });
 
   it("asks us to bookmark a project when clicking the 'Bookmark a Project' button", async () => {
     await addProjectBookmark(projName, [pkgName]);
 
-    const pkgElem = await waitForPackageBookmark(projName, pkgName);
+    console.log("Added ");
+
+    const pkgElem = await waitForPackageBookmark(
+      instanceName,
+      projName,
+      pkgName
+    );
     await pkgElem.getLabel().should.eventually.equal(pkgName);
   });
 
   it("fetches the files of the package bookmark as well", async () => {
     await new EditorView().closeAllEditors();
 
-    const pkgElement = await waitForPackageBookmark(projName, pkgName);
+    const pkgElement = await waitForPackageBookmark(
+      instanceName,
+      projName,
+      pkgName
+    );
 
     const specFile = `${pkgName}.spec`;
     const specFileElement = await pkgElement.findChildItem(specFile);
@@ -165,9 +170,11 @@ describe("Bookmarked Projects", function () {
   it("adds additional packages to an existing bookmarked project", async () => {
     await addProjectBookmark(projName, ["ack", "jq"]);
 
-    await waitForPackageBookmark(projName, pkgName);
-    await waitForPackageBookmark(projName, "jq", { timeoutMs: 10000 });
-    await waitForPackageBookmark(projName, "ack");
+    await waitForPackageBookmark(instanceName, projName, pkgName);
+    await waitForPackageBookmark(instanceName, projName, "jq", {
+      timeoutMs: 10000
+    });
+    await waitForPackageBookmark(instanceName, projName, "ack");
 
     await ((await (
       await focusOnSection(BOOKMARKED_PROJECTS_SECTION_NAME)
@@ -187,9 +194,14 @@ describe("Bookmarked Projects", function () {
       ["jq", "ack", pkgName].should.contain.a.thing.that.equals(lbl)
     );
 
-    const pkgInCurProj = await waitForPackageBookmark(projName, pkgName, {
-      section: "Current Project"
-    });
+    const pkgInCurProj = await waitForPackageBookmark(
+      instanceName,
+      projName,
+      pkgName,
+      {
+        section: "Current Project"
+      }
+    );
 
     if (!(await pkgInCurProj.isExpanded())) {
       await pkgInCurProj.select();
@@ -215,15 +227,19 @@ describe("Bookmarked Projects", function () {
 
     await addProjectBookmark(newProj);
 
-    await waitForPackageBookmark(projName, "jtc");
-    await waitForPackageBookmark(projName, "jq");
-    await waitForPackageBookmark(projName, "ack");
+    await waitForPackageBookmark(instanceName, projName, "jtc");
+    await waitForPackageBookmark(instanceName, projName, "jq");
+    await waitForPackageBookmark(instanceName, projName, "ack");
 
-    await waitForPackageBookmark(newProj, testPkg);
+    await waitForPackageBookmark(instanceName, newProj, testPkg);
   });
 
   it("displays the correct contents of the new package's file", async () => {
-    const pkgElem = await waitForPackageBookmark(newProj, testPkg);
+    const pkgElem = await waitForPackageBookmark(
+      instanceName,
+      newProj,
+      testPkg
+    );
     await pkgElem.click();
 
     const fileElements = await pkgElem.getChildren();
@@ -240,7 +256,11 @@ describe("Bookmarked Projects", function () {
     // wait for OBS to actually delete the package
     await bookmarkSection.getDriver().sleep(3000);
 
-    const pkgElem = await waitForPackageBookmark(newProj, testPkg);
+    const pkgElem = await waitForPackageBookmark(
+      instanceName,
+      newProj,
+      testPkg
+    );
 
     await pkgElem.collapse();
     await findAndClickButtonOnTreeItem(
@@ -248,7 +268,7 @@ describe("Bookmarked Projects", function () {
       "Update this Package and its contents"
     );
     await ((await bookmarkSection.findItem(newProj)) as TreeItem).collapse();
-    await waitForPackageBookmark(newProj, testPkg);
+    await waitForPackageBookmark(instanceName, newProj, testPkg);
 
     await pkgElem.getDriver().sleep(5000);
   });
@@ -267,7 +287,11 @@ describe("Bookmarked Projects", function () {
 
   xit("allows to branch the package from the bookmarks", async () => {
     await dismissAllNotifications();
-    const pkgElement = await waitForPackageBookmark(projName, pkgName);
+    const pkgElement = await waitForPackageBookmark(
+      instanceName,
+      projName,
+      pkgName
+    );
     await pkgElement.select();
 
     const actionButton = await pkgElement.getActionButton(
@@ -325,6 +349,6 @@ describe("Bookmarked Projects", function () {
     );
     await openNewFolderNotification[0].takeAction("No");
 
-    await waitForPackageBookmark(branchedProjName, pkgName);
+    await waitForPackageBookmark(instanceName, branchedProjName, pkgName);
   });
 });
