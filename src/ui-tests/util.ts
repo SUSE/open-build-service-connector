@@ -335,6 +335,16 @@ export function promiseWithTimeout<T>(
   });
 }
 
+async function findChildByLabel(
+  treeItem: TreeItem,
+  label: string
+): Promise<TreeItem | undefined> {
+  const children = await treeItem.getChildren();
+
+  const labels = await getLabelsOfTreeItems(children);
+  return children[labels.findIndex((name) => name === label)];
+}
+
 /**
  * Try for `timeoutMs` milliseconds to locate the OBS instance with the name
  * `instanceName` in the bookmarked projects view.
@@ -352,26 +362,24 @@ export function waitForObsInstance(
       const bookmarkSection = await focusOnSection(
         BOOKMARKED_PROJECTS_SECTION_NAME
       );
-      while (true) {
+      let instanceElement: TreeItem | undefined;
+      while (instanceElement === undefined) {
         if ((await bookmarkSection.findWelcomeContent()) === undefined) {
           const myBookmarksItem = await bookmarkSection.findItem(
-            "My bookmarks"
+            "My bookmarks",
+            1
           );
+
           if (myBookmarksItem !== undefined) {
-            const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
-            const childLabels = await Promise.all(
-              bookmarkChildren.map((c) => c.getLabel())
+            instanceElement = await findChildByLabel(
+              myBookmarksItem as TreeItem,
+              instanceName
             );
-            const instanceIndex = childLabels.findIndex(
-              (lbl) => lbl === instanceName
-            );
-            if (instanceIndex !== -1) {
-              return bookmarkChildren[instanceIndex];
-            }
           }
         }
         await bookmarkSection.getDriver().sleep(500);
       }
+      return instanceElement;
     },
     timeoutMs,
     {
@@ -381,6 +389,7 @@ export function waitForObsInstance(
 }
 
 export function waitForProjectBookmark(
+  instanceName: string,
   projectName: string,
   {
     timeoutMs = 5000
@@ -388,25 +397,21 @@ export function waitForProjectBookmark(
     timeoutMs?: number;
   } = {}
 ): Promise<TreeItem> {
-  return promiseWithTimeout(async () => {
-    const bookmarkSection = await focusOnSection(
-      BOOKMARKED_PROJECTS_SECTION_NAME
-    );
-    while (true) {
-      const myBookmarksItem = await bookmarkSection.findItem("My bookmarks");
-      expect(myBookmarksItem).to.not.equal(undefined);
-      const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
-      const childLabels = await Promise.all(
-        bookmarkChildren.map((c) => c.getLabel())
-      );
-      const projIndex = childLabels.findIndex((lbl) => lbl === projectName);
-      if (projIndex !== -1) {
-        return bookmarkChildren[projIndex];
+  return promiseWithTimeout(
+    async () => {
+      const obsElement = await waitForObsInstance(instanceName, { timeoutMs });
+      let projectElement: TreeItem | undefined;
+      while (projectElement === undefined) {
+        projectElement = await findChildByLabel(obsElement, projectName);
+        await obsElement.getDriver().sleep(500);
       }
-
-      await bookmarkSection.getDriver().sleep(500);
+      return projectElement;
+    },
+    timeoutMs,
+    {
+      errorMsg: `Failed to find the project element ${projectName} from the instance ${instanceName}`
     }
-  }, timeoutMs);
+  );
 }
 
 /**
@@ -415,6 +420,7 @@ export function waitForProjectBookmark(
  * Project" section.
  */
 export function waitForPackageBookmark(
+  instanceName: string,
   projectName: string,
   packageName: string,
   {
@@ -427,46 +433,36 @@ export function waitForPackageBookmark(
 ): Promise<TreeItem> {
   return promiseWithTimeout(
     async () => {
-      let pkgElem: TreeItem | undefined = undefined;
-      const curSection = await focusOnSection(section);
-      while (pkgElem === undefined) {
-        await curSection.getDriver().sleep(500);
+      let pkgElem: TreeItem | undefined;
+      let projElement: TreeItem | undefined;
 
-        let projElement: TreeItem | undefined;
-
-        if (section === "Bookmarked Projects") {
-          const myBookmarksItem = await curSection.findItem("My bookmarks");
-          expect(myBookmarksItem).to.not.equal(undefined);
-          const bookmarkChildren = await (myBookmarksItem as TreeItem).getChildren();
-          const childLabels = await Promise.all(
-            bookmarkChildren.map((c) => c.getLabel())
-          );
-          const projIndex = childLabels.findIndex((lbl) => lbl === projectName);
-          if (projIndex !== -1) {
-            projElement = bookmarkChildren[projIndex];
-          }
-        } else {
+      if (section === "Current Project") {
+        const curSection = await focusOnSection(section);
+        projElement = await waitForElement(async () => {
           projElement = (await curSection.findItem(projectName)) as
             | TreeItem
             | undefined;
-        }
 
-        if (projElement === undefined) {
-          continue;
-        }
+          if (projElement === undefined) {
+            return undefined;
+          }
 
-        if (!(await projElement.isSelected())) {
-          await projElement.select();
-        }
-        const pkgElements = await projElement.getChildren();
+          return projElement;
+        });
+      } else {
+        projElement = await waitForProjectBookmark(instanceName, projectName, {
+          timeoutMs
+        });
+      }
 
-        const pkgNames = await Promise.all(
-          pkgElements.map((p) => p.getLabel())
-        );
-        const pkgInd = pkgNames.findIndex((name) => name === packageName);
-        if (pkgInd !== -1) {
-          pkgElem = pkgElements[pkgInd];
-        }
+      console.log(await projElement.getLabel());
+      if (!(await projElement.isSelected())) {
+        await projElement.select();
+      }
+
+      while (pkgElem === undefined) {
+        pkgElem = await findChildByLabel(projElement, packageName);
+        await projElement.getDriver().sleep(500);
       }
       return pkgElem;
     },
