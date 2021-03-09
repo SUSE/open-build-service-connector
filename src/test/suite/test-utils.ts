@@ -66,7 +66,9 @@ export const createStubbedObsFetchers = (sandbox: SinonSandbox) => ({
   submitPackage: sandbox.stub(),
   checkConnection: sandbox.stub(),
   readAccountsFromOscrc: sandbox.stub(),
-  fetchServerCaCertificate: sandbox.stub()
+  fetchServerCaCertificate: sandbox.stub(),
+  checkOutProject: sandbox.stub(),
+  checkOutPackage: sandbox.stub()
 });
 
 export async function waitForEvent<T>(
