@@ -26,6 +26,7 @@ import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
 import { ErrorPageDocumentProvider } from "./assert";
 import { BookmarkedProjectsTreeProvider } from "./bookmark-tree-view";
+import { BuildLogDisplay, BuildStatusDisplay } from "./build-control";
 import { CheckOutHandler } from "./check-out-handler";
 import { cmdPrefix } from "./constants";
 import { CurrentPackageWatcherImpl } from "./current-package-watcher";
@@ -155,7 +156,9 @@ export async function activate(
     new EmptyDocumentForDiffProvider(),
     new CheckOutHandler(accountManager, logger),
     vscode.commands.registerCommand(GET_LOGFILE_PATH_COMMAND, () => logFile),
-    new ErrorPageDocumentProvider(logger)
+    new ErrorPageDocumentProvider(logger),
+    new BuildStatusDisplay(accountManager, logger),
+    new BuildLogDisplay(accountManager, logger)
   );
   if (oscBuildTaskProvider !== undefined) {
     context.subscriptions.push(oscBuildTaskProvider);
