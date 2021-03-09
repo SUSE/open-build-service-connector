@@ -324,7 +324,7 @@ export function promiseWithTimeout<T>(
   let tmout: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     tmout = setTimeout(
-      () => reject(new Error(errorMsg ?? `Timeout ${timeoutMs} expired`)),
+      () => reject(new Error(errorMsg ?? `Timeout of ${timeoutMs}ms expired`)),
       timeoutMs
     );
   });
