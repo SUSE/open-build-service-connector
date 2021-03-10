@@ -18,8 +18,10 @@ it in production.
 ## Features
 
 Be sure to checkout the unveiling talk at [SUSECON Digital
-2020](https://www.susecon.com/sessions.html) (session id `DEV-1287`), which
-includes a full live demo in the second half.
+2020](https://www.susecon.com/sessions.html) (session id `DEV-1287`) and the
+presentation from the [openSUSE + LibreOffice Virtual Conference
+2020](https://events.opensuse.org/conferences/oSLO/program/proposals/3127). Both
+presentations include a live demo in the second half.
 
 ### Bookmark and view projects
 
