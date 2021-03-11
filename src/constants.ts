@@ -27,3 +27,6 @@ export const cmdPrefix = "vscodeObs";
  * default to false).
  */
 export const ignoreFocusOut = true;
+
+/** custom authority since vscode lowercases it, so we cannot put information into it */
+export const URI_AUTHORITY = "remote_file";

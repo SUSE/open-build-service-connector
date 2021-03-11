@@ -25,15 +25,12 @@ import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
-import { cmdPrefix } from "./constants";
+import { cmdPrefix, URI_AUTHORITY } from "./constants";
 import { GET_FILE_FROM_CACHE_COMMAND } from "./project-bookmarks";
 import { isFileTreeElement, ProjectTreeItem } from "./project-view";
 
 /** URI scheme of the read-only files */
 export const OBS_PACKAGE_FILE_URI_SCHEME = "vscodeObsPackageFile";
-
-/** custom authority since vscode lowercases it, so we cannot put information into it */
-const URI_AUTHORITY = "remote_file";
 
 export const SHOW_REMOTE_PACKAGE_FILE_CONTENTS_COMMAND = `${cmdPrefix}.RemotePackageFile.showRemotePackageFileContents`;
 

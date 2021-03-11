@@ -143,6 +143,8 @@ export class BookmarkedPackageTreeElement extends vscode.TreeItem {
 
   public readonly contextValue = "package";
 
+  public readonly packageName: string;
+
   public readonly iconPath:
     | vscode.ThemeIcon
     | { readonly dark: string; readonly light: string } = new vscode.ThemeIcon(
@@ -155,6 +157,7 @@ export class BookmarkedPackageTreeElement extends vscode.TreeItem {
     if (pkg.state !== BookmarkState.Ok) {
       this.iconPath = BROKEN_BOOKMARK_ICON;
     }
+    this.packageName = pkg.name;
   }
 }
 

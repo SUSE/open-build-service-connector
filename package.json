@@ -103,6 +103,14 @@
           "command": "vscodeObs.obsProject.submitPackage"
         },
         {
+          "when": "view == bookmarkedProjectsTree && viewItem == package",
+          "command": "vscodeObs.BuildControl.showBuildStatus"
+        },
+        {
+          "when": "view == bookmarkedProjectsTree && viewItem == package",
+          "command": "vscodeObs.BuildControl.openBuildLog"
+        },
+        {
           "group": "inline",
           "when": "view == bookmarkedProjectsTree && viewItem == package",
           "command": "vscodeObs.obsProject.checkOutPackage"
@@ -375,6 +383,14 @@
         "command": "vscodeObs.assert.openErrorReportPage",
         "title": "Open Error Reporting Page",
         "icon": "$(bug)"
+      },
+      {
+        "command": "vscodeObs.BuildControl.showBuildStatus",
+        "title": "Show the build status"
+      },
+      {
+        "command": "vscodeObs.BuildControl.openBuildLog",
+        "title": "Show the build log"
       }
     ],
     "views": {
