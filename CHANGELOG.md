@@ -10,6 +10,17 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+
+### Changed
+
+
+### Removed
+
+
+## [0.0.6] - 2021-03-11
+
+### Added
+
 - Log internal errors better and provide the user with a error reporting page
 - Add command to the server entries to open the settings directly
 - Add support to view the build status and build log
