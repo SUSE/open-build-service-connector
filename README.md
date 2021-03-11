@@ -164,6 +164,30 @@ downloaded the correct certificate (it will present you with the fingerprint of
 the certificate during the import process).
 
 
+### Build status and build log
+
+You can query the current build status for all repositories and architectures as
+well as the build log via the commands `Show the build status` and `Show the
+build log`. These are available as stand alone commands or via the context menu
+of bookmarked packages:
+
+![build_log_and_status_commands.png](screenshots/build_log_and_status_commands.png)
+
+The build status is presented as a virtual text document with an entry for each
+repository and each architecture containing the published binaries and
+information about these:
+
+![build_status_display.png](screenshots/build_status_display.png)
+
+The individual repositories and architectures can be folded via the twistie in
+the gutter.
+
+The build log of a package is fetched from the Open Build Service and shown as a
+read only document. You will first be queried for the repository and
+architecture for which you want to view the log, before it is displayed. In case
+the build is currently running, then the log will be updated live inside VSCode.
+
+
 ## Requirements
 
 You need an account on an instance of the Open Build Service
