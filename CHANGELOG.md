@@ -13,6 +13,17 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+
+### Removed
+
+
+## [0.0.7] - 2021-03-18
+
+### Added
+
+
+### Changed
+
 - Switch to using VSCode's bundled keytar to prevent errors with remote sessions
 
 ### Removed
