@@ -22,8 +22,12 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-unsafe-call */
 
 import { promises as fsPromises } from "fs";
-import { fetchProject } from "open-build-service-api";
-import { pathExists, PathType, zip } from "open-build-service-api/lib/util";
+import {
+  fetchProject,
+  pathExists,
+  PathType,
+  zip
+} from "open-build-service-api";
 import { join, resolve } from "path";
 import { Logger } from "pino";
 import * as vscode from "vscode";
