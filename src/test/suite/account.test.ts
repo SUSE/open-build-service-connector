@@ -196,9 +196,20 @@ describe("AccountManager", function () {
         );
 
         // password was retrieved?
-        this.fixture.sandbox.assert.calledOnce(
-          this.fixture.keytarGetPasswordMock
-        );
+        if (this.fixture.keytarGetPasswordMock.callCount > 1) {
+          // recent vscode versions try to run some migration scripts and call
+          // getPassword("vscode-github.login", "account")
+          // or
+          // getPassword("vscode-insiders-github.login", "account")
+          this.fixture.keytarGetPasswordMock.should.have.been.calledWithMatch(
+            match(/vscode(-insiders)?-github\.login/),
+            "account"
+          );
+          this.fixture.keytarGetPasswordMock.should.have.callCount(2);
+        } else {
+          this.fixture.keytarGetPasswordMock.should.have.callCount(1);
+        }
+
         this.fixture.sandbox.assert.calledWithMatch(
           this.fixture.keytarGetPasswordMock,
           match.string,
