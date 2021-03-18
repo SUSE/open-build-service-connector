@@ -501,6 +501,7 @@ ${msg}
             packageChange = true;
             return;
         }
+        /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
         assert(matchingPkgFile.state === FileState.Modified);
 
         // if the document is not open, then just overwrite the file contents
