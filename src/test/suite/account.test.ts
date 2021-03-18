@@ -201,8 +201,10 @@ describe("AccountManager", function () {
           // getPassword("vscode-github.login", "account")
           // or
           // getPassword("vscode-insiders-github.login", "account")
+          // or
+          // getPassword("vscode-insiders-microsoft.login", "account")
           this.fixture.keytarGetPasswordMock.should.have.been.calledWithMatch(
-            match(/vscode(-insiders)?-github\.login/),
+            match(/vscode(-insiders)?-(.*)\.login/),
             "account"
           );
           this.fixture.keytarGetPasswordMock.should.have.callCount(2);
