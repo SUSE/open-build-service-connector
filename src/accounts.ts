@@ -20,7 +20,7 @@
  */
 
 import { promises as fsPromises } from "fs";
-import * as keytar from "keytar";
+import * as keytarT from "keytar";
 import {
   Account,
   certificateToPem,
@@ -43,7 +43,13 @@ import {
   ObsFetchers,
   VscodeWindow
 } from "./dependency-injection";
-import { findRegexPositionInString, setDifference } from "./util";
+import {
+  findRegexPositionInString,
+  getNodeModule,
+  setDifference
+} from "./util";
+
+const keytar = getNodeModule<typeof keytarT>("keytar");
 
 /**
  * # Accounts management

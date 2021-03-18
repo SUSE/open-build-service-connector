@@ -491,3 +491,43 @@ export function findRegexPositionInString(
     matchPos - lastNewlineBeforeMatch
   );
 }
+
+declare const __webpack_require__: typeof require;
+declare const __non_webpack_require__: typeof require;
+
+const getRequire = (): typeof require =>
+  typeof __webpack_require__ === "function" ? __non_webpack_require__ : require;
+
+/**
+ * `require()` a node module from vscode's bundled dependencies.
+ *
+ * @return The loaded module or `undefined` if the module is not in vscode's
+ *     bundle.
+ */
+// inspired by:
+// https://code.visualstudio.com/api/advanced-topics/remote-extensions#persisting-secrets
+export function getBundledNodeModule<T>(moduleName: string): T | undefined {
+  const r = getRequire();
+
+  try {
+    return r(`${vscode.env.appRoot}/node_modules.asar/${moduleName}`) as T;
+  } catch (err) {
+    try {
+      return r(`${vscode.env.appRoot}/node_modules/${moduleName}`) as T;
+    } catch (err) {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * `require()` a node module from either vscode's bundle or from node's search
+ * path, preferring the vscode bundle.
+ *
+ * @throw Module not found error if the module is neither in vscode's bundle,
+ *     nor in node's search path
+ */
+export function getNodeModule<T>(moduleName: string): T {
+  const r = getRequire();
+  return getBundledNodeModule<T>(moduleName) ?? (r(moduleName) as T);
+}
