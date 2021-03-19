@@ -590,6 +590,7 @@
   "engines": {
     "vscode": "^1.50.0"
   },
+  "extensionKind": ["workspace"],
   "prettier": {
     "trailingComma": "none"
   },
