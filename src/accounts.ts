@@ -29,7 +29,8 @@ import {
   normalizeUrl
 } from "open-build-service-api";
 import { withoutUndefinedMembers } from "open-build-service-api/lib/util";
-import { basename } from "path";
+import { homedir } from "os";
+import { basename, join } from "path";
 import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
@@ -1502,7 +1503,9 @@ export class AccountManagerImpl extends LoggingBase {
 
     const res =
       defaultAccounts.length === 0
-        ? await this.obsFetchers.readAccountsFromOscrc("~/.oscrc")
+        ? await this.obsFetchers.readAccountsFromOscrc(
+            join(homedir(), ".oscrc")
+          )
         : defaultAccounts;
     this.logger.trace(
       "Read the following accounts from osc's config file: %o",
