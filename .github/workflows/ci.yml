@@ -72,7 +72,11 @@ jobs:
           sudo apt-get -y install ninja-build libsecret-1-dev libglib2.0-dev python3-pip python3-setuptools
           sudo pip3 install meson
 
-          npm install keytar@$(< package.json jq ".dependencies.keytar"|sed 's/"//g')
+          npm install keytar@$(python3 -c 'import re
+          with open("yarn.lock", "r") as lockfile:
+              contents = lockfile.read(-1)
+              print(re.findall("^keytar@.*:$\s*version \"(?P<version>.*)\"", contents, re.MULTILINE)[0])
+          ')
 
     - run: |
           cd mocklibsecret
