@@ -166,7 +166,7 @@ class AccountManagerFixture extends LoggingFixture {
 }
 
 describe("AccountManager", function () {
-  this.timeout(5000);
+  this.timeout(10000);
 
   beforeEach(async function () {
     this.fixture = new AccountManagerFixture(this);
