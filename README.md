@@ -6,6 +6,9 @@
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://github.com/SUSE/open-build-service-connector/blob/master/LICENSE)
 [![styled with prettier](https://img.shields.io/badge/styled_with-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 
+[![Dependency Status](https://david-dm.org/SUSE/open-build-service-connector.svg)](https://david-dm.org/SUSE/open-build-service-connector)
+[![devDependency Status](https://david-dm.org/SUSE/open-build-service-connector/dev-status.svg)](https://david-dm.org/SUSE/open-build-service-connector#info=devDependencies)
+
 Visual Studio Code extension for integration with the [Open Build
 Service](https://openbuildservice.org/): it allows you to view existing packages
 and projects, check them out locally, build them and integrates into VSCode's
