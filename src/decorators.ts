@@ -97,6 +97,7 @@ export function logAndReportExceptions(
       const args = [];
 
       for (let i = 0; i < arguments.length; i++) {
+        /* eslint-disable-next-line prefer-rest-params */
         args[i - 0] = arguments[i];
       }
 
