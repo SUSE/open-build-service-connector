@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import {
   Arch,
   BaseRepository,
@@ -31,9 +31,9 @@ import {
   readInCheckedOutProject,
   updateCheckedOutProject
 } from "open-build-service-api";
-import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
+import { assert } from "./assert";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix } from "./constants";
 import {
@@ -237,7 +237,7 @@ export class RepositoryTreeProvider
   constructor(
     currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly vscodeWindow: VscodeWindow = vscode.window
   ) {
     super(accountManager, logger);

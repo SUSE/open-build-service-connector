@@ -19,12 +19,11 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { promises as fsPromises } from "fs";
-import { Logger } from "pino";
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import * as vscode from "vscode";
 import { LoggingDisposableBase } from "./base-components";
 import { cmdPrefix } from "./constants";
-import { getGlobalLogger, GET_LOGFILE_PATH_COMMAND } from "./extension";
+import { DISPLAY_LOG_COMMAND, getGlobalLogger } from "./logging";
 
 const cmdId = "assert";
 
@@ -33,7 +32,7 @@ export const ERROR_PAGE_SCHEME = `vscodeObsErrorPage`;
 export const SET_LAST_ERROR_COMMAND = `${cmdPrefix}.${cmdId}.setLastError`;
 
 /** Open the error reporting page */
-export const OPEN_ERROR_REPORT_PAGE_COMMAND = `${cmdPrefix}.${cmdId}.openErrorReportPage`;
+export const OPEN_INTERNAL_ERROR_PAGE_COMMAND = `${cmdPrefix}.${cmdId}.openInternalErrorPage`;
 
 interface InternalError {
   readonly msg: string;
@@ -44,7 +43,7 @@ interface InternalError {
 const DEFAULT_INTERNAL_ERROR = { msg: "No error recorded" };
 
 export const ERROR_PAGE_URI = vscode.Uri.parse(
-  `${ERROR_PAGE_SCHEME}:last error.md`,
+  `${ERROR_PAGE_SCHEME}:internal error.md`,
   true
 );
 
@@ -77,7 +76,7 @@ export function assert(condition: boolean, msg?: string): asserts condition {
             async (yesNo): Promise<void> => {
               if (yesNo === "Yes") {
                 await vscode.commands.executeCommand(
-                  OPEN_ERROR_REPORT_PAGE_COMMAND
+                  OPEN_INTERNAL_ERROR_PAGE_COMMAND
                 );
               }
             }
@@ -108,34 +107,10 @@ export class ErrorPageDocumentProvider
   public onDidChange: vscode.Event<vscode.Uri> = this.onDidChangeEmitter.event;
 
   /** Displays the actual */
-  public async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
+  public provideTextDocumentContent(uri: vscode.Uri): string {
     if (uri.scheme !== ERROR_PAGE_SCHEME) {
       throw new Error(
         `invalid uri scheme: ${uri.scheme}, expected ${ERROR_PAGE_SCHEME}`
-      );
-    }
-
-    const logFilePath = await vscode.commands.executeCommand<string>(
-      GET_LOGFILE_PATH_COMMAND
-    );
-    if (logFilePath === undefined) {
-      this.logger.error(
-        "Tried to get the log file path, but got undefined instead"
-      );
-    }
-
-    let logfile: string | undefined;
-
-    try {
-      logfile =
-        logFilePath !== undefined
-          ? await fsPromises.readFile(logFilePath, { encoding: "utf8" })
-          : undefined;
-    } catch (err) {
-      this.logger.error(
-        "Tried to read the logfile from %s but got %s",
-        logFilePath,
-        (err as Error).toString()
       );
     }
 
@@ -156,19 +131,10 @@ message: ${this.lastError.msg}
 ${this.lastError.stack}
 `
         : "",
-      logfile !== undefined
-        ? `
-## Log file (please remove sensitive information):
-\`\`\`json
-${logfile}
-\`\`\`
-`
-        : logFilePath === undefined
-        ? `
-## Could not get the path of the logfile
-`
-        : `
-## Could not read logfile from ${logFilePath}
+      `
+## Log file (please remove sensitive information)
+
+Open the log by executing the command ${DISPLAY_LOG_COMMAND}
 `
     );
   }
@@ -179,7 +145,9 @@ ${logfile}
     await vscode.commands.executeCommand(SET_LAST_ERROR_COMMAND, lastError);
   }
 
-  private async openErrorReportPage(lastError?: InternalError): Promise<void> {
+  private async openInternalErrorPage(
+    lastError?: InternalError
+  ): Promise<void> {
     this.setLastError(lastError ?? DEFAULT_INTERNAL_ERROR, false);
     const document = await vscode.workspace.openTextDocument(ERROR_PAGE_URI);
     await vscode.window.showTextDocument(document, { preview: false });
@@ -206,7 +174,7 @@ ${logfile}
     }
   }
 
-  constructor(logger: Logger) {
+  constructor(logger: IVSCodeExtLogger) {
     super(logger);
     this.disposables.push(
       vscode.commands.registerCommand(
@@ -215,8 +183,8 @@ ${logfile}
         this
       ),
       vscode.commands.registerCommand(
-        OPEN_ERROR_REPORT_PAGE_COMMAND,
-        this.openErrorReportPage,
+        OPEN_INTERNAL_ERROR_PAGE_COMMAND,
+        this.openInternalErrorPage,
         this
       ),
       vscode.workspace.registerTextDocumentContentProvider(

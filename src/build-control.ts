@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import * as assert from "assert";
 import {
   Arch,
@@ -31,7 +32,6 @@ import {
   zip
 } from "open-build-service-api";
 import { BasePackage } from "open-build-service-api/lib/package";
-import { Logger } from "pino";
 import { parse, stringify } from "querystring";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
@@ -383,7 +383,7 @@ export class BuildLogDisplay
 
   constructor(
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly vscodeWindow: VscodeWindow = vscode.window
   ) {
     super(accountManager, logger);
@@ -707,7 +707,7 @@ export class BuildStatusDisplay
 
   constructor(
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly fileMap = new Map<string, PackageBuildDisplay>(),
     private readonly vscodeWindow: VscodeWindow = vscode.window
   ) {

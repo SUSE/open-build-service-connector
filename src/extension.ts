@@ -19,20 +19,17 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { promises as fsPromises } from "fs";
-import { join } from "path";
-import * as pino from "pino";
 import * as vscode from "vscode";
 import { AccountManagerImpl } from "./accounts";
 import { ErrorPageDocumentProvider } from "./assert";
 import { BookmarkedProjectsTreeProvider } from "./bookmark-tree-view";
 import { BuildLogDisplay, BuildStatusDisplay } from "./build-control";
 import { CheckOutHandler } from "./check-out-handler";
-import { cmdPrefix } from "./constants";
 import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
 import { ObsServerInformation } from "./instance-info";
+import { setupLogger } from "./logging";
 import { OscBuildTaskProvider } from "./osc-build-task";
 import { RemotePackageFileContentProvider } from "./package-file-contents";
 import { ProjectBookmarkManager } from "./project-bookmarks";
@@ -40,38 +37,14 @@ import { RepositoryTreeProvider } from "./repository";
 import { PackageScmHistoryTree } from "./scm-history";
 import { PackageScm } from "./vcs";
 
-export const GET_LOGFILE_PATH_COMMAND = `${cmdPrefix}.logging.getLogfilePath`;
-
-let logger: pino.Logger | undefined;
-
-export const getGlobalLogger = (): pino.Logger | undefined => logger;
-
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
   const showCollapseAll = true;
 
-  const logFile = join(
-    context.logUri.fsPath,
-    `vscode-obs.${new Date().getTime()}.log`
-  );
-
-  let options: pino.LoggerOptions;
-  if (process.env.EXTENSION_DEBUG === "1") {
-    options = {
-      level: "trace"
-    };
-    console.log(logFile);
-  } else {
-    options = {
-      level: vscode.workspace
-        .getConfiguration("vscode-obs")
-        .get<pino.Level>("logLevel", "error")
-    };
-  }
-
-  await fsPromises.mkdir(context.logUri.fsPath, { recursive: true });
-  logger = pino(options, pino.destination(logFile));
+  const logger = setupLogger(context, {
+    debugMode: process.env.EXTENSION_DEBUG === "1"
+  });
 
   const accountManager = await AccountManagerImpl.createAccountManager(logger);
 
@@ -155,7 +128,6 @@ export async function activate(
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),
     new CheckOutHandler(accountManager, logger),
-    vscode.commands.registerCommand(GET_LOGFILE_PATH_COMMAND, () => logFile),
     new ErrorPageDocumentProvider(logger),
     new BuildStatusDisplay(accountManager, logger),
     new BuildLogDisplay(accountManager, logger)

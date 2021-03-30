@@ -21,7 +21,7 @@
 
 import { assert } from "./assert";
 import { PackageFile } from "open-build-service-api";
-import { Logger } from "pino";
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
@@ -93,7 +93,7 @@ export class RemotePackageFileContentProvider
     );
   }
 
-  constructor(accountManager: AccountManager, logger: Logger) {
+  constructor(accountManager: AccountManager, logger: IVSCodeExtLogger) {
     super(accountManager, logger);
 
     this.disposables.push(

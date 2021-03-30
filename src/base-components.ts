@@ -19,11 +19,11 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
+import { IChildLogger, IVSCodeExtLogger } from "@vscode-logging/logger";
 import { Package, PackageFile, Project } from "open-build-service-api";
-import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, ActiveAccounts, ApiUrl } from "./accounts";
+import { assert } from "./assert";
 
 export class BasePackage implements Package {
   public readonly apiUrl: string;
@@ -104,7 +104,11 @@ export class BasePackageFile implements PackageFile {
 
 /** Base class for components that should have access to the logger */
 export class LoggingBase {
-  constructor(protected readonly logger: Logger) {}
+  protected readonly logger: IChildLogger;
+
+  constructor(extLogger: IVSCodeExtLogger) {
+    this.logger = extLogger.getChildLogger({ label: this.constructor.name });
+  }
 }
 
 export class DisposableBase {
@@ -118,8 +122,11 @@ export class DisposableBase {
 }
 
 export class LoggingDisposableBase extends DisposableBase {
-  constructor(protected readonly logger: Logger) {
+  protected readonly logger: IChildLogger;
+
+  constructor(extLogger: IVSCodeExtLogger) {
     super();
+    this.logger = extLogger.getChildLogger({ label: this.constructor.name });
   }
 }
 
@@ -135,10 +142,10 @@ export class ConnectionListenerBase extends DisposableBase {
 }
 
 export class ConnectionListenerLoggerBase extends ConnectionListenerBase {
-  constructor(
-    accountManager: AccountManager,
-    protected readonly logger: Logger
-  ) {
+  protected readonly logger: IChildLogger;
+
+  constructor(accountManager: AccountManager, extLogger: IVSCodeExtLogger) {
     super(accountManager);
+    this.logger = extLogger.getChildLogger({ label: this.constructor.name });
   }
 }

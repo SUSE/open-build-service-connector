@@ -19,26 +19,30 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { getExtensionLogger } from "@vscode-logging/logger";
 import { should, use } from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import * as chaiThings from "chai-things";
 import { AsyncFunc, Context, Func } from "mocha";
-import * as pino from "pino";
 import { SinonSandbox } from "sinon";
 import * as sinonChai from "sinon-chai";
 import * as vscode from "vscode";
 import { DisposableBase } from "../../base-components";
+import { EXTENSION_NAME } from "../../logging";
 import { makeFakeEventEmitter } from "./fakes";
+import { getTmpPrefix } from "./utilities";
 
 use(chaiThings);
 use(chaiAsPromised);
 use(sinonChai);
 should();
 
-export const testLogger = pino(
-  { level: "trace" },
-  pino.destination("./logfile.json")
-);
+export const testLogger = getExtensionLogger({
+  level: "trace",
+  extName: `${EXTENSION_NAME}.Testing`,
+  logPath: getTmpPrefix(),
+  sourceLocationTracking: true
+});
 
 export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => {
   const emiter = makeFakeEventEmitter<vscode.TextEditor | undefined>();

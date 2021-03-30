@@ -33,14 +33,12 @@ import {
   ERROR_PAGE_URI,
   SET_LAST_ERROR_COMMAND
 } from "../../assert";
-import { GET_LOGFILE_PATH_COMMAND } from "../../extension";
 import { safeUnlink } from "../../util";
 import { castToAsyncFunc, LoggingFixture, testLogger } from "./test-utils";
 
 class ErrorPageDocumentProviderFixture extends LoggingFixture {
   public errorPageProvider: ErrorPageDocumentProvider;
   public tempfile?: string;
-  public logfileCmdDisposable?: vscode.Disposable;
 
   public constructor(ctx: Mocha.Context) {
     super(ctx);
@@ -53,12 +51,6 @@ class ErrorPageDocumentProviderFixture extends LoggingFixture {
     const tempfile = join(tmpdir(), "obs-connector-tempfile-".concat(randStr));
     await fsPromises.writeFile(tempfile, "");
     this.tempfile = tempfile;
-
-    this.logfileCmdDisposable = vscode.commands.registerCommand(
-      GET_LOGFILE_PATH_COMMAND,
-      () => tempfile
-    );
-    this.disposables.push(this.logfileCmdDisposable);
   }
 
   public async afterEach(ctx: Mocha.Context) {
@@ -96,7 +88,7 @@ describe("ErrorPageDocumentProvider", () => {
     it(
       "shows the default error",
       castToAsyncFunc<ErrorPageTestCtx>(async function () {
-        const page = await this.fixture.errorPageProvider.provideTextDocumentContent(
+        const page = this.fixture.errorPageProvider.provideTextDocumentContent(
           ERROR_PAGE_URI
         );
 
@@ -111,7 +103,7 @@ describe("ErrorPageDocumentProvider", () => {
       castToAsyncFunc<ErrorPageTestCtx>(async function () {
         await ErrorPageDocumentProvider.setLastErrorCommand({ msg });
 
-        const page = await this.fixture.errorPageProvider.provideTextDocumentContent(
+        const page = this.fixture.errorPageProvider.provideTextDocumentContent(
           ERROR_PAGE_URI
         );
 
@@ -126,7 +118,7 @@ describe("ErrorPageDocumentProvider", () => {
       castToAsyncFunc<ErrorPageTestCtx>(async function () {
         await ErrorPageDocumentProvider.setLastErrorCommand({ msg, stack });
 
-        const page = await this.fixture.errorPageProvider.provideTextDocumentContent(
+        const page = this.fixture.errorPageProvider.provideTextDocumentContent(
           ERROR_PAGE_URI
         );
 
@@ -144,7 +136,7 @@ describe("ErrorPageDocumentProvider", () => {
           occurenceTime
         });
 
-        const page = await this.fixture.errorPageProvider.provideTextDocumentContent(
+        const page = this.fixture.errorPageProvider.provideTextDocumentContent(
           ERROR_PAGE_URI
         );
 
@@ -158,7 +150,7 @@ describe("ErrorPageDocumentProvider", () => {
       "shows an error setLastError is invoked without a parameter",
       castToAsyncFunc<ErrorPageTestCtx>(async function () {
         await vscode.commands.executeCommand(SET_LAST_ERROR_COMMAND, undefined);
-        const page = await this.fixture.errorPageProvider.provideTextDocumentContent(
+        const page = this.fixture.errorPageProvider.provideTextDocumentContent(
           ERROR_PAGE_URI
         );
 
@@ -171,64 +163,13 @@ describe("ErrorPageDocumentProvider", () => {
     );
 
     it(
-      "does not die when the logfile is not present",
-      castToAsyncFunc<ErrorPageTestCtx>(async function () {
-        await safeUnlink(this.fixture.tempfile);
-
-        const page = await this.fixture.errorPageProvider.provideTextDocumentContent(
-          ERROR_PAGE_URI
-        );
-
-        page.should.match(/message: no error/i);
-        page.should.not.match(/stack:/);
-        page.should.not.match(/recorded on:/);
-        page.should.match(/could not read logfile/i);
-      })
-    );
-
-    it(
-      "does not die when the logfile's path cannot be retrieved",
-      castToAsyncFunc<ErrorPageTestCtx>(async function () {
-        this.fixture.logfileCmdDisposable?.dispose();
-
-        const disp = vscode.commands.registerCommand(
-          GET_LOGFILE_PATH_COMMAND,
-          () => undefined
-        );
-
-        let page: string;
-        try {
-          page = await this.fixture.errorPageProvider.provideTextDocumentContent(
-            ERROR_PAGE_URI
-          );
-        } finally {
-          disp.dispose();
-        }
-
-        page.should.match(/message: no error/i);
-        page.should.not.match(/stack:/);
-        page.should.not.match(/recorded on:/);
-        page.should.match(/Could not get the path of the logfile/i);
-      })
-    );
-
-    it(
-      "errors out if the logfile path get command is not defined",
-      castToAsyncFunc<ErrorPageTestCtx>(async function () {
-        this.fixture.logfileCmdDisposable?.dispose();
-
-        await this.fixture.errorPageProvider
-          .provideTextDocumentContent(ERROR_PAGE_URI)
-          .should.be.rejectedWith(/command.*not found/i);
-      })
-    );
-
-    it(
       "throws an error if the uri scheme is invalid",
       castToAsyncFunc<ErrorPageTestCtx>(async function () {
-        await this.fixture.errorPageProvider
-          .provideTextDocumentContent(vscode.Uri.file(cwd()))
-          .should.be.rejectedWith(/invalid uri scheme/i);
+        expect(() =>
+          this.fixture.errorPageProvider.provideTextDocumentContent(
+            vscode.Uri.file(cwd())
+          )
+        ).to.throw(/invalid uri scheme/i);
       })
     );
   });

@@ -29,7 +29,7 @@ import {
   zip
 } from "open-build-service-api";
 import { join, resolve } from "path";
-import { Logger } from "pino";
+import { IChildLogger, IVSCodeExtLogger } from "@vscode-logging/logger";
 import * as vscode from "vscode";
 import { ActiveAccounts, promptUserForAccount } from "./accounts";
 import { assert } from "./assert";
@@ -225,7 +225,7 @@ export function logAndReportExceptionsWrapper<RT>(
 }
 
 export async function logException<RT>(
-  logger: Logger,
+  logger: IVSCodeExtLogger | IChildLogger,
   func: () => Promise<RT>,
   description: string = "Function"
 ): Promise<RT | undefined> {
