@@ -30,3 +30,6 @@ export const ignoreFocusOut = true;
 
 /** custom authority since vscode lowercases it, so we cannot put information into it */
 export const URI_AUTHORITY = "remote_file";
+
+/** Top level key for configuration options of this extension  */
+export const CONFIGURATION_EXTENSION_NAME = "vscode-obs";

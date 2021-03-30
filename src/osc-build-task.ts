@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import {
   Arch,
@@ -26,7 +27,6 @@ import {
   ProcessError,
   runProcess
 } from "open-build-service-api";
-import { Logger } from "pino";
 import { inspect } from "util";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
@@ -285,7 +285,7 @@ export class OscBuildTaskProvider
    *     package. It is used to retrieve the list of packages in the current
    *     workspace.
    * @param accountManager  The provider of connections to the Buildservice.
-   * @param logger  Logger for debugging.
+   * @param logger  Extension logger for this class.
    * @param vscodeWorkspace  Dependency injection of [[vscode.workspace]]
    * @param obsFetchers Dependency injection of parts of the
    *     `open-build-service-api` module that perform remote reads & writes
@@ -295,7 +295,7 @@ export class OscBuildTaskProvider
   public static async createOscBuildTaskProvider(
     currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     vscodeWorkspace: VscodeWorkspace = vscode.workspace,
     obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS,
     runProcessFunc: typeof runProcess = runProcess
@@ -330,7 +330,7 @@ export class OscBuildTaskProvider
   private constructor(
     private readonly currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
-    protected readonly logger: Logger,
+    protected readonly logger: IVSCodeExtLogger,
     private readonly vscodeWorkspace: VscodeWorkspace,
     private readonly obsFetchers: ObsFetchers
   ) {

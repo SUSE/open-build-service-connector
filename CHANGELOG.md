@@ -13,6 +13,8 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Switch the logging backend to
+  [@vscode-logging/logger](https://github.com/SAP/vscode-logging)
 
 ### Removed
 

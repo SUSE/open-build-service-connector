@@ -19,8 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { join } from "path";
-import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
@@ -97,7 +97,7 @@ export class CurrentProjectTreeProvider
   constructor(
     currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
-    logger: Logger
+    logger: IVSCodeExtLogger
   ) {
     super(accountManager, logger);
 

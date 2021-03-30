@@ -257,7 +257,6 @@ describe("OscBuildTaskProvider", () => {
           expect(tasks).to.be.an("array").and.have.length(3);
 
           const taskDefs = tasks.map((t) => t.definition);
-          testLogger.info(taskDefs);
 
           const commonDef = {
             oscBinaryPath: "/usr/bin/osc",

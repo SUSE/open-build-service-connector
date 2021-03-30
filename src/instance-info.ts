@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import {
   Arch,
   Distribution,
@@ -27,7 +28,6 @@ import {
   fetchProjectList,
   zip
 } from "open-build-service-api";
-import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";
@@ -120,7 +120,7 @@ export class ObsServerInformation extends ConnectionListenerLoggerBase {
 
   constructor(
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly obsFetchers: ObsFetchers = {
       fetchConfiguration,
       fetchHostedDistributions,

@@ -34,9 +34,9 @@ import {
   AccountStorage,
   CONFIGURATION_ACCOUNTS,
   CONFIGURATION_CHECK_UNIMPORTED_ACCOUNTS,
-  CONFIGURATION_EXTENSION_NAME,
   KEYTAR_SERVICE_NAME
 } from "../../accounts";
+import { CONFIGURATION_EXTENSION_NAME } from "../../constants";
 import {
   CA_CERT_ROOT_CERTIFICATE_RAW,
   fakeAccount1,

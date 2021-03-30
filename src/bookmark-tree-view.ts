@@ -19,8 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { ConnectionState, Package, Project } from "open-build-service-api";
-import { Logger } from "pino";
 import * as vscode from "vscode";
 import {
   AccountManager,
@@ -293,7 +293,7 @@ export class BookmarkedProjectsTreeProvider
   constructor(
     accountManager: AccountManager,
     private readonly bookmarkMngr: ProjectBookmarkManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private vscodeWindow: VscodeWindow = vscode.window,
     private readonly obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ) {

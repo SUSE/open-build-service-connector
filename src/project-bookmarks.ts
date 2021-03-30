@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { promises as fsPromises } from "fs";
 import {
   ModifiedPackage,
@@ -30,10 +30,10 @@ import {
   Project
 } from "open-build-service-api";
 import { join } from "path";
-import { Logger } from "pino";
 import { inspect } from "util";
 import * as vscode from "vscode";
 import { AccountManager, ApiUrl } from "./accounts";
+import { assert } from "./assert";
 import {
   BasePackage,
   BasePackageFile,
@@ -201,7 +201,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
   public static async createMetadataCache(
     extensionContext: vscode.ExtensionContext,
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     initialProjects = new Map<ApiUrl, ProjectBookmark[]>(),
     obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ): Promise<MetadataCache> {
@@ -228,7 +228,7 @@ class MetadataCache extends ConnectionListenerLoggerBase {
   private constructor(
     extensionContext: vscode.ExtensionContext,
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly obsFetchers: ObsFetchers
   ) {
     super(accountManager, logger);
@@ -709,7 +709,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
   public static async createProjectBookmarkManager(
     ctx: vscode.ExtensionContext,
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ): Promise<ProjectBookmarkManager> {
     const bookmarkedProjects = loadMapFromMemento<ApiUrl, ProjectBookmark[]>(
@@ -747,7 +747,7 @@ export class ProjectBookmarkManager extends LoggingDisposableBase {
     private readonly metadataCache: MetadataCache,
     private globalState: vscode.Memento,
 
-    logger: Logger
+    logger: IVSCodeExtLogger
   ) {
     super(logger);
 

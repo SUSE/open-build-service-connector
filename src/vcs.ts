@@ -32,7 +32,7 @@ import {
 } from "open-build-service-api";
 import { undoFileDeletion } from "open-build-service-api/lib/vcs";
 import { basename, dirname, join, sep } from "path";
-import { Logger } from "pino";
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { ConnectionListenerLoggerBase } from "./base-components";
@@ -124,7 +124,7 @@ export class PackageScm
   constructor(
     private readonly currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
-    logger: Logger
+    logger: IVSCodeExtLogger
   ) {
     super(accountManager, logger);
 

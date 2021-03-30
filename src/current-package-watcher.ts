@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import {
   Connection,
   isProjectWithMeta,
@@ -33,7 +34,6 @@ import {
   readInModifiedPackageFromDir
 } from "open-build-service-api";
 import { basename, dirname, join, relative } from "path";
-import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
 import { assert } from "./assert";
@@ -245,7 +245,7 @@ export class CurrentPackageWatcherImpl
 
   public static async createCurrentPackageWatcher(
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     bookmarkManager: ProjectBookmarkManager,
     vscodeWindow: VscodeWindow = vscode.window,
     vscodeWorkspace: VscodeWorkspace = vscode.workspace,
@@ -290,7 +290,7 @@ export class CurrentPackageWatcherImpl
 
   private constructor(
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     onBookmarkUpdate: vscode.Event<BookmarkUpdate>,
     private readonly vscodeWindow: VscodeWindow,
     private readonly vscodeWorkspace: VscodeWorkspace,

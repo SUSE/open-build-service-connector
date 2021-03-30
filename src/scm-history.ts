@@ -19,21 +19,21 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import {
   fetchHistory,
   ModifiedPackage,
   Package,
   Revision
 } from "open-build-service-api";
-import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
+import { assert } from "./assert";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix } from "./constants";
 import {
-  CurrentPackageWatcher,
   CurrentPackage,
+  CurrentPackageWatcher,
   isModifiedPackage
 } from "./current-package-watcher";
 
@@ -111,7 +111,7 @@ export class PackageScmHistoryTree
   public static async createPackageScmHistoryTree(
     currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
-    logger: Logger
+    logger: IVSCodeExtLogger
   ): Promise<PackageScmHistoryTree> {
     const historyTree = new PackageScmHistoryTree(
       currentPackageWatcher,
@@ -134,7 +134,7 @@ export class PackageScmHistoryTree
   private constructor(
     currentPackageWatcher: CurrentPackageWatcher,
     accountManager: AccountManager,
-    logger: Logger
+    logger: IVSCodeExtLogger
   ) {
     super(accountManager, logger);
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;

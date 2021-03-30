@@ -18,6 +18,7 @@ src/ui-tests/accounts/fakeHome/*
 src/ui-tests/accounts/settings.json
 dist/*
 test-home/*
+test-tmp/*
 
 media/dark/endpoints_disconnected.svg
 media/light/endpoints_disconnected.svg

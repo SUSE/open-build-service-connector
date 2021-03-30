@@ -19,10 +19,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { expect } from "chai";
 import { afterEach, beforeEach, Context, describe, it } from "mocha";
 import { sleep } from "open-build-service-api/lib/util";
-import { Logger } from "pino";
 import {
   assert,
   createSandbox,
@@ -50,9 +50,10 @@ describe("decorators", () => {
 
       constructor() {
         const sandbox = createSandbox();
-        const loggingStub = { error: sandbox.stub() };
-        super((loggingStub as any) as Logger);
-        this.loggingStub = loggingStub;
+        const childLoggerStub = { error: sandbox.stub() };
+        const extLoggerStub = { getChildLogger: () => childLoggerStub };
+        super((extLoggerStub as any) as IVSCodeExtLogger);
+        this.loggingStub = childLoggerStub;
         this.sandbox = sandbox;
         this.vscodeWindow = createStubbedVscodeWindow(this.sandbox);
       }

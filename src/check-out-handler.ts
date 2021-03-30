@@ -19,10 +19,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { promises as fsPromises } from "fs";
 import { pathExists, rmRf } from "open-build-service-api";
 import { join } from "path";
-import { Logger } from "pino";
 import * as vscode from "vscode";
 import { AccountManager, promptUserForAccount } from "./accounts";
 import { assert } from "./assert";
@@ -58,7 +58,7 @@ export class CheckOutHandler extends ConnectionListenerLoggerBase {
 
   constructor(
     accountManager: AccountManager,
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly vscodeWindow: VscodeWindow = vscode.window,
     private readonly obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS,
     private readonly executeCommand: typeof vscode.commands.executeCommand = vscode

@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { promises as fsPromises } from "fs";
 import * as keytarT from "keytar";
 import {
@@ -30,13 +31,16 @@ import {
 } from "open-build-service-api";
 import { withoutUndefinedMembers } from "open-build-service-api/lib/util";
 import { basename } from "path";
-import { Logger } from "pino";
 import { URL } from "url";
 import * as vscode from "vscode";
 import { assert } from "./assert";
 import { LoggingBase } from "./base-components";
 import { ObsServerTreeElement } from "./bookmark-tree-view";
-import { cmdPrefix, ignoreFocusOut } from "./constants";
+import {
+  cmdPrefix,
+  CONFIGURATION_EXTENSION_NAME,
+  ignoreFocusOut
+} from "./constants";
 import { logAndReportExceptions } from "./decorators";
 import {
   DEFAULT_OBS_FETCHERS,
@@ -88,9 +92,6 @@ const keytar = getNodeModule<typeof keytarT>("keytar");
  * The passwords are saved under the service name [[keytarServiceName]] and the
  * account name is the normalized URL (via [[normalizeUrl]]) to the API.
  */
-
-/** Top level key for configuration options of this extension  */
-export const CONFIGURATION_EXTENSION_NAME = "vscode-obs";
 
 /** Key under which the AccountStorage array is stored. */
 export const CONFIGURATION_ACCOUNTS = "accounts";
@@ -357,7 +358,7 @@ class RuntimeAccountConfiguration extends LoggingBase {
   >();
 
   constructor(
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly checkConnection: typeof DEFAULT_OBS_FETCHERS.checkConnection
   ) {
     super(logger);
@@ -764,7 +765,7 @@ export class AccountManagerImpl extends LoggingBase {
    * already registered.
    */
   public static async createAccountManager(
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     vscodeWindow: VscodeWindow = vscode.window,
     vscodeCommands: typeof vscode.commands = vscode.commands,
     vscodeWorkspace: typeof vscode.workspace = vscode.workspace,
@@ -851,10 +852,7 @@ export class AccountManagerImpl extends LoggingBase {
     ApiUrl[]
   > = new vscode.EventEmitter<ApiUrl[]>();
 
-  private runtimeAccountConfig: RuntimeAccountConfiguration = new RuntimeAccountConfiguration(
-    this.logger,
-    this.obsFetchers.checkConnection
-  );
+  private runtimeAccountConfig: RuntimeAccountConfiguration;
 
   private accountsWithOutPw: AccountStorage[] = [];
   private readonly disposables: vscode.Disposable[] = [];
@@ -862,13 +860,17 @@ export class AccountManagerImpl extends LoggingBase {
   private onDidChangeConfigurationDisposable: vscode.Disposable | undefined;
 
   private constructor(
-    logger: Logger,
+    logger: IVSCodeExtLogger,
     private readonly vscodeWindow: VscodeWindow,
     private readonly vscodeWorkspace: typeof vscode.workspace = vscode.workspace,
     private readonly obsFetchers: ObsFetchers = DEFAULT_OBS_FETCHERS
   ) {
     super(logger);
 
+    this.runtimeAccountConfig = new RuntimeAccountConfiguration(
+      logger,
+      this.obsFetchers.checkConnection
+    );
     this.activeAccounts = this.runtimeAccountConfig.activeAccounts;
     this.onAccountChange = this.onAccountChangeEmitter.event;
     this.disposables.push(this.onAccountChangeEmitter);
