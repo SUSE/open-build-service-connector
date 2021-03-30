@@ -25,7 +25,7 @@
     "nyc": "^15",
     "pino-pretty": "^4",
     "prettier": "^2",
-    "sinon": "^9",
+    "sinon": "^10",
     "sinon-chai": "^3.5.0",
     "ts-loader": "^8.0.11",
     "ts-mock-imports": "^1.2.6",
