@@ -9,6 +9,8 @@
 [![Dependency Status](https://david-dm.org/SUSE/open-build-service-connector.svg)](https://david-dm.org/SUSE/open-build-service-connector)
 [![devDependency Status](https://david-dm.org/SUSE/open-build-service-connector/dev-status.svg)](https://david-dm.org/SUSE/open-build-service-connector#info=devDependencies)
 
+Join the chat on [`#open-build-service-connector:matrix.org`](https://matrix.to/#/#open-build-service-connector:matrix.org?via=matrix.org).
+
 Visual Studio Code extension for integration with the [Open Build
 Service](https://openbuildservice.org/): it allows you to view existing packages
 and projects, check them out locally, build them and integrates into VSCode's
