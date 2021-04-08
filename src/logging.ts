@@ -69,9 +69,8 @@ export const getGlobalLogger = (): IVSCodeExtLogger | undefined => logger;
  *     function of the extension.
  *
  * @param debugMode  When `true`, then the created logger's logging level is set
- *     to `trace` and source location tracking and logging to console is
- *     enabled.
- *     Otherwise, the later two options are kept at the default and the logging
+ *     to `trace` and logging to console is enabled.
+ *     Otherwise, logging to console is kept at the default and the logging
  *     level is taken from [[CONFIGURATION_LOG_LEVEL]].
  *
  * @param getExtensionLoggerFunc  The function that returns the logger (only
@@ -101,7 +100,6 @@ export function setupLogger(
           .get<LogLevel>(CONFIGURATION_LOG_LEVEL, DEFAULT_LOG_LEVEL)
   };
   if (debugMode) {
-    options.sourceLocationTracking = true;
     options.logConsole = true;
   }
   logger = getExtensionLoggerFunc(options);

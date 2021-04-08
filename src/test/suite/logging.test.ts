@@ -103,8 +103,7 @@ describe("logging", () => {
         options.should.deep.include({
           logPath: this.fixture.fakeContext.logUri.fsPath,
           level: "trace",
-          logConsole: true,
-          sourceLocationTracking: true
+          logConsole: true
         });
       })
     );
