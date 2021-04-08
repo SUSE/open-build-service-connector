@@ -230,6 +230,18 @@
     minimatch "^3.0.4"
     strip-json-comments "^3.1.1"
 
+"@gitgraph/core@1.5.0":
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/@gitgraph/core/-/core-1.5.0.tgz#fc27924b82eabc5fa1f90480df5239e0c84dcafa"
+  integrity sha512-8CeeHbkKoFHM1y9vfjYiHyEpzl1mEhVrg5c/eFgDBsntOYswoDKU2yOf6DjtVINcE60wmcuynBSJqjMkQo07Ww==
+
+"@gitgraph/js@^1.4.0":
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/@gitgraph/js/-/js-1.4.0.tgz#27d92664841af1d886e1b970742d3f0b80df2867"
+  integrity sha512-7wxTTCFnRVjsqj+Zt09+3F79WhH4MK46ZS20AwbcB/MJFshSMeMH4nYmNDPa9McVsiL+cFsvW1pmZoquAOoHMw==
+  dependencies:
+    "@gitgraph/core" "1.5.0"
+
 "@istanbuljs/load-nyc-config@^1.0.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@istanbuljs/load-nyc-config/-/load-nyc-config-1.1.0.tgz#fd3db1d59ecf7cf121e80650bb86712f9b55eced"

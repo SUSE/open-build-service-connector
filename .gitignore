@@ -19,6 +19,8 @@ src/ui-tests/accounts/settings.json
 dist/*
 test-home/*
 test-tmp/*
+media/html/*
+frontend_out/*
 
 media/dark/endpoints_disconnected.svg
 media/light/endpoints_disconnected.svg
