@@ -389,3 +389,55 @@ export class FakeVscodeWorkspace {
     this.createFileSystemWatcherSpy = spy(this, "createFileSystemWatcher");
   }
 }
+
+export const createFakeWebviewView = (
+  sandox: SinonSandbox,
+  {
+    viewType = "fakeWebview",
+    title,
+    description,
+    visible,
+    cspSource,
+    webviewOptions
+  }: {
+    viewType?: string;
+    title?: string;
+    description?: string;
+    visible?: boolean;
+    cspSource?: string;
+    webviewOptions?: vscode.WebviewOptions;
+  } = {}
+): {
+  webviewView: vscode.WebviewView;
+  emiters: {
+    onDidChangeVisibility: FakeEventEmitter<void>;
+    onDidDispose: FakeEventEmitter<void>;
+    onDidReceiveMessage: FakeEventEmitter<any>;
+  };
+} => {
+  const emiters = {
+    onDidChangeVisibility: makeFakeEventEmitter<void>(),
+    onDidDispose: makeFakeEventEmitter<void>(),
+    onDidReceiveMessage: makeFakeEventEmitter<any>()
+  };
+  return {
+    emiters,
+    webviewView: {
+      viewType: viewType ?? "fakeWebView",
+      onDidChangeVisibility: emiters.onDidChangeVisibility.event,
+      onDidDispose: emiters.onDidDispose.event,
+      title,
+      description,
+      visible: visible ?? true,
+      show: sandox.stub(),
+      webview: {
+        cspSource: cspSource ?? "cspFooBar",
+        asWebviewUri: (uri: vscode.Uri): vscode.Uri => uri,
+        postMessage: sandox.stub(),
+        onDidReceiveMessage: emiters.onDidReceiveMessage.event,
+        html: "",
+        options: webviewOptions ?? {}
+      }
+    }
+  };
+};
