@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { assert } from "./assert";
+import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import { promises as fsPromises } from "fs";
 import {
   addAndDeleteFilesFromPackage,
@@ -32,9 +32,9 @@ import {
 } from "open-build-service-api";
 import { undoFileDeletion } from "open-build-service-api/lib/vcs";
 import { basename, dirname, join, sep } from "path";
-import { IVSCodeExtLogger } from "@vscode-logging/logger";
 import * as vscode from "vscode";
 import { AccountManager } from "./accounts";
+import { assert } from "./assert";
 import { ConnectionListenerLoggerBase } from "./base-components";
 import { cmdPrefix, ignoreFocusOut } from "./constants";
 import {
@@ -46,7 +46,6 @@ import {
   EmptyDocumentForDiffProvider,
   fsPathFromEmptyDocumentUri
 } from "./empty-file-provider";
-import { fsPathFromObsRevisionUri } from "./scm-history";
 import { makeThemedIconPath } from "./util";
 
 interface LineChange {
@@ -97,17 +96,12 @@ export const fileAtHeadUri = {
  * to a source control file.
  */
 export function getPkgPathFromVcsUri(uri: vscode.Uri): string | undefined {
-  let fsPath =
+  const fsPath =
     uri.scheme === "file"
       ? uri.fsPath
       : fsPathFromFileAtHeadUri(uri) ?? fsPathFromEmptyDocumentUri(uri);
 
-  if (fsPath !== undefined) {
-    fsPath = dirname(fsPath);
-  } else {
-    fsPath = fsPathFromObsRevisionUri(uri);
-  }
-  return fsPath;
+  return fsPath !== undefined ? dirname(fsPath) : undefined;
 }
 
 export class PackageScm
