@@ -25,6 +25,8 @@ import {
   checkOutPackage,
   checkOutProject,
   fetchFileContents,
+  fetchHistory,
+  fetchHistoryAcrossLinks,
   fetchPackage,
   fetchProject,
   fetchServerCaCertificate,
@@ -53,6 +55,8 @@ export interface VscodeWindow {
   activeTextEditor: typeof vscode.window.activeTextEditor;
 
   visibleTextEditors: typeof vscode.window.visibleTextEditors;
+
+  registerWebviewViewProvider: typeof vscode.window.registerWebviewViewProvider;
 }
 
 export interface VscodeWorkspace {
@@ -67,6 +71,8 @@ export interface ObsFetchers {
   readonly fetchFileContents: typeof fetchFileContents;
   readonly fetchPackage: typeof fetchPackage;
   readonly fetchProject: typeof fetchProject;
+  readonly fetchHistory: typeof fetchHistory;
+  readonly fetchHistoryAcrossLinks: typeof fetchHistoryAcrossLinks;
   readonly branchPackage: typeof branchPackage;
   readonly readInUnifiedPackage: typeof readInUnifiedPackage;
   readonly submitPackage: typeof submitPackage;
@@ -81,6 +87,8 @@ export const DEFAULT_OBS_FETCHERS: ObsFetchers = {
   fetchProject,
   fetchFileContents,
   fetchPackage,
+  fetchHistory,
+  fetchHistoryAcrossLinks,
   branchPackage,
   readInUnifiedPackage,
   submitPackage,

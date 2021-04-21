@@ -40,3 +40,4 @@ test-home/**
 scripts/**
 generate_icons.sh
 .dir-locals.el
+frontend_out/**

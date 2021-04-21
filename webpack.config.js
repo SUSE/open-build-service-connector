@@ -12,20 +12,12 @@
 
 const path = require("path");
 
-/**@type {import('webpack').Configuration}*/
-const config = {
+const createWebpackConfig = (
+  configFile,
+  { exclude = /node_modules/, include = undefined } = {}
+) => ({
   target: "node",
-  entry: "./src/extension.ts",
-  output: {
-    path: path.resolve(__dirname, "dist"),
-    filename: "extension.js",
-    libraryTarget: "commonjs2",
-    devtoolModuleFilenameTemplate: "../[resource-path]"
-  },
   devtool: "source-map",
-  externals: {
-    vscode: "commonjs vscode"
-  },
   resolve: {
     extensions: [".ts", ".js"]
   },
@@ -33,14 +25,17 @@ const config = {
     rules: [
       {
         test: /\.ts$/,
-        exclude: /node_modules/,
+        exclude,
+        include,
         use: [
           {
             loader: "ts-loader",
             options: {
               compilerOptions: {
                 module: "es6"
-              }
+              },
+              context: __dirname,
+              configFile: path.resolve(__dirname, configFile)
             }
           }
         ]
@@ -54,6 +49,38 @@ const config = {
       }
     ]
   }
+});
+
+/**@type {import('webpack').Configuration}*/
+const extensionConfig = {
+  ...createWebpackConfig("./tsconfig.json"),
+  entry: "./src/extension.ts",
+  output: {
+    path: path.resolve(__dirname, "dist"),
+    filename: "extension.js",
+    library: { type: "commonjs2" },
+    devtoolModuleFilenameTemplate: "../[resource-path]"
+  },
+  externals: {
+    vscode: "commonjs vscode"
+  }
 };
 
-module.exports = config;
+/**@type {import('webpack').Configuration}*/
+const frontendConfig = {
+  ...createWebpackConfig("./tsconfig.frontend.json", {
+    exclude: undefined,
+    include: [
+      path.resolve(__dirname, "src", "history-graph-common.ts"),
+      path.resolve(__dirname, "src", "frontend", "draw-graph.ts")
+    ]
+  }),
+  entry: "./src/frontend/draw-graph.ts",
+  output: {
+    path: path.resolve(__dirname, "media", "html"),
+    filename: "draw-graph.js",
+    library: { type: "commonjs" }
+  }
+};
+
+module.exports = [extensionConfig, frontendConfig];

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "sourceMap": true,
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedParameters": true,
+    "experimentalDecorators": true
+  },
+  "exclude": [
+    "**/*.js",
+    "**/*.js.map",
+    "node_modules",
+    ".vscode-test",
+    "test-resources",
+    "flycheck_*",
+    "open-build-service"
+  ]
+}

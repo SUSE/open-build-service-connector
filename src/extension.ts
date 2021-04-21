@@ -28,13 +28,13 @@ import { CheckOutHandler } from "./check-out-handler";
 import { CurrentPackageWatcherImpl } from "./current-package-watcher";
 import { CurrentProjectTreeProvider } from "./current-project-view";
 import { EmptyDocumentForDiffProvider } from "./empty-file-provider";
+import { HistoryGraph } from "./history-graph";
 import { ObsServerInformation } from "./instance-info";
 import { setupLogger } from "./logging";
 import { OscBuildTaskProvider } from "./osc-build-task";
 import { RemotePackageFileContentProvider } from "./package-file-contents";
 import { ProjectBookmarkManager } from "./project-bookmarks";
 import { RepositoryTreeProvider } from "./repository";
-import { PackageScmHistoryTree } from "./scm-history";
 import { PackageScm } from "./vcs";
 
 export async function activate(
@@ -90,25 +90,10 @@ export async function activate(
     showCollapseAll,
     treeDataProvider: repoTreeProvider
   });
-  const [
-    packageScmHistoryTreeProvider,
-    oscBuildTaskProvider
-  ] = await Promise.all([
-    PackageScmHistoryTree.createPackageScmHistoryTree(
-      currentPackageWatcher,
-      accountManager,
-      logger
-    ),
-    OscBuildTaskProvider.createOscBuildTaskProvider(
-      currentPackageWatcher,
-      accountManager,
-      logger
-    )
-  ]);
-
-  const packageScmHistoryTree = vscode.window.createTreeView(
-    "packageScmHistoryTree",
-    { showCollapseAll, treeDataProvider: packageScmHistoryTreeProvider }
+  const oscBuildTaskProvider = await OscBuildTaskProvider.createOscBuildTaskProvider(
+    currentPackageWatcher,
+    accountManager,
+    logger
   );
 
   const pkgFileProv = new RemotePackageFileContentProvider(
@@ -124,7 +109,11 @@ export async function activate(
     pkgFileProv,
     currentPackageWatcher,
     new PackageScm(currentPackageWatcher, accountManager, logger),
-    packageScmHistoryTree,
+    HistoryGraph.createHistoryGraph(
+      currentPackageWatcher,
+      accountManager,
+      logger
+    ),
     new ObsServerInformation(accountManager, logger),
     new EmptyDocumentForDiffProvider(),
     new CheckOutHandler(accountManager, logger),
