@@ -2,13 +2,15 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "module": "commonjs",
-    "outDir": "out",
-    "lib": ["es6"],
+    "outDir": "./frontend_out",
     "rootDir": "src",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "lib": ["dom", "es2015"],
+    "target": "es5"
   },
+  "include": ["src/history-graph-common.ts", "src/frontend/*.ts"],
   "exclude": [
-    "src/frontend/**",
+    "src/*.ts",
     "node_modules",
     ".vscode-test",
     "test-resources",

@@ -57,7 +57,8 @@ export const createStubbedVscodeWindow = (sandbox: SinonSandbox) => {
     onDidChangeActiveTextEditorEmiter: emiter,
     onDidChangeActiveTextEditor: emiter.event,
     activeTextEditor: undefined as vscode.TextEditor | undefined,
-    visibleTextEditors: [] as vscode.TextEditor[]
+    visibleTextEditors: [] as vscode.TextEditor[],
+    registerWebviewViewProvider: sandbox.stub()
   };
 };
 
@@ -66,6 +67,8 @@ export const createStubbedObsFetchers = (sandbox: SinonSandbox) => ({
   fetchFileContents: sandbox.stub(),
   fetchPackage: sandbox.stub(),
   fetchProject: sandbox.stub(),
+  fetchHistory: sandbox.stub(),
+  fetchHistoryAcrossLinks: sandbox.stub(),
   readInUnifiedPackage: sandbox.stub(),
   submitPackage: sandbox.stub(),
   checkConnection: sandbox.stub(),
